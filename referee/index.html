@@ -27,7 +27,7 @@
     .pending-page{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;text-align:center}
 
     /* MATCHES LIST */
-    .matches-page{display:none;min-height:100vh;flex-direction:column}
+    .matches-page{display:none;height:100vh;flex-direction:column}
     .header{background:#1E3A8A;padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
     .header h1{font-size:15px;font-weight:700}
     .header .user{font-size:12px;color:#93C5FD;display:flex;align-items:center;gap:8px}
@@ -38,7 +38,7 @@
     .match-card .players{font-size:15px;font-weight:600;margin:4px 0}
     .match-card .draw{font-size:12px;color:#94A3B8}
     .empty{text-align:center;padding:60px 20px;color:#64748B}
-    .install-bar{background:#1E293B;padding:10px 16px;text-align:center;border-top:1px solid #334155;display:none}
+    .install-bar{background:#1E293B;padding:10px 16px;text-align:center;border-top:1px solid #334155;flex-shrink:0}
     .install-bar button{background:#2563EB;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
 
     /* SCORER - LANDSCAPE COURT */
@@ -73,8 +73,8 @@
     .swap-btn:active{background:#475569}
 
     /* Barra inferior */
-    .scorer-bottom{background:#0F172A;padding:6px 12px;display:flex;gap:8px;align-items:center;justify-content:center;z-index:5}
-    .scorer-bottom .btn{padding:8px 16px;font-size:12px}
+    .scorer-bottom{background:#0F172A;padding:8px 12px;display:flex;gap:8px;align-items:center;justify-content:center;z-index:5;flex-shrink:0}
+    .scorer-bottom .btn{padding:10px 20px;font-size:14px}
 
     /* Modal */
     .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:100;align-items:center;justify-content:center;padding:20px}
