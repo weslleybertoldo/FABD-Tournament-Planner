@@ -358,3 +358,26 @@ ipcMain.handle('supabase:unsubscribe', async () => {
   if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
   return true;
 });
+
+ipcMain.handle('supabase:getReferees', async () => {
+  try {
+    const { data, error } = await supabase.from('referees').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch(e) { log('ERROR', 'getReferees:', e.message); return []; }
+});
+
+ipcMain.handle('supabase:updateRefereeStatus', async (_, id, status) => {
+  try {
+    const { error } = await supabase.from('referees').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch(e) { log('ERROR', 'updateRefereeStatus:', e.message); return false; }
+});
+
+ipcMain.handle('supabase:getRefereeByName', async (_, id) => {
+  try {
+    const { data } = await supabase.from('referees').select('name').eq('id', id).single();
+    return data?.name || null;
+  } catch(e) { return null; }
+});

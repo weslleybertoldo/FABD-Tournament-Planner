@@ -2136,17 +2136,32 @@ function renderCourtsPanel() {
     const emQuadra=matches.find(m=>m.court===name&&m.status==='Em Quadra');
     const headerClass=emQuadra?'active':'';
 
-    h+=`<div class="court-card"><div class="court-card-header ${headerClass}"><span>${esc(name)}</span><span class="court-status">${emQuadra?'Em jogo':'Livre'}</span></div><div class="court-card-body${emQuadra?'':' empty'}">`;
+    h+=`<div class="court-card"><div class="court-card-header ${headerClass}"><span>${esc(name)}${emQuadra?' <span style="font-weight:400;font-size:11px;opacity:0.8">'+esc(emQuadra.drawName)+' - '+esc(emQuadra.roundName||'')+'</span>':''}</span><span class="court-status">${emQuadra?'Em jogo':'Livre'}</span></div><div class="court-card-body${emQuadra?'':' empty'}">`;
     if(!emQuadra){
       h+='Quadra livre';
     } else {
       const live=emQuadra.liveScore||'';
-      h+=`<div class="court-match">
-        <span class="match-num">#${emQuadra.num}</span>
-        <span class="match-players">${esc(emQuadra.player1)} vs ${esc(emQuadra.player2)}</span>
-        <span class="match-draw">${esc(emQuadra.drawName)}</span>
-        ${live?`<span class="match-score" style="color:#F59E0B;font-size:16px;font-weight:700">${esc(live)}</span>`:''}
-        ${emQuadra.score?`<span class="match-score">${esc(emQuadra.score)}</span>`:''}
+      // Parsear live score: "15 - 12 (Set 2)"
+      let liveP1='0',liveP2='0',liveSet='1';
+      if(live){
+        const m=live.match(/(\d+)\s*-\s*(\d+)\s*\(Set\s*(\d+)\)/);
+        if(m){liveP1=m[1];liveP2=m[2];liveSet=m[3];}
+      }
+      // Sets anteriores
+      let setsHtml='';
+      if(emQuadra.liveSets){
+        emQuadra.liveSets.forEach((s,i)=>{setsHtml+=`<span style="font-size:11px;color:var(--fabd-gray-500);margin:0 2px">${s}</span>`;});
+      }
+      h+=`<div style="padding:8px 0">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div style="flex:1;text-align:left;font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(emQuadra.player1)}</div>
+          <div style="min-width:60px;text-align:center">
+            <div style="font-size:22px;font-weight:800;color:${live?'#F59E0B':'var(--fabd-gray-700)'}">${live?liveP1+' - '+liveP2:(emQuadra.score||'x')}</div>
+            ${live?`<div style="font-size:10px;color:var(--fabd-gray-500)">Set ${liveSet}</div>`:''}
+            ${setsHtml?`<div style="margin-top:2px">${setsHtml}</div>`:''}
+          </div>
+          <div style="flex:1;text-align:right;font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(emQuadra.player2)}</div>
+        </div>
       </div>`;
     }
     h+='</div></div>';
@@ -2169,6 +2184,9 @@ async function handleRealtimeScoreUpdate(data){
   // Atualizar placar ao vivo para exibicao
   const s1=data.score_p1||0, s2=data.score_p2||0, set=data.current_set||1;
   m.liveScore=`${s1} - ${s2} (Set ${set})`;
+  // Sets anteriores para exibicao
+  const setsP1=data.sets_p1||[],setsP2=data.sets_p2||[];
+  m.liveSets=setsP1.map((v,i)=>v+'-'+(setsP2[i]||0));
 
   // Se arbitro finalizou o jogo (winner definido)
   if(data.winner&&data.final_score){
@@ -2698,7 +2716,6 @@ function renderUmpires(){
 async function loadOnlineReferees(){
   let container=document.getElementById('online-referees-container');
   if(!container){
-    // Criar container se nao existe
     const parent=document.getElementById('umpires-table-body')?.closest('.card');
     if(!parent)return;
     const div=document.createElement('div');
@@ -2708,10 +2725,7 @@ async function loadOnlineReferees(){
     container=div;
   }
   try{
-    const response=await fetch('https://zwjgjtrmsqtyyjtuotuo.supabase.co/rest/v1/referees?select=*&order=created_at.desc',{
-      headers:{'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY'}
-    });
-    const referees=await response.json();
+    const referees=await window.api.supabaseGetReferees();
     if(!referees?.length){container.innerHTML='<h4 style="color:var(--fabd-gray-600);margin-bottom:8px">Arbitros Online</h4><p style="color:var(--fabd-gray-500);font-size:13px">Nenhum arbitro conectado.</p>';return;}
     let h='<h4 style="color:var(--fabd-gray-600);margin-bottom:12px">Arbitros Online (via App)</h4>';
     h+='<table><thead><tr><th>Nome</th><th>Email</th><th>Status</th><th>Acoes</th></tr></thead><tbody>';
@@ -2723,15 +2737,9 @@ async function loadOnlineReferees(){
         <td style="font-size:12px;color:var(--fabd-gray-500)">${esc(r.email||'')}</td>
         <td><span class="tag ${stClass}">${stText}</span></td>
         <td>`;
-      if(r.status!=='autorizado'){
-        h+=`<button class="btn btn-sm btn-success" onclick="authorizeReferee('${esc(r.id)}','autorizado')">Liberar</button> `;
-      }
-      if(r.status!=='bloqueado'){
-        h+=`<button class="btn btn-sm btn-danger" onclick="authorizeReferee('${esc(r.id)}','bloqueado')">Bloquear</button>`;
-      }
-      if(r.status==='autorizado'){
-        h+=`<button class="btn btn-sm btn-secondary" onclick="authorizeReferee('${esc(r.id)}','pendente')" style="margin-left:4px">Revogar</button>`;
-      }
+      if(r.status!=='autorizado')h+=`<button class="btn btn-sm btn-success" onclick="authorizeReferee('${esc(r.id)}','autorizado')">Liberar</button> `;
+      if(r.status!=='bloqueado')h+=`<button class="btn btn-sm btn-danger" onclick="authorizeReferee('${esc(r.id)}','bloqueado')">Bloquear</button>`;
+      if(r.status==='autorizado')h+=`<button class="btn btn-sm btn-secondary" onclick="authorizeReferee('${esc(r.id)}','pendente')" style="margin-left:4px">Revogar</button>`;
       h+=`</td></tr>`;
     });
     h+='</tbody></table>';
@@ -2741,26 +2749,12 @@ async function loadOnlineReferees(){
 
 async function authorizeReferee(id,status){
   try{
-    await fetch('https://zwjgjtrmsqtyyjtuotuo.supabase.co/rest/v1/referees?id=eq.'+id,{
-      method:'PATCH',
-      headers:{
-        'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY',
-        'Content-Type':'application/json'
-      },
-      body:JSON.stringify({status,updated_at:new Date().toISOString()})
-    });
-    // Se autorizou, adicionar na lista local de umpires
+    await window.api.supabaseUpdateRefereeStatus(id,status);
     if(status==='autorizado'){
-      const resp=await fetch('https://zwjgjtrmsqtyyjtuotuo.supabase.co/rest/v1/referees?id=eq.'+id+'&select=name',{
-        headers:{'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY'}
-      });
-      const data=await resp.json();
-      if(data?.[0]?.name){
+      const name=await window.api.supabaseGetRefereeName(id);
+      if(name){
         const umps=loadUmpires();
-        if(!umps.some(u=>u.name===data[0].name)){
-          umps.push({name:data[0].name,level:'Online'});
-          saveUmpires(umps);
-        }
+        if(!umps.some(u=>u.name===name)){umps.push({name,level:'Online'});saveUmpires(umps);}
       }
     }
     showToast(status==='autorizado'?'Arbitro autorizado!':status==='bloqueado'?'Arbitro bloqueado':'Acesso revogado');
