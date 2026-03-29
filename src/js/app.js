@@ -2354,7 +2354,9 @@ async function resetMatch(idx){
   if(!confirm(`Desfazer resultado do jogo #${m.num}?`))return;
   // Reverter avanço na draw antes de limpar o winner
   reverseResultInDraws(m);
-  m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;
+  // Remover do Supabase (historico publico)
+  try{await window.api.supabaseRemoveFromCourt(tournament.id,m.num);}catch(e){}
+  m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;m.liveScore='';m.liveSets=undefined;
   await window.api.saveTournament(tournament);
   renderMatches();renderFinishedMatches();showToast('Jogo resetado');
 }

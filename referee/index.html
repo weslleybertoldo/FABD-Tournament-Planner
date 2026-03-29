@@ -190,12 +190,24 @@
     let state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
     const PTS=21,MAX=30,BEST=3;
 
+    // === PWA SERVICE WORKER ===
+    if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+
     // === PWA INSTALL ===
-    window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('install-bar').style.display='block';});
-    function installPWA(){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('install-bar').style.display='none';});}}
+    window.addEventListener('beforeinstallprompt',e=>{
+      e.preventDefault();deferredPrompt=e;
+      const bar=document.getElementById('install-bar');
+      if(bar)bar.style.display='block';
+    });
+    window.addEventListener('appinstalled',()=>{deferredPrompt=null;const bar=document.getElementById('install-bar');if(bar)bar.style.display='none';});
+    function installPWA(){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(r=>{deferredPrompt=null;document.getElementById('install-bar').style.display='none';});}}
+    // Mostrar botao de instalar se nao esta em modo standalone (ja instalado)
+    if(!window.matchMedia('(display-mode: standalone)').matches){
+      setTimeout(()=>{const bar=document.getElementById('install-bar');if(bar&&!deferredPrompt)bar.style.display='block';},3000);
+    }
 
     // === BLOCK NOTIFICATIONS ===
-    if('Notification' in window&&Notification.permission==='granted'){/* already granted, we just won't show any */}
+    if('Notification' in window){try{Notification.requestPermission().then(p=>{});}catch(e){}}
 
     // === LOCK ORIENTATION ===
     function lockLandscape(){try{screen.orientation?.lock?.('landscape').catch(()=>{});}catch(e){}}
@@ -342,16 +354,17 @@
       });
       document.getElementById('div-history').innerHTML=hist;
 
-      // Peteca (servico)
+      // Peteca (servico) - regra badminton: score par = lado direito (parte de baixo da tela)
       const serverSide=state.server===leftPlayer?'left':'right';
       document.getElementById('shuttle-left').style.display=serverSide==='left'?'block':'none';
       document.getElementById('shuttle-right').style.display=serverSide==='right'?'block':'none';
-      // Posicao da peteca: lado par/impar do servidor
       const serverScore=state.server===1?state.p1:state.p2;
       const isEven=serverScore%2===0;
+      // Par = direito do jogador = parte de baixo da tela (65%)
+      // Impar = esquerdo do jogador = parte de cima da tela (35%)
       const shuttle=document.getElementById('shuttle-'+serverSide);
       if(shuttle){
-        shuttle.style.top=isEven?'35%':'65%';
+        shuttle.style.top=isEven?'65%':'35%';
         shuttle.style[serverSide==='left'?'right':'left']='15px';
         shuttle.style[serverSide==='left'?'left':'right']='auto';
       }
