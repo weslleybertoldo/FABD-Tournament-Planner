@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>FABD - Arbitro</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Segoe UI',sans-serif;background:#0F172A;color:#fff;min-height:100vh;overflow-x:hidden}
+    .header{background:#1E3A8A;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+    .header h1{font-size:16px;font-weight:700}
+    .header .user{font-size:12px;color:#93C5FD;display:flex;align-items:center;gap:8px}
+    .header .user img{width:28px;height:28px;border-radius:50%}
+    .btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity 0.2s}
+    .btn:active{opacity:0.7}
+    .btn-primary{background:#2563EB;color:#fff}
+    .btn-danger{background:#DC2626;color:#fff}
+    .btn-success{background:#10B981;color:#fff}
+    .btn-google{background:#fff;color:#333;display:flex;align-items:center;gap:12px;padding:14px 24px;font-size:16px;border-radius:12px;margin:20px auto;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+    .btn-google img{width:24px;height:24px}
+
+    /* Login */
+    .login-page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:20px;text-align:center}
+    .login-page .logo{font-size:48px;margin-bottom:16px}
+    .login-page h2{font-size:24px;margin-bottom:8px}
+    .login-page p{color:#94A3B8;margin-bottom:32px}
+
+    /* Lista de jogos */
+    .matches-list{padding:16px}
+    .match-card{background:#1E293B;border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer;transition:transform 0.15s;border-left:4px solid #2563EB}
+    .match-card:active{transform:scale(0.98)}
+    .match-card .court{font-size:11px;color:#60A5FA;font-weight:700;text-transform:uppercase;margin-bottom:4px}
+    .match-card .players{font-size:16px;font-weight:600;margin-bottom:4px}
+    .match-card .draw{font-size:12px;color:#94A3B8}
+    .empty{text-align:center;padding:60px 20px;color:#64748B}
+    .empty .icon{font-size:48px;margin-bottom:12px}
+
+    /* Scorer */
+    .scorer{display:none;min-height:100vh;flex-direction:column}
+    .scorer-header{background:#1E3A8A;padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+    .scorer-header .back{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:8px}
+    .scorer-info{text-align:center;padding:8px;background:#0F172A;font-size:12px;color:#94A3B8}
+    .scorer-board{flex:1;display:flex;flex-direction:column}
+    .score-side{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;-webkit-user-select:none;user-select:none;transition:background 0.1s;position:relative}
+    .score-side:active{background:rgba(255,255,255,0.1)}
+    .score-side .name{font-size:16px;font-weight:600;margin-bottom:8px;text-align:center;padding:0 10px}
+    .score-side .score{font-size:80px;font-weight:800;line-height:1}
+    .score-side .sets{font-size:14px;color:#94A3B8;margin-top:8px}
+    .side-top{background:#1E3A8A}
+    .side-bottom{background:#DC2626}
+    .score-divider{background:#0F172A;padding:6px;display:flex;align-items:center;justify-content:center;gap:16px}
+    .score-divider .set-label{font-size:14px;font-weight:700;color:#F59E0B}
+    .score-divider .set-scores{font-size:12px;color:#94A3B8}
+    .scorer-actions{background:#0F172A;padding:12px 16px;display:flex;gap:8px}
+    .scorer-actions .btn{flex:1;padding:12px}
+
+    /* Modal confirmacao */
+    .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:100;align-items:center;justify-content:center;padding:20px}
+    .modal-overlay.active{display:flex}
+    .modal{background:#1E293B;border-radius:16px;padding:24px;max-width:400px;width:100%;text-align:center}
+    .modal h3{font-size:20px;margin-bottom:16px}
+    .modal .final-score{font-size:24px;font-weight:700;color:#F59E0B;margin-bottom:8px}
+    .modal .winner{font-size:16px;color:#10B981;margin-bottom:24px}
+    .modal .actions{display:flex;gap:12px}
+    .modal .actions .btn{flex:1}
+  </style>
+</head>
+<body>
+  <!-- LOGIN -->
+  <div id="page-login" class="login-page">
+    <div class="logo">&#127992;</div>
+    <h2>FABD Arbitro</h2>
+    <p>Acesse com sua conta Google para arbitrar partidas</p>
+    <button class="btn-google" onclick="loginGoogle()">
+      <svg width="24" height="24" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Entrar com Google
+    </button>
+    <div style="margin-top:16px">
+      <p style="font-size:12px;color:#475569">Ou entre com seu nome:</p>
+      <input type="text" id="manual-name" placeholder="Seu nome completo" style="margin-top:8px;padding:12px 16px;border-radius:8px;border:2px solid #334155;background:#1E293B;color:#fff;font-size:14px;width:250px;text-align:center">
+      <br><button class="btn btn-primary" style="margin-top:8px" onclick="loginManual()">Entrar</button>
+    </div>
+  </div>
+
+  <!-- LISTA DE JOGOS -->
+  <div id="page-matches" style="display:none">
+    <div class="header">
+      <h1 id="tournament-name">FABD Arbitro</h1>
+      <div class="user">
+        <span id="user-name"></span>
+        <button class="btn btn-danger" style="padding:6px 12px;font-size:11px" onclick="logout()">Sair</button>
+      </div>
+    </div>
+    <div class="matches-list" id="matches-list">
+      <div class="empty"><div class="icon">&#9203;</div><p>Nenhum jogo em quadra no momento.<br>Aguarde o organizador adicionar jogos.</p></div>
+    </div>
+  </div>
+
+  <!-- SCORER -->
+  <div id="page-scorer" class="scorer">
+    <div class="scorer-header">
+      <button class="back" onclick="exitScorer()">&#8592;</button>
+      <span id="scorer-draw" style="font-size:13px"></span>
+      <span id="scorer-court" style="font-size:13px;color:#60A5FA"></span>
+    </div>
+    <div class="scorer-info" id="scorer-info">Set 1</div>
+    <div class="scorer-board">
+      <div class="score-side side-top" onclick="addPoint(1)">
+        <div class="name" id="scorer-p1-name">Jogador 1</div>
+        <div class="score" id="scorer-p1-score">0</div>
+        <div class="sets" id="scorer-p1-sets"></div>
+      </div>
+      <div class="score-divider">
+        <span class="set-label" id="scorer-set-label">SET 1</span>
+        <span class="set-scores" id="scorer-set-history"></span>
+      </div>
+      <div class="score-side side-bottom" onclick="addPoint(2)">
+        <div class="name" id="scorer-p2-name">Jogador 2</div>
+        <div class="score" id="scorer-p2-score">0</div>
+        <div class="sets" id="scorer-p2-sets"></div>
+      </div>
+    </div>
+    <div class="scorer-actions">
+      <button class="btn btn-danger" onclick="undoPoint()">Desfazer</button>
+      <button class="btn btn-primary" onclick="showServiceChange()">Servico</button>
+    </div>
+  </div>
+
+  <!-- MODAL CONFIRMAR PLACAR -->
+  <div class="modal-overlay" id="modal-confirm">
+    <div class="modal">
+      <h3>Partida Finalizada!</h3>
+      <div class="final-score" id="confirm-score"></div>
+      <div class="winner" id="confirm-winner"></div>
+      <div class="actions">
+        <button class="btn btn-danger" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-success" onclick="confirmResult()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL='https://zwjgjtrmsqtyyjtuotuo.supabase.co';
+    const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY';
+    const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+    let currentUser=null;
+    let currentMatch=null;
+    let scoreState={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,history:[]};
+    let pollInterval=null;
+    const POINTS=21,MAX_POINTS=30,BEST_OF=3;
+
+    // === AUTH ===
+    async function loginGoogle(){
+      const{error}=await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+window.location.pathname}});
+      if(error)alert('Erro: '+error.message);
+    }
+
+    function loginManual(){
+      const name=document.getElementById('manual-name').value.trim();
+      if(!name){alert('Digite seu nome');return;}
+      currentUser={name,id:'manual_'+Date.now()};
+      localStorage.setItem('fabd-referee-user',JSON.stringify(currentUser));
+      showMatchesPage();
+    }
+
+    function logout(){
+      currentUser=null;
+      localStorage.removeItem('fabd-referee-user');
+      supabase.auth.signOut();
+      document.getElementById('page-login').style.display='flex';
+      document.getElementById('page-matches').style.display='none';
+      document.getElementById('page-scorer').style.display='none';
+      if(pollInterval)clearInterval(pollInterval);
+    }
+
+    async function checkAuth(){
+      // Verificar Google auth
+      const{data:{session}}=await supabase.auth.getSession();
+      if(session?.user){
+        currentUser={name:session.user.user_metadata?.full_name||session.user.email,id:session.user.id,email:session.user.email,photo:session.user.user_metadata?.avatar_url};
+        localStorage.setItem('fabd-referee-user',JSON.stringify(currentUser));
+        showMatchesPage();
+        return;
+      }
+      // Verificar login manual
+      const saved=localStorage.getItem('fabd-referee-user');
+      if(saved){
+        currentUser=JSON.parse(saved);
+        showMatchesPage();
+        return;
+      }
+      document.getElementById('page-login').style.display='flex';
+    }
+
+    // === MATCHES LIST ===
+    function showMatchesPage(){
+      document.getElementById('page-login').style.display='none';
+      document.getElementById('page-matches').style.display='block';
+      document.getElementById('page-scorer').style.display='none';
+      document.getElementById('user-name').textContent=currentUser.name;
+      loadMatches();
+      // Polling para atualizar lista
+      if(pollInterval)clearInterval(pollInterval);
+      pollInterval=setInterval(loadMatches,5000);
+    }
+
+    async function loadMatches(){
+      try{
+        // Buscar torneio ativo
+        const{data:tournaments}=await supabase.from('tournaments').select('id,name').order('updated_at',{ascending:false}).limit(1);
+        if(!tournaments?.length){
+          document.getElementById('matches-list').innerHTML='<div class="empty"><div class="icon">&#128580;</div><p>Nenhum torneio ativo</p></div>';
+          return;
+        }
+        const t=tournaments[0];
+        document.getElementById('tournament-name').textContent=t.name;
+
+        // Buscar jogos em quadra
+        const{data:matches}=await supabase.from('live_matches').select('*').eq('tournament_id',t.id).eq('status','Em Quadra').order('court');
+        const list=document.getElementById('matches-list');
+        if(!matches?.length){
+          list.innerHTML='<div class="empty"><div class="icon">&#9203;</div><p>Nenhum jogo em quadra no momento.<br>Aguarde o organizador adicionar jogos.</p></div>';
+          return;
+        }
+        let h='';
+        matches.forEach(m=>{
+          h+=`<div class="match-card" onclick="openScorer('${m.id}')">
+            <div class="court">${esc(m.court||'Quadra')}</div>
+            <div class="players">${esc(m.player1)} vs ${esc(m.player2)}</div>
+            <div class="draw">${esc(m.draw_name)} - ${esc(m.round_name||'')}</div>
+          </div>`;
+        });
+        list.innerHTML=h;
+      }catch(e){console.error(e);}
+    }
+
+    // === SCORER ===
+    async function openScorer(matchId){
+      try{
+        const{data:match}=await supabase.from('live_matches').select('*').eq('id',matchId).single();
+        if(!match){alert('Jogo nao encontrado');return;}
+        currentMatch=match;
+        scoreState={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,history:[]};
+
+        // Verificar se ja tem score salvo
+        const{data:score}=await supabase.from('live_scores').select('*').eq('match_id',matchId).single();
+        if(score&&score.current_set>1){
+          scoreState.set=score.current_set;
+          scoreState.p1=score.score_p1;
+          scoreState.p2=score.score_p2;
+          scoreState.setsP1=score.sets_p1||[];
+          scoreState.setsP2=score.sets_p2||[];
+          scoreState.setsWonP1=score.sets_won_p1||0;
+          scoreState.setsWonP2=score.sets_won_p2||0;
+        }
+
+        document.getElementById('scorer-p1-name').textContent=match.player1;
+        document.getElementById('scorer-p2-name').textContent=match.player2;
+        document.getElementById('scorer-draw').textContent=match.draw_name;
+        document.getElementById('scorer-court').textContent=match.court;
+
+        document.getElementById('page-matches').style.display='none';
+        document.getElementById('page-scorer').style.display='flex';
+        if(pollInterval)clearInterval(pollInterval);
+        updateScorerDisplay();
+      }catch(e){console.error(e);alert('Erro ao abrir jogo');}
+    }
+
+    function addPoint(player){
+      scoreState.history.push({set:scoreState.set,p1:scoreState.p1,p2:scoreState.p2});
+      if(player===1)scoreState.p1++;
+      else scoreState.p2++;
+      checkSetEnd();
+      updateScorerDisplay();
+      syncScore();
+    }
+
+    function undoPoint(){
+      if(!scoreState.history.length)return;
+      const prev=scoreState.history.pop();
+      scoreState.set=prev.set;
+      scoreState.p1=prev.p1;
+      scoreState.p2=prev.p2;
+      updateScorerDisplay();
+      syncScore();
+    }
+
+    function checkSetEnd(){
+      const{p1,p2}=scoreState;
+      const won=(hi,lo)=>(hi>=POINTS&&hi-lo>=2)||(hi>=MAX_POINTS&&hi>lo);
+      if(won(p1,p2)||won(p2,p1)){
+        scoreState.setsP1.push(p1);
+        scoreState.setsP2.push(p2);
+        if(p1>p2)scoreState.setsWonP1++;
+        else scoreState.setsWonP2++;
+
+        const needed=Math.ceil(BEST_OF/2);
+        if(scoreState.setsWonP1>=needed||scoreState.setsWonP2>=needed){
+          // Jogo terminou
+          const winner=scoreState.setsWonP1>=needed?1:2;
+          showConfirmModal(winner);
+          return;
+        }
+        // Proximo set
+        scoreState.set++;
+        scoreState.p1=0;
+        scoreState.p2=0;
+      }
+    }
+
+    function updateScorerDisplay(){
+      document.getElementById('scorer-p1-score').textContent=scoreState.p1;
+      document.getElementById('scorer-p2-score').textContent=scoreState.p2;
+      document.getElementById('scorer-set-label').textContent='SET '+scoreState.set;
+      // Historico de sets
+      let hist='';
+      scoreState.setsP1.forEach((s,i)=>{hist+=(i?'  ':'')+s+'-'+scoreState.setsP2[i];});
+      document.getElementById('scorer-set-history').textContent=hist;
+      document.getElementById('scorer-p1-sets').textContent='Sets: '+scoreState.setsWonP1;
+      document.getElementById('scorer-p2-sets').textContent='Sets: '+scoreState.setsWonP2;
+      document.getElementById('scorer-info').textContent=`Set ${scoreState.set} | ${currentMatch?.draw_name||''}`;
+    }
+
+    async function syncScore(){
+      if(!currentMatch)return;
+      try{
+        await supabase.from('live_scores').upsert({
+          match_id:currentMatch.id,
+          tournament_id:currentMatch.tournament_id,
+          current_set:scoreState.set,
+          score_p1:scoreState.p1,
+          score_p2:scoreState.p2,
+          sets_p1:scoreState.setsP1,
+          sets_p2:scoreState.setsP2,
+          sets_won_p1:scoreState.setsWonP1,
+          sets_won_p2:scoreState.setsWonP2,
+          updated_at:new Date().toISOString()
+        },{onConflict:'match_id'});
+      }catch(e){console.warn('Sync error:',e);}
+    }
+
+    function showConfirmModal(winner){
+      const scores=scoreState.setsP1.map((s,i)=>s+'-'+scoreState.setsP2[i]).join(' / ');
+      const winnerName=winner===1?currentMatch.player1:currentMatch.player2;
+      document.getElementById('confirm-score').textContent=scores;
+      document.getElementById('confirm-winner').textContent='Vencedor: '+winnerName;
+      document.getElementById('modal-confirm').classList.add('active');
+      document.getElementById('modal-confirm').dataset.winner=winner;
+      document.getElementById('modal-confirm').dataset.score=scores;
+    }
+
+    function closeModal(){document.getElementById('modal-confirm').classList.remove('active');}
+
+    async function confirmResult(){
+      const modal=document.getElementById('modal-confirm');
+      const winner=parseInt(modal.dataset.winner);
+      const finalScore=modal.dataset.score;
+      try{
+        // Atualizar live_scores com resultado final
+        await supabase.from('live_scores').upsert({
+          match_id:currentMatch.id,
+          tournament_id:currentMatch.tournament_id,
+          current_set:scoreState.set,
+          score_p1:scoreState.p1,
+          score_p2:scoreState.p2,
+          sets_p1:scoreState.setsP1,
+          sets_p2:scoreState.setsP2,
+          sets_won_p1:scoreState.setsWonP1,
+          sets_won_p2:scoreState.setsWonP2,
+          winner,
+          final_score:finalScore,
+          umpire_name:currentUser?.name||'',
+          updated_at:new Date().toISOString()
+        },{onConflict:'match_id'});
+
+        // Atualizar status do match
+        await supabase.from('live_matches').update({status:'Finalizada',umpire:currentUser?.name||''}).eq('id',currentMatch.id);
+
+        closeModal();
+        alert('Placar registrado com sucesso!');
+        exitScorer();
+      }catch(e){console.error(e);alert('Erro ao salvar: '+e.message);}
+    }
+
+    function exitScorer(){
+      document.getElementById('page-scorer').style.display='none';
+      currentMatch=null;
+      showMatchesPage();
+    }
+
+    function showServiceChange(){/* Futuro: indicador de servico */}
+
+    function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
+
+    // Init
+    checkAuth();
+  </script>
+</body>
+</html>

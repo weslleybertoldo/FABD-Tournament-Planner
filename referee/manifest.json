@@ -1,0 +1,12 @@
+{
+  "name": "FABD Arbitro",
+  "short_name": "Arbitro",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0F172A",
+  "theme_color": "#1E3A8A",
+  "icons": [
+    {"src": "../src/assets/logo-fabd.jpg", "sizes": "192x192", "type": "image/jpeg"}
+  ]
+}

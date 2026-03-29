@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>FABD - Placar Ao Vivo</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Segoe UI',sans-serif;background:#0F172A;color:#fff;min-height:100vh}
+    .header{background:#1E3A8A;padding:16px 20px;text-align:center;position:sticky;top:0;z-index:10}
+    .header h1{font-size:20px;font-weight:700}
+    .header .sub{font-size:12px;color:#93C5FD;margin-top:4px}
+    .header .live-dot{display:inline-block;width:8px;height:8px;background:#EF4444;border-radius:50%;margin-right:6px;animation:pulse 1.5s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+    .container{max-width:800px;margin:0 auto;padding:16px}
+    .match-live{background:#1E293B;border-radius:16px;padding:20px;margin-bottom:16px;border:2px solid #334155}
+    .match-live.active{border-color:#F59E0B;box-shadow:0 0 20px rgba(245,158,11,0.2)}
+    .match-live .court-badge{display:inline-block;background:#2563EB;color:#fff;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-bottom:12px}
+    .match-live .draw-info{font-size:12px;color:#94A3B8;margin-bottom:12px}
+    .match-live .scoreboard{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .match-live .player{flex:1;text-align:center}
+    .match-live .player .name{font-size:16px;font-weight:700;margin-bottom:8px;min-height:40px;display:flex;align-items:center;justify-content:center}
+    .match-live .player .name.winner{color:#10B981}
+    .match-live .player .points{font-size:56px;font-weight:800;line-height:1}
+    .match-live .player .sets-won{font-size:14px;color:#F59E0B;font-weight:700;margin-top:4px}
+    .match-live .vs{font-size:14px;color:#475569;font-weight:700}
+    .match-live .set-info{text-align:center;margin-top:12px;font-size:13px;color:#94A3B8}
+    .match-live .set-history{display:flex;justify-content:center;gap:12px;margin-top:8px}
+    .match-live .set-history .set-score{background:#0F172A;padding:4px 10px;border-radius:6px;font-size:13px;font-weight:600}
+    .match-live .finished-badge{display:inline-block;background:#10B981;color:#fff;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-top:8px}
+    .empty{text-align:center;padding:80px 20px;color:#64748B}
+    .empty .icon{font-size:64px;margin-bottom:16px}
+    .empty h3{font-size:20px;margin-bottom:8px;color:#94A3B8}
+    .refresh-info{text-align:center;font-size:11px;color:#475569;margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><span class="live-dot"></span>Placar Ao Vivo</h1>
+    <div class="sub" id="tournament-name">Carregando...</div>
+  </div>
+  <div class="container" id="live-container">
+    <div class="empty"><div class="icon">&#127992;</div><h3>Carregando jogos...</h3></div>
+  </div>
+  <div class="refresh-info">Atualiza automaticamente a cada 3 segundos</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL='https://zwjgjtrmsqtyyjtuotuo.supabase.co';
+    const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY';
+    const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+    function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''}
+
+    async function loadLive(){
+      try{
+        // Buscar torneio ativo
+        const{data:tournaments}=await supabase.from('tournaments').select('id,name').order('updated_at',{ascending:false}).limit(1);
+        if(!tournaments?.length){
+          document.getElementById('live-container').innerHTML='<div class="empty"><div class="icon">&#128580;</div><h3>Nenhum torneio ativo</h3><p>Aguarde o organizador iniciar um torneio.</p></div>';
+          document.getElementById('tournament-name').textContent='';
+          return;
+        }
+        const t=tournaments[0];
+        document.getElementById('tournament-name').textContent=t.name;
+
+        // Buscar jogos em quadra
+        const{data:matches}=await supabase.from('live_matches').select('*').eq('tournament_id',t.id).order('court');
+        if(!matches?.length){
+          document.getElementById('live-container').innerHTML='<div class="empty"><div class="icon">&#9203;</div><h3>Nenhum jogo em andamento</h3><p>Aguarde o inicio das partidas.</p></div>';
+          return;
+        }
+
+        // Buscar scores
+        const matchIds=matches.map(m=>m.id);
+        const{data:scores}=await supabase.from('live_scores').select('*').in('match_id',matchIds);
+        const scoreMap={};
+        (scores||[]).forEach(s=>{scoreMap[s.match_id]=s;});
+
+        let h='';
+        matches.forEach(m=>{
+          const s=scoreMap[m.id];
+          const isActive=s&&!s.winner;
+          const isFinished=s&&s.winner;
+          const p1Score=s?s.score_p1:0;
+          const p2Score=s?s.score_p2:0;
+          const currentSet=s?s.current_set:1;
+          const setsP1=s?.sets_p1||[];
+          const setsP2=s?.sets_p2||[];
+          const setsWonP1=s?.sets_won_p1||0;
+          const setsWonP2=s?.sets_won_p2||0;
+          const winner=s?.winner;
+
+          h+=`<div class="match-live${isActive?' active':''}">`;
+          h+=`<span class="court-badge">${esc(m.court||'Quadra')}</span>`;
+          h+=`<span class="draw-info" style="margin-left:12px">${esc(m.draw_name)} - ${esc(m.round_name||'')}</span>`;
+
+          h+=`<div class="scoreboard">`;
+          h+=`<div class="player"><div class="name${winner===1?' winner':''}">${esc(m.player1)}</div>`;
+          h+=`<div class="points">${p1Score}</div>`;
+          if(setsWonP1||setsWonP2)h+=`<div class="sets-won">${setsWonP1} sets</div>`;
+          h+=`</div>`;
+          h+=`<div class="vs">VS</div>`;
+          h+=`<div class="player"><div class="name${winner===2?' winner':''}">${esc(m.player2)}</div>`;
+          h+=`<div class="points">${p2Score}</div>`;
+          if(setsWonP1||setsWonP2)h+=`<div class="sets-won">${setsWonP2} sets</div>`;
+          h+=`</div></div>`;
+
+          if(!isFinished)h+=`<div class="set-info">Set ${currentSet}</div>`;
+
+          if(setsP1.length){
+            h+=`<div class="set-history">`;
+            setsP1.forEach((sp1,i)=>{h+=`<span class="set-score">${sp1}-${setsP2[i]}</span>`;});
+            h+=`</div>`;
+          }
+
+          if(isFinished){
+            const winnerName=winner===1?m.player1:m.player2;
+            h+=`<div style="text-align:center;margin-top:8px"><span class="finished-badge">Finalizada - ${esc(winnerName)} venceu</span></div>`;
+          }
+
+          h+=`</div>`;
+        });
+
+        document.getElementById('live-container').innerHTML=h;
+      }catch(e){console.error(e);}
+    }
+
+    // Carregar e atualizar a cada 3 segundos
+    loadLive();
+    setInterval(loadLive,3000);
+  </script>
+</body>
+</html>
