@@ -703,15 +703,25 @@ function syncDrawsPlayers(){
       const playersChanged=sortedOld.length!==sortedNew.length||sortedOld.some((p,i)=>p!==sortedNew[i]);
       const typeChanged=idealType!==d.type;
       if(playersChanged||typeChanged){
-        // Resetar chave para re-sortear com novos dados
-        d.players=newPlayers;
-        d.type=idealType;
-        d.matches=[];
-        toReset.push(d.name);
-        // Limpar partidas desta chave
-        if(tournament.matches){
-          tournament.matches=tournament.matches.filter(m=>m.drawName!==d.name);
-          tournament.matches.forEach((m,i)=>{m.id=(i+1).toString();m.num=i+1;});
+        // Verificar se tem jogos finalizados — NÃO resetar se tiver
+        const hasFinished=(tournament.matches||[]).some(m=>m.drawName===d.name&&(m.status==='Finalizada'||m.status==='WO'));
+        if(hasFinished){
+          // Apenas atualizar lista de jogadores sem resetar matches
+          d.players=newPlayers;
+          // Não mudar tipo nem limpar matches/partidas
+          showToast(`Chave "${d.name}" tem jogos finalizados. Jogadores atualizados mas chave mantida.`,'info');
+        } else {
+          // Resetar chave para re-sortear com novos dados
+          d.players=newPlayers;
+          d.type=idealType;
+          d.matches=[];
+          d.awarded=false;
+          toReset.push(d.name);
+          // Limpar partidas desta chave
+          if(tournament.matches){
+            tournament.matches=tournament.matches.filter(m=>m.drawName!==d.name);
+            tournament.matches.forEach((m,i)=>{m.id=(i+1).toString();m.num=i+1;});
+          }
         }
       }
     } else {
@@ -1917,7 +1927,8 @@ function repropagateAllResults(){
       (d.matches||[]).forEach((dm,i)=>{
         if(!dm.winner){
           const tm=findTournamentMatch(d.name,i,dm);
-          if(tm&&tm.winner){dm.winner=tm.winner;changed=true;}
+          // So sincronizar se o tournament.match tem score real (nao apenas winner sem score)
+          if(tm&&tm.winner&&tm.score&&tm.score!==''){dm.winner=tm.winner;changed=true;}
         }
       });
       return;
@@ -2247,14 +2258,28 @@ function renderCourtsPanel() {
 // Receber atualizacao de placar em tempo real do Supabase
 async function handleRealtimeScoreUpdate(data){
   if(!data||!tournament?.matches?.length)return;
-  // Extrair match_num do match_id (formato: tournamentId_matchNum)
-  const parts=(data.match_id||'').split('_');
-  const matchNum=parseInt(parts[parts.length-1]);
-  if(!matchNum)return;
-  const m=tournament.matches.find(x=>x.num===matchNum);
+  const matchId=data.match_id||'';
+  // Buscar match pelo ID estavel (drawName + players) ou fallback por match_num
+  let m=null;
+  // Tentar encontrar pelo match_id que contem drawName e players
+  for(const mx of tournament.matches){
+    const draw=(mx.drawName||'').replace(/[^a-zA-Z0-9]/g,'');
+    const p1=(mx.player1||'').replace(/[^a-zA-Z0-9]/g,'').substring(0,20);
+    const p2=(mx.player2||'').replace(/[^a-zA-Z0-9]/g,'').substring(0,20);
+    const stableId=`${tournament.id}_${draw}_${p1}_${p2}`;
+    if(matchId===stableId){m=mx;break;}
+  }
+  // Fallback: por match_num (para compatibilidade com dados antigos)
+  if(!m){
+    const parts=matchId.split('_');
+    const matchNum=parseInt(parts[parts.length-1]);
+    if(matchNum)m=tournament.matches.find(x=>x.num===matchNum);
+  }
   if(!m)return;
   // Se jogo ja foi finalizado localmente, ignorar
   if(m.status==='Finalizada'||m.status==='WO')return;
+  // Se o jogo nao esta em quadra, ignorar
+  if(m.status!=='Em Quadra')return;
 
   // Atualizar placar ao vivo para exibicao
   const s1=data.score_p1||0, s2=data.score_p2||0, set=data.current_set||1;
@@ -2326,7 +2351,7 @@ async function assignCourt(idx, value) {
   // Sincronizar com Supabase
   try{
     if(value&&m.status==='Em Quadra'){const ok=await window.api.supabaseUpsertMatch(tournament.id,m);if(!ok)showToast('Aviso: sincronizacao online falhou','warning');}
-    else if(!value){await window.api.supabaseRemoveFromCourt(tournament.id,m.num);}
+    else if(!value){await window.api.supabaseRemoveFromCourt(tournament.id,m);}
   }catch(e){console.warn('Supabase sync:',e);showToast('Aviso: sincronizacao online falhou','warning');}
   renderCourtsPanel();renderMatches();
 }
@@ -2428,7 +2453,7 @@ async function resetMatch(idx){
   // Reverter avanço na draw antes de limpar o winner
   reverseResultInDraws(m);
   // Remover do Supabase (historico publico)
-  try{await window.api.supabaseRemoveFromCourt(tournament.id,m.num);}catch(e){console.warn('Supabase cleanup:',e);}
+  try{await window.api.supabaseRemoveFromCourt(tournament.id,m);}catch(e){console.warn('Supabase cleanup:',e);}
   m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;m.liveScore='';m.liveSets=undefined;
   await window.api.saveTournament(tournament);
   renderMatches();renderFinishedMatches();showToast('Jogo resetado');

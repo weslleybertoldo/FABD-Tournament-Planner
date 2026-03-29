@@ -267,9 +267,17 @@ ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name) => {
   } catch(e) { log('ERROR', 'Supabase upsertTournament:', e.message); return false; }
 });
 
+// Gerar ID estavel para match (nao depende de numeracao)
+function stableMatchId(tournamentId, matchData) {
+  const draw = (matchData.drawName || '').replace(/[^a-zA-Z0-9]/g, '');
+  const p1 = (matchData.player1 || '').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+  const p2 = (matchData.player2 || '').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+  return `${tournamentId}_${draw}_${p1}_${p2}`;
+}
+
 ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
   try {
-    const id = `${tournamentId}_${matchData.num}`;
+    const id = stableMatchId(tournamentId, matchData);
     const row = {
       id, tournament_id: tournamentId, match_num: matchData.num,
       draw_name: matchData.drawName || '', round: matchData.round || 1,
@@ -280,7 +288,6 @@ ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
     };
     const { error } = await supabase.from('live_matches').upsert(row, { onConflict: 'id' });
     if (error) throw error;
-    // Criar registro de score se nao existir (upsert para evitar race condition)
     const { error: scoreError } = await supabase.from('live_scores').upsert({ match_id: id, tournament_id: tournamentId }, { onConflict: 'match_id' });
     if (scoreError) { log('ERROR', 'Supabase score upsert:', scoreError.message); return false; }
     log('INFO', 'Supabase match upserted:', id);
@@ -288,9 +295,9 @@ ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
   } catch(e) { log('ERROR', 'Supabase upsertMatch:', e.message); return false; }
 });
 
-ipcMain.handle('supabase:removeFromCourt', async (_, tournamentId, matchNum) => {
+ipcMain.handle('supabase:removeFromCourt', async (_, tournamentId, matchData) => {
   try {
-    const id = `${tournamentId}_${matchNum}`;
+    const id = typeof matchData === 'object' ? stableMatchId(tournamentId, matchData) : `${tournamentId}_${matchData}`;
     await supabase.from('live_scores').delete().eq('match_id', id);
     await supabase.from('live_matches').delete().eq('id', id);
     log('INFO', 'Supabase match removed:', id);
