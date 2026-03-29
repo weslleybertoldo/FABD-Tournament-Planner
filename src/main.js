@@ -159,6 +159,14 @@ ipcMain.handle('db:newTournament', (_, tournament) => {
 });
 
 ipcMain.handle('app:openExternal', (_, url) => { const { shell } = require('electron'); shell.openExternal(url); });
+ipcMain.handle('app:checkUpdate', async () => {
+  try {
+    const resp = await fetch('https://api.github.com/repos/weslleybertoldo/FABD-Tournament-Planner/releases/latest');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    return data;
+  } catch (e) { return { error: e.message }; }
+});
 
 ipcMain.handle('db:closeTournament', async () => {
   // Limpar dados do Supabase antes de fechar

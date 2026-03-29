@@ -31,6 +31,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupNavigation();
   setupValidation();
   updateOverview();
+  const verEl=document.getElementById('current-version');
+  if(verEl)verEl.textContent=`Versao atual: v${APP_VERSION}`;
 });
 
 async function loadData(autoLoad=false) {
@@ -3316,12 +3318,10 @@ async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
   statusEl.textContent='Verificando...';statusEl.style.color='var(--fabd-gray-500)';
   try{
-    const resp=await fetch('https://api.github.com/repos/weslleybertoldo/FABD-Tournament-Planner/releases/latest');
-    if(!resp.ok)throw new Error('Erro ao buscar');
-    const data=await resp.json();
+    const data=await window.api.checkUpdate();
+    if(data.error)throw new Error(data.error);
     const latestVersion=(data.tag_name||'').replace('v','');
     if(latestVersion&&latestVersion!==APP_VERSION){
-      // Buscar asset .exe
       const exeAsset=(data.assets||[]).find(a=>a.name.endsWith('.exe'));
       statusEl.innerHTML=`<span style="color:#F59E0B;font-weight:600">Nova versao disponivel: v${esc(latestVersion)}</span>`;
       if(exeAsset){

@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('api', {
   saveSettings: (s) => ipcRenderer.invoke('db:saveSettings', s),
 
   openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
+  checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
   log: (l, m) => ipcRenderer.send('log', l, m),
 
   // Supabase Realtime
