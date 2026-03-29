@@ -127,8 +127,9 @@
     <div class="matches-list" id="matches-list">
       <div class="empty"><div style="font-size:48px">&#9203;</div><p>Nenhum jogo em quadra.<br>Aguarde o organizador.</p></div>
     </div>
-    <div class="install-bar" id="install-bar">
-      <button onclick="installPWA()">&#128229; Instalar App no Dispositivo</button>
+    <div class="install-bar" id="install-bar" style="display:block">
+      <button id="install-btn" onclick="installPWA()">&#128229; Instalar App no Dispositivo</button>
+      <p id="install-hint" style="display:none;font-size:11px;color:#64748B;margin-top:6px"></p>
     </div>
   </div>
 
@@ -196,15 +197,20 @@
     // === PWA INSTALL ===
     window.addEventListener('beforeinstallprompt',e=>{
       e.preventDefault();deferredPrompt=e;
-      const bar=document.getElementById('install-bar');
-      if(bar)bar.style.display='block';
+      document.getElementById('install-hint').style.display='none';
     });
-    window.addEventListener('appinstalled',()=>{deferredPrompt=null;const bar=document.getElementById('install-bar');if(bar)bar.style.display='none';});
-    function installPWA(){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(r=>{deferredPrompt=null;document.getElementById('install-bar').style.display='none';});}}
-    // Mostrar botao de instalar se nao esta em modo standalone (ja instalado)
-    if(!window.matchMedia('(display-mode: standalone)').matches){
-      setTimeout(()=>{const bar=document.getElementById('install-bar');if(bar&&!deferredPrompt)bar.style.display='block';},3000);
+    window.addEventListener('appinstalled',()=>{deferredPrompt=null;document.getElementById('install-bar').style.display='none';});
+    function installPWA(){
+      if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('install-bar').style.display='none';});return;}
+      // Instrucoes manuais
+      const hint=document.getElementById('install-hint');
+      const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent);
+      if(isIOS){hint.textContent='No Safari: toque no botao Compartilhar (quadrado com seta) e depois "Adicionar a Tela de Inicio".';}
+      else{hint.textContent='No Chrome: toque nos 3 pontinhos (menu) e depois "Adicionar a tela inicial" ou "Instalar app".';}
+      hint.style.display='block';
     }
+    // Esconder se ja esta instalado
+    if(window.matchMedia('(display-mode: standalone)').matches){document.getElementById('install-bar').style.display='none';}
 
     // === BLOCK NOTIFICATIONS ===
     if('Notification' in window){try{Notification.requestPermission().then(p=>{});}catch(e){}}
