@@ -32,6 +32,9 @@
     .header{background:#1E3A8A;padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
     .header h1{font-size:15px;font-weight:700}
     .header .user{font-size:12px;color:#93C5FD;display:flex;align-items:center;gap:8px}
+    .ref-tabs{display:flex;background:#1E293B;border-bottom:1px solid #334155}
+    .ref-tab{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;color:#64748B;cursor:pointer;border-bottom:3px solid transparent}
+    .ref-tab.active{color:#fff;border-bottom-color:#F59E0B}
     .matches-list{flex:1;padding:12px;overflow-y:auto}
     .match-card{background:#1E293B;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;border-left:4px solid #2563EB}
     .match-card:active{transform:scale(0.98)}
@@ -125,8 +128,20 @@
         <button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="logout()">Sair</button>
       </div>
     </div>
-    <div class="matches-list" id="matches-list">
+    <div class="ref-tabs">
+      <div class="ref-tab active" onclick="setRefTab('jogos')">Jogos</div>
+      <div class="ref-tab" onclick="setRefTab('historico')">Historico</div>
+      <div class="ref-tab" onclick="setRefTab('arbitros')">Arbitros</div>
+    </div>
+    <div id="ref-tab-jogos" class="matches-list">
       <div class="empty"><div style="font-size:48px">&#9203;</div><p>Nenhum jogo em quadra.<br>Aguarde o organizador.</p></div>
+    </div>
+    <div id="ref-tab-historico" class="matches-list" style="display:none">
+      <div style="padding:8px"><input type="text" id="hist-search" placeholder="Buscar por arbitro, atleta..." oninput="filterHistory()" style="width:100%;padding:10px 14px;border-radius:8px;border:2px solid #334155;background:#1E293B;color:#fff;font-size:14px"></div>
+      <div id="hist-list"></div>
+    </div>
+    <div id="ref-tab-arbitros" class="matches-list" style="display:none">
+      <div id="arb-list"></div>
     </div>
     <div class="install-bar" id="install-bar" style="display:block">
       <button id="install-btn" onclick="installPWA()">&#128229; Instalar App no Dispositivo</button>
@@ -259,16 +274,110 @@
     // === MATCHES ===
     function showMatches(){hideAll();const p=document.getElementById('page-matches');p.style.display='flex';document.getElementById('user-name').textContent=currentUser.name;loadMatches();if(pollInterval)clearInterval(pollInterval);pollInterval=setInterval(loadMatches,5000);}
 
+    let currentTournamentId=null;
+
     async function loadMatches(){
       try{
         const{data:ts}=await sb.from('tournaments').select('id,name').order('updated_at',{ascending:false}).limit(1);
-        if(!ts?.length){document.getElementById('matches-list').innerHTML='<div class="empty"><div style="font-size:48px">&#128580;</div><p>Nenhum torneio ativo</p></div>';return;}
+        if(!ts?.length){document.getElementById('ref-tab-jogos').innerHTML='<div class="empty"><div style="font-size:48px">&#128580;</div><p>Nenhum torneio ativo</p></div>';return;}
+        currentTournamentId=ts[0].id;
         document.getElementById('tournament-name').textContent=ts[0].name;
         const{data:ms}=await sb.from('live_matches').select('*').eq('tournament_id',ts[0].id).eq('status','Em Quadra').order('court');
-        const list=document.getElementById('matches-list');
+        const list=document.getElementById('ref-tab-jogos');
         if(!ms?.length){list.innerHTML='<div class="empty"><div style="font-size:48px">&#9203;</div><p>Nenhum jogo em quadra.<br>Aguarde o organizador.</p></div>';return;}
         let h='';ms.forEach(m=>{h+=`<div class="match-card" onclick="openScorer('${m.id}')"><div class="court">${esc(m.court)}</div><div class="players">${esc(m.player1)} vs ${esc(m.player2)}</div><div class="draw">${esc(m.draw_name)} - ${esc(m.round_name||'')}</div></div>`;});
         list.innerHTML=h;
+      }catch(e){console.error(e);}
+    }
+
+    // === TABS ===
+    function setRefTab(tab){
+      document.querySelectorAll('.ref-tab').forEach((t,i)=>t.classList.toggle('active',['jogos','historico','arbitros'][i]===tab));
+      document.getElementById('ref-tab-jogos').style.display=tab==='jogos'?'block':'none';
+      document.getElementById('ref-tab-historico').style.display=tab==='historico'?'block':'none';
+      document.getElementById('ref-tab-arbitros').style.display=tab==='arbitros'?'block':'none';
+      if(tab==='historico')loadHistory();
+      if(tab==='arbitros')loadArbitros();
+    }
+
+    let historyData=[];
+    async function loadHistory(){
+      if(!sb||!currentTournamentId)return;
+      try{
+        const{data:ms}=await sb.from('live_matches').select('*').eq('tournament_id',currentTournamentId).eq('status','Finalizada').order('updated_at',{ascending:false});
+        if(!ms?.length){document.getElementById('hist-list').innerHTML='<div class="empty"><div style="font-size:48px">&#127942;</div><p>Nenhuma partida finalizada</p></div>';return;}
+        const ids=ms.map(m=>m.id);
+        const{data:scores}=await sb.from('live_scores').select('*').in('match_id',ids);
+        const sm={};(scores||[]).forEach(s=>{sm[s.match_id]=s;});
+        historyData=ms.map(m=>({...m,score:sm[m.id]}));
+        renderHistory(historyData);
+      }catch(e){console.error(e);}
+    }
+
+    function renderHistory(data){
+      if(!data.length){document.getElementById('hist-list').innerHTML='<div class="empty"><div style="font-size:48px">&#127942;</div><p>Nenhuma partida</p></div>';return;}
+      let h='';
+      data.forEach(m=>{
+        const s=m.score;
+        const w=s?.winner;
+        const sP1=s?.sets_p1||[],sP2=s?.sets_p2||[];
+        const ump=s?.umpire_name||m.umpire||'';
+        let setsHtml='';
+        sP1.forEach((v,i)=>{setsHtml+=`<span style="background:#0F172A;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600">${v}-${sP2[i]}</span> `;});
+        h+=`<div class="match-card" style="border-left-color:${w?'#10B981':'#334155'};cursor:default">
+          <div class="court">${esc(m.court||'')} ${esc(m.draw_name)} - ${esc(m.round_name||'')}</div>
+          <div class="players" style="margin:6px 0">
+            <span style="${w===1?'color:#10B981':''}">${esc(m.player1)}</span>
+            <span style="color:#475569;margin:0 8px">vs</span>
+            <span style="${w===2?'color:#10B981':''}">${esc(m.player2)}</span>
+          </div>
+          <div style="margin:4px 0">${setsHtml||'-'}</div>
+          <div style="font-size:11px;color:#64748B">${ump?'Arbitro: '+esc(ump):''}</div>
+        </div>`;
+      });
+      document.getElementById('hist-list').innerHTML=h;
+    }
+
+    function filterHistory(){
+      const q=(document.getElementById('hist-search')?.value||'').toLowerCase();
+      if(!q){renderHistory(historyData);return;}
+      const filtered=historyData.filter(m=>{
+        const ump=(m.score?.umpire_name||m.umpire||'').toLowerCase();
+        const p1=(m.player1||'').toLowerCase();
+        const p2=(m.player2||'').toLowerCase();
+        const draw=(m.draw_name||'').toLowerCase();
+        return ump.includes(q)||p1.includes(q)||p2.includes(q)||draw.includes(q);
+      });
+      renderHistory(filtered);
+    }
+
+    async function loadArbitros(){
+      if(!sb||!currentTournamentId)return;
+      try{
+        const{data:ms}=await sb.from('live_matches').select('*').eq('tournament_id',currentTournamentId).eq('status','Finalizada');
+        if(!ms?.length){document.getElementById('arb-list').innerHTML='<div class="empty"><div style="font-size:48px">&#128100;</div><p>Nenhum arbitro registrado</p></div>';return;}
+        const ids=ms.map(m=>m.id);
+        const{data:scores}=await sb.from('live_scores').select('umpire_name,match_id').in('match_id',ids);
+        // Contar por arbitro
+        const stats={};
+        (scores||[]).forEach(s=>{
+          const name=s.umpire_name||'Sem arbitro';
+          if(!stats[name])stats[name]=0;
+          stats[name]++;
+        });
+        const sorted=Object.entries(stats).sort((a,b)=>b[1]-a[1]);
+        let h='<div style="padding:4px 0">';
+        sorted.forEach(([name,count])=>{
+          h+=`<div class="match-card" style="cursor:default;display:flex;align-items:center;justify-content:space-between">
+            <div><strong style="font-size:15px">${esc(name)}</strong></div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="background:#2563EB;color:#fff;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700">${count}</span>
+              <span style="font-size:12px;color:#64748B">jogo${count>1?'s':''}</span>
+            </div>
+          </div>`;
+        });
+        h+='</div>';
+        document.getElementById('arb-list').innerHTML=h;
       }catch(e){console.error(e);}
     }
 
