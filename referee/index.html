@@ -283,7 +283,12 @@
 
     function addPoint(side){
       const player=side==='left'?leftPlayer:rightPlayer;
-      state.history.push({set:state.set,p1:state.p1,p2:state.p2,server:state.server});
+      state.history.push({
+        set:state.set,p1:state.p1,p2:state.p2,server:state.server,
+        setsP1:[...state.setsP1],setsP2:[...state.setsP2],
+        setsWonP1:state.setsWonP1,setsWonP2:state.setsWonP2,
+        leftPlayer,rightPlayer
+      });
       if(player===1)state.p1++;else state.p2++;
       // Servico: quem marcou ponto serve (badminton)
       state.server=player;
@@ -296,6 +301,9 @@
       if(!state.history.length)return;
       const prev=state.history.pop();
       state.set=prev.set;state.p1=prev.p1;state.p2=prev.p2;state.server=prev.server;
+      state.setsP1=prev.setsP1;state.setsP2=prev.setsP2;
+      state.setsWonP1=prev.setsWonP1;state.setsWonP2=prev.setsWonP2;
+      leftPlayer=prev.leftPlayer;rightPlayer=prev.rightPlayer;
       updateDisplay();syncScore();
     }
 
