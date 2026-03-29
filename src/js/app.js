@@ -1802,36 +1802,33 @@ function renderGroupsElimination(d) {
 
   const qualifiers = d.groupQualifiers || 2;
   const groupsFinished = areGroupsFinished(d);
+  const groups = d.groupsData.groups;
+  const hasElim = groupsFinished && d.groupsData.eliminationMatches?.length;
 
-  // Render each group
-  d.groupsData.groups.forEach(g => {
+  // Abas: Grupo A | Grupo B | ... | Eliminatorias
+  h += `<div class="tabs" id="ge-tabs" style="margin-bottom:16px">`;
+  groups.forEach((g, i) => {
+    h += `<div class="tab${i === 0 ? ' active' : ''}" onclick="setGeTab(${i})">${esc(g.name)}</div>`;
+  });
+  if (hasElim) h += `<div class="tab" onclick="setGeTab(${groups.length})">Eliminatorias</div>`;
+  h += `</div>`;
+
+  // Paineis dos grupos
+  groups.forEach((g, gi) => {
     const gLabel = g.name.replace('Grupo ', '');
-    // Sync match data from d.matches (which may have been updated via scoring)
     const groupMatches = d.matches.filter(m => m.group === gLabel && m.phase === 'group');
-    // Update g.matches from d.matches
     g.matches = groupMatches.length ? groupMatches : g.matches;
-
     const standings = computeGroupStandings(g.players, g.matches);
 
-    h += `<div style="margin-bottom:24px">
-      <h3 style="color:var(--fabd-blue);margin-bottom:12px;display:flex;align-items:center;gap:8px">
-        <span style="background:var(--fabd-blue);color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">${esc(gLabel)}</span>
-        ${esc(g.name)}
-      </h3>`;
-
-    // Standings table
+    h += `<div class="ge-panel" id="ge-panel-${gi}" style="${gi > 0 ? 'display:none' : ''}">`;
+    // Classificacao
     h += '<div class="table-container"><table><thead><tr><th style="text-align:center;width:40px">Pos</th><th>Jogador</th><th style="text-align:center">V</th><th style="text-align:center">D</th><th style="text-align:center">Pts+</th><th style="text-align:center">Pts-</th><th style="text-align:center">Diff</th></tr></thead><tbody>';
     standings.forEach((s, i) => {
-      const isQualified = i < qualifiers;
-      const bg = isQualified ? '#D1FAE5' : (i % 2 === 0 ? '#fff' : '#f8f9fa');
-      const fw = isQualified ? '700' : '400';
-      const color = isQualified ? '#065F46' : '#1a1a1a';
-      const badge = isQualified ? ' <span style="background:#10B981;color:white;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px">Classificado</span>' : '';
-      h += `<tr style="background:${bg}"><td style="text-align:center;font-weight:${fw};color:${color}">${i + 1}o</td><td style="font-weight:${fw}">${esc(s.name)}${badge}</td><td style="text-align:center">${s.wins}</td><td style="text-align:center">${s.losses}</td><td style="text-align:center">${s.ptsFor}</td><td style="text-align:center">${s.ptsAgainst}</td><td style="text-align:center;font-weight:700;color:${s.ptsDiff > 0 ? '#059669' : s.ptsDiff < 0 ? '#DC2626' : '#666'}">${s.ptsDiff > 0 ? '+' : ''}${s.ptsDiff}</td></tr>`;
+      const isQ = i < qualifiers;
+      h += `<tr style="background:${isQ ? '#D1FAE5' : i % 2 === 0 ? '#fff' : '#f8f9fa'}"><td style="text-align:center;font-weight:${isQ ? '700' : '400'};color:${isQ ? '#065F46' : '#1a1a1a'}">${i + 1}o</td><td style="font-weight:${isQ ? '700' : '400'}">${esc(s.name)}${isQ ? ' <span style="background:#10B981;color:white;font-size:10px;padding:1px 6px;border-radius:10px">Classif.</span>' : ''}</td><td style="text-align:center">${s.wins}</td><td style="text-align:center">${s.losses}</td><td style="text-align:center">${s.ptsFor}</td><td style="text-align:center">${s.ptsAgainst}</td><td style="text-align:center;font-weight:700;color:${s.ptsDiff > 0 ? '#059669' : s.ptsDiff < 0 ? '#DC2626' : '#666'}">${s.ptsDiff > 0 ? '+' : ''}${s.ptsDiff}</td></tr>`;
     });
     h += '</tbody></table></div>';
-
-    // Round-robin cross table for the group
+    // Confrontos
     h += '<div class="table-container" style="margin-top:8px"><table><thead><tr><th>#</th><th>Jogador</th>';
     g.players.forEach((_, i) => h += `<th style="text-align:center">${i + 1}</th>`);
     h += '</tr></thead><tbody>';
@@ -1854,26 +1851,26 @@ function renderGroupsElimination(d) {
     h += '</tbody></table></div></div>';
   });
 
-  // Elimination bracket
-  if (groupsFinished && d.groupsData.eliminationMatches?.length) {
-    h += `<div style="margin-top:32px;border-top:3px solid var(--fabd-blue);padding-top:24px">
-      <h3 style="color:var(--fabd-blue);margin-bottom:16px">&#127942; Fase Eliminatoria</h3>`;
-    // Create a temporary draw-like object for renderBracket
+  // Painel Eliminatorias (como aba)
+  if (hasElim) {
+    h += `<div class="ge-panel" id="ge-panel-${groups.length}" style="display:none">`;
     const elimDraw = { matches: d.groupsData.eliminationMatches, players: d.groupsData.eliminationMatches.filter(m => m.round === 1).flatMap(m => [m.player1, m.player2]).filter(p => p && p !== 'BYE') };
     h += renderBracket(elimDraw);
     h += '</div>';
-  } else if (groupsFinished) {
-    h += `<div style="margin-top:24px;padding:20px;background:#FEF3C7;border-radius:8px;text-align:center;border:2px solid #F59E0B">
-      <p style="color:#92400E;font-weight:700">Fase de grupos concluida! Gerando eliminatoria...</p></div>`;
-  } else {
-    const totalGroupMatches = d.groupsData.groups.reduce((sum, g) => sum + g.matches.filter(m => m.player1 && m.player2 && m.player1 !== 'BYE' && m.player2 !== 'BYE').length, 0);
-    const doneGroupMatches = d.groupsData.groups.reduce((sum, g) => sum + g.matches.filter(m => m.winner !== undefined && m.winner !== null).length, 0);
-    h += `<div style="margin-top:24px;padding:16px;background:var(--fabd-gray-100);border-radius:8px;text-align:center">
-      <p style="color:var(--fabd-gray-600)">Fase de grupos em andamento: ${doneGroupMatches}/${totalGroupMatches} partidas concluidas</p>
-      <p style="color:var(--fabd-gray-500);font-size:13px">A fase eliminatoria sera gerada automaticamente quando todos os jogos dos grupos estiverem concluidos.</p></div>`;
+  } else if (!groupsFinished) {
+    const totalGM = d.groupsData.groups.reduce((s, g) => s + g.matches.filter(m => m.player1 && m.player2 && m.player1 !== 'BYE' && m.player2 !== 'BYE').length, 0);
+    const doneGM = d.groupsData.groups.reduce((s, g) => s + g.matches.filter(m => m.winner !== undefined && m.winner !== null).length, 0);
+    h += `<div style="margin-top:16px;padding:16px;background:var(--fabd-gray-100);border-radius:8px;text-align:center">
+      <p style="color:var(--fabd-gray-600)">Fase de grupos: ${doneGM}/${totalGM} partidas</p>
+      <p style="color:var(--fabd-gray-500);font-size:12px">Eliminatoria sera gerada ao concluir todos os jogos dos grupos.</p></div>`;
   }
 
   return h;
+}
+
+function setGeTab(idx){
+  document.querySelectorAll('#ge-tabs .tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  document.querySelectorAll('.ge-panel').forEach((p,i)=>p.style.display=i===idx?'':'none');
 }
 
 async function deleteDraw(i) {
@@ -3405,10 +3402,26 @@ let editingProfileId=null;
 function deleteGameProfile(id){if(!confirm('Excluir?'))return;gameProfiles=gameProfiles.filter(x=>x.id!==id);saveGameProfiles();renderGameProfiles();}
 function cancelProfileEditor(){document.getElementById('game-profile-editor').style.display='none';editingProfileId=null;}
 function onGameModeChange(){const m=document.getElementById('gp-mode').value;document.getElementById('gp-fixed-config').style.display=m==='fixed'?'':'none';document.getElementById('gp-custom-config').style.display=m==='custom'?'':'none';}
-function setRanges(ranges){const c=document.getElementById('gp-ranges-container');let h='';ranges.forEach((r,i)=>{h+=`<div class="form-row" style="margin-bottom:8px;align-items:end"><div class="form-group" style="margin-bottom:0">${i===0?'<label style="font-size:12px">De</label>':''}<input type="number" class="form-control range-min" value="${r.min}" min="1" max="99"></div><div class="form-group" style="margin-bottom:0">${i===0?'<label style="font-size:12px">Ate</label>':''}<input type="number" class="form-control range-max" value="${r.max}" min="1" max="99"></div><div class="form-group" style="margin-bottom:0">${i===0?'<label style="font-size:12px">Sistema</label>':''}<select class="form-control range-type"><option value="Todos contra Todos"${r.type==='Todos contra Todos'?' selected':''}>Todos contra Todos</option><option value="Grupos + Eliminatoria"${r.type==='Grupos + Eliminatoria'?' selected':''}>Grupos + Elim.</option><option value="Eliminatoria"${r.type==='Eliminatoria'?' selected':''}>Eliminatoria</option></select></div><div><button class="btn btn-sm btn-danger" onclick="removeRange(${i})">&times;</button></div></div>`;});c.innerHTML=h;}
+function setRanges(ranges){const c=document.getElementById('gp-ranges-container');let h='';ranges.forEach((r,i)=>{
+  const isGrupos=r.type==='Grupos + Eliminatoria';
+  h+=`<div class="form-row" style="margin-bottom:8px;align-items:end">
+    <div class="form-group" style="margin-bottom:0">${i===0?'<label style="font-size:12px">De</label>':''}<input type="number" class="form-control range-min" value="${r.min}" min="1" max="99"></div>
+    <div class="form-group" style="margin-bottom:0">${i===0?'<label style="font-size:12px">Ate</label>':''}<input type="number" class="form-control range-max" value="${r.max}" min="1" max="99"></div>
+    <div class="form-group" style="margin-bottom:0">${i===0?'<label style="font-size:12px">Sistema</label>':''}<select class="form-control range-type" onchange="onRangeTypeChange()"><option value="Todos contra Todos"${r.type==='Todos contra Todos'?' selected':''}>Todos contra Todos</option><option value="Grupos + Eliminatoria"${isGrupos?' selected':''}>Grupos + Elim.</option><option value="Eliminatoria"${r.type==='Eliminatoria'?' selected':''}>Eliminatoria</option></select></div>
+    <div class="form-group" style="margin-bottom:0;${isGrupos?'':'display:none'}" data-grupos-config>${i===0?'<label style="font-size:12px">Grupos</label>':''}<input type="number" class="form-control range-groups" value="${r.numGroups||2}" min="2" max="8" style="width:50px"></div>
+    <div class="form-group" style="margin-bottom:0;${isGrupos?'':'display:none'}" data-qualif-config>${i===0?'<label style="font-size:12px">Classif.</label>':''}<input type="number" class="form-control range-qualifiers" value="${r.groupQualifiers||2}" min="1" max="4" style="width:50px"></div>
+    <div><button class="btn btn-sm btn-danger" onclick="removeRange(${i})">&times;</button></div></div>`;
+});c.innerHTML=h;}
+function onRangeTypeChange(){
+  document.querySelectorAll('#gp-ranges-container .form-row').forEach(row=>{
+    const type=row.querySelector('.range-type')?.value;
+    const isGrupos=type==='Grupos + Eliminatoria';
+    row.querySelectorAll('[data-grupos-config],[data-qualif-config]').forEach(el=>{el.style.display=isGrupos?'':'none';});
+  });
+}
 function addRange(){const r=collectRanges();const l=r.length?r[r.length-1].max+1:2;r.push({min:l,max:l+10,type:'Eliminatoria'});setRanges(r);}
 function removeRange(i){const r=collectRanges();if(r.length<=1)return;r.splice(i,1);setRanges(r);}
-function collectRanges(){const r=[];document.querySelectorAll('#gp-ranges-container .form-row').forEach(row=>{r.push({min:parseInt(row.querySelector('.range-min').value)||1,max:parseInt(row.querySelector('.range-max').value)||99,type:row.querySelector('.range-type').value});});return r;}
+function collectRanges(){const r=[];document.querySelectorAll('#gp-ranges-container .form-row').forEach(row=>{const entry={min:parseInt(row.querySelector('.range-min').value)||1,max:parseInt(row.querySelector('.range-max').value)||99,type:row.querySelector('.range-type').value};if(entry.type==='Grupos + Eliminatoria'){entry.numGroups=parseInt(row.querySelector('.range-groups')?.value)||2;entry.groupQualifiers=parseInt(row.querySelector('.range-qualifiers')?.value)||2;}r.push(entry);});return r;}
 function saveGameProfile(){const name=gv('gp-name');if(!name){alert('Nome');return;}const mode=document.getElementById('gp-mode').value;const p={id:editingProfileId||Date.now().toString(),name,mode,fixedType:document.getElementById('gp-fixed-type').value,ranges:mode==='custom'?collectRanges():[]};if(editingProfileId){const i=gameProfiles.findIndex(x=>x.id===editingProfileId);if(i>=0)gameProfiles[i]=p;}else gameProfiles.push(p);saveGameProfiles();cancelProfileEditor();renderGameProfiles();showToast('Perfil salvo!');}
 function getDrawTypeForCount(t,count){if(!t.gameProfileId)return null;const p=gameProfiles.find(x=>x.id===t.gameProfileId);if(!p)return null;if(p.mode==='fixed')return p.fixedType;for(const r of(p.ranges||[]))if(count>=r.min&&count<=r.max)return r.type;if(p.ranges?.length)return p.ranges[p.ranges.length-1].type;return null;}
 
