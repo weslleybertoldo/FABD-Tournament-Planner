@@ -932,7 +932,7 @@ function renderDraws() {
   let lh = '';
   draws.forEach((d,i) => {
     const has = d.matches?.length > 0;
-    const st = has ? '<span class="tag tag-green">Sorteado</span>' : '<span class="tag tag-yellow">Pendente</span>';
+    const st = d.awarded ? '<span class="tag" style="background:#D1FAE5;color:#065F46;border:1px solid #10B981">&#127942; Premiado</span>' : has ? '<span class="tag tag-green">Sorteado</span>' : '<span class="tag tag-yellow">Pendente</span>';
     lh += `<div class="draws-list-item${i===selectedDrawIdx?' active':''}" onclick="selectDraw(${i})">
       <div class="draw-item-name">${esc(d.name)}</div>
       <div class="draw-item-info">${esc(d.type)} - ${d.players?.length||0} jogadores - ${has?(d.type==='Eliminatoria'?(d.players?.length||0)-1:((d.players?.length||0)*((d.players?.length||0)-1)/2)):0} jogos ${st}</div>
@@ -959,6 +959,7 @@ function renderDrawDetail(idx) {
 
   let h = `<div class="card-header"><h3>${esc(d.name)}</h3><div>
     <button class="btn btn-sm btn-success" onclick="generateSingleDraw(${idx})">&#127922; Sortear esta chave</button>
+    ${has?`<button class="btn btn-sm" style="background:${d.awarded?'#D1FAE5;color:#065F46;border:1px solid #10B981':'#FEF3C7;color:#92400E;border:1px solid #F59E0B'}" onclick="toggleAwarded(${idx})">${d.awarded?'&#10003; Premiado':'&#127942; Premiar'}</button>`:''}
     <button class="btn btn-sm btn-danger" onclick="deleteDraw(${idx})">Excluir</button>
   </div></div>
   <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
@@ -1006,7 +1007,48 @@ function renderDrawDetail(idx) {
       </div>
     </div>`;
   }
+
+  // Ranking section (shown when draw has matches)
+  if(has){
+    const ranking=computeDrawRanking(d);
+    if(ranking&&ranking.length){
+      h+=`<div style="margin-top:24px;background:linear-gradient(135deg,#FEF3C7 0%,#FFFBEB 100%);border-radius:12px;padding:20px;border:2px solid #F59E0B">
+        <h3 style="color:#92400E;margin-bottom:16px;display:flex;align-items:center;gap:8px"><span style="font-size:20px">&#127942;</span> Ranking / Premiacao</h3>`;
+      if(d.type==='Eliminatoria'){
+        ranking.forEach(r=>{
+          const medal=r.pos===1?'\uD83E\uDD47':r.pos===2?'\uD83E\uDD48':'\uD83E\uDD49';
+          const label=r.pos===1?'1o Lugar - Ouro':r.pos===2?'2o Lugar - Prata':'3o Lugar - Bronze';
+          const bg=r.pos===1?'#FEF3C7':r.pos===2?'#F3F4F6':'#FED7AA';
+          const color=r.pos===1?'#D97706':r.pos===2?'#6B7280':'#92400E';
+          h+=`<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:${bg};border-radius:8px;margin-bottom:8px;border-left:4px solid ${color}">
+            <span style="font-size:28px">${medal}</span>
+            <div><div style="font-size:11px;color:${color};font-weight:700;text-transform:uppercase;letter-spacing:0.5px">${label}</div>
+            <div style="font-size:16px;font-weight:700;color:#1a1a1a">${esc(r.name)}</div></div></div>`;
+        });
+      } else {
+        h+='<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#1E3A8A"><th style="color:white;padding:6px 10px;text-align:center;font-size:11px">Pos.</th><th style="color:white;padding:6px 10px;text-align:left;font-size:11px">Jogador</th><th style="color:white;padding:6px 10px;text-align:center;font-size:11px">V</th><th style="color:white;padding:6px 10px;text-align:center;font-size:11px">D</th><th style="color:white;padding:6px 10px;text-align:center;font-size:11px">Pts+</th><th style="color:white;padding:6px 10px;text-align:center;font-size:11px">Pts-</th><th style="color:white;padding:6px 10px;text-align:center;font-size:11px">Diff</th></tr></thead><tbody>';
+        ranking.forEach((r,i)=>{
+          const medal=r.pos===1?'\uD83E\uDD47':r.pos===2?'\uD83E\uDD48':r.pos===3?'\uD83E\uDD49':'';
+          const bg=i%2===0?'#fff':'#f8f9fa';
+          const fw=r.pos<=3?'700':'400';
+          const color=r.pos===1?'#D97706':r.pos===2?'#6B7280':r.pos===3?'#92400E':'#1a1a1a';
+          h+=`<tr style="background:${bg}"><td style="text-align:center;padding:6px 10px;font-weight:${fw};color:${color}">${medal} ${i+1}o</td><td style="padding:6px 10px;font-weight:${fw}">${esc(r.name)}</td><td style="text-align:center;padding:6px 10px">${r.wins}</td><td style="text-align:center;padding:6px 10px">${r.losses}</td><td style="text-align:center;padding:6px 10px">${r.ptsFor}</td><td style="text-align:center;padding:6px 10px">${r.ptsAgainst}</td><td style="text-align:center;padding:6px 10px;font-weight:700;color:${r.ptsDiff>0?'#059669':r.ptsDiff<0?'#DC2626':'#666'}">${r.ptsDiff>0?'+':''}${r.ptsDiff}</td></tr>`;
+        });
+        h+='</tbody></table>';
+      }
+      h+='</div>';
+    }
+  }
+
   detailEl.innerHTML = h;
+}
+
+async function toggleAwarded(idx){
+  const d=tournament.draws[idx];if(!d)return;
+  d.awarded=!d.awarded;
+  await window.api.saveTournament(tournament);
+  renderDraws();
+  showToast(d.awarded?`Chave "${d.name}" premiada!`:`Premiacao removida de "${d.name}"`);
 }
 
 // Sincronizar chaves com novos atletas adicionados
@@ -2942,7 +2984,299 @@ async function importBackup(){
 }
 
 // === REPORTS ===
-function printReport(type){showToast(`Relatorio "${type}" em desenvolvimento`,'info');}
+function printReport(type){
+  if(!tournament){showToast('Nenhum torneio ativo','warning');return;}
+  const tName=esc(tournament.name);
+  const tDate=fmtDate(tournament.startDate)+(tournament.endDate&&tournament.endDate!==tournament.startDate?' a '+fmtDate(tournament.endDate):'');
+  const tLocation=esc(tournament.location||'')+' - '+esc(tournament.city||'');
+
+  const reportStyles=`
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box;}
+      body{font-family:'Segoe UI',Tahoma,sans-serif;font-size:13px;color:#1a1a1a;padding:20px 30px;}
+      .report-header{text-align:center;margin-bottom:24px;border-bottom:3px solid #1E3A8A;padding-bottom:16px;}
+      .report-header h1{font-size:20px;color:#1E3A8A;margin-bottom:4px;}
+      .report-header h2{font-size:15px;color:#333;font-weight:600;margin-bottom:4px;}
+      .report-header p{font-size:12px;color:#666;}
+      .report-header .fabd-name{font-size:14px;color:#C41E2A;font-weight:700;letter-spacing:1px;margin-bottom:8px;}
+      table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+      th{background:#1E3A8A;color:white;padding:6px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;}
+      td{padding:5px 10px;border-bottom:1px solid #ddd;font-size:12px;}
+      tr:nth-child(even){background:#f8f9fa;}
+      .cat-title{background:#f0f4ff;padding:8px 12px;font-weight:700;color:#1E3A8A;font-size:14px;margin:16px 0 8px;border-left:4px solid #1E3A8A;}
+      .medal-gold{color:#D97706;font-weight:700;}
+      .medal-silver{color:#6B7280;font-weight:700;}
+      .medal-bronze{color:#92400E;font-weight:700;}
+      .winner{color:#059669;font-weight:700;}
+      .no-print{margin:20px 0;}
+      .bracket-svg{overflow-x:auto;margin:10px 0;}
+      .rr-table th,.rr-table td{text-align:center;padding:4px 6px;font-size:11px;}
+      .rr-table td:nth-child(2){text-align:left;}
+      .page-break{page-break-before:always;}
+      @media print{.no-print{display:none !important;}}
+    </style>`;
+  const reportHeader=`<div class="report-header">
+    <div class="fabd-name">FEDERACAO ALAGOANA DE BADMINTON</div>
+    <h1>${tName}</h1>
+    <p>${tDate} | ${tLocation}</p>
+  </div>`;
+  const printBtn='<div class="no-print" style="text-align:center"><button onclick="window.print()" style="padding:10px 24px;font-size:14px;background:#1E3A8A;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">Imprimir</button> <button onclick="window.close()" style="padding:10px 24px;font-size:14px;background:#6B7280;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-left:8px">Fechar</button></div>';
+
+  let body='';
+  switch(type){
+    case 'entries': body=reportEntries(); break;
+    case 'draws': body=reportDraws(); break;
+    case 'results': body=reportResults(); break;
+    case 'oop': body=reportOOP(); break;
+    case 'winners': body=reportWinners(); break;
+    case 'players': body=reportPlayers(); break;
+    default: body='<p>Relatorio nao encontrado.</p>';
+  }
+
+  const w=window.open('','_blank','width=900,height=700');
+  if(!w){showToast('Popup bloqueado. Permita popups para imprimir.','warning');return;}
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${tName} - Relatorio</title>${reportStyles}</head><body>${reportHeader}${printBtn}${body}${printBtn}</body></html>`);
+  w.document.close();
+}
+
+function reportEntries(){
+  const entries=tournament.entries||[];
+  if(!entries.length)return'<p>Nenhum inscrito.</p>';
+  const groups={};
+  entries.forEach(e=>{if(!groups[e.key])groups[e.key]=[];groups[e.key].push(e);});
+  let h='<h2 style="color:#1E3A8A;margin-bottom:12px">Lista de Inscritos</h2>';
+  Object.keys(groups).sort().forEach(key=>{
+    const list=groups[key];
+    h+=`<div class="cat-title">${esc(key)} (${list.length} inscritos)</div>`;
+    h+='<table><thead><tr><th>#</th><th>Jogador</th><th>Clube</th><th>Dupla</th><th>Status</th></tr></thead><tbody>';
+    list.forEach((e,i)=>{
+      const partnerName=e.partner?players.find(p=>p.id===e.partner):null;
+      const pn=partnerName?`${partnerName.firstName} ${partnerName.lastName}`:'';
+      h+=`<tr><td>${i+1}</td><td>${esc(e.playerName)}</td><td>${esc(e.club||'-')}</td><td>${esc(pn)||'-'}</td><td>${esc(e.status)}</td></tr>`;
+    });
+    h+='</tbody></table>';
+  });
+  return h;
+}
+
+function reportDraws(){
+  const draws=tournament.draws||[];
+  if(!draws.length)return'<p>Nenhuma chave criada.</p>';
+  let h='<h2 style="color:#1E3A8A;margin-bottom:12px">Chaves / Brackets</h2>';
+  draws.forEach((d,di)=>{
+    if(di>0)h+='<div class="page-break"></div>';
+    h+=`<div class="cat-title">${esc(d.name)} - ${esc(d.type)} (${d.players?.length||0} jogadores)</div>`;
+    if(!d.matches?.length){
+      h+='<p style="padding:8px;color:#666">Chave ainda nao sorteada.</p>';
+      h+='<table><thead><tr><th>#</th><th>Jogador</th></tr></thead><tbody>';
+      (d.players||[]).forEach((p,i)=>{h+=`<tr><td>${i+1}</td><td>${esc(p)}</td></tr>`;});
+      h+='</tbody></table>';
+      return;
+    }
+    if(d.type==='Eliminatoria'){
+      h+=reportBracketSVG(d);
+    } else {
+      h+=reportRoundRobinTable(d);
+    }
+  });
+  return h;
+}
+
+function reportBracketSVG(d){
+  // Reuse the renderBracket logic but return the SVG HTML
+  return renderBracket(d);
+}
+
+function reportRoundRobinTable(d){
+  if(!d.players?.length)return'';
+  let h='<table class="rr-table"><thead><tr><th>#</th><th>Jogador</th>';
+  d.players.forEach((_,i)=>h+=`<th>${i+1}</th>`);
+  h+='<th>V</th><th>D</th><th>Pts</th></tr></thead><tbody>';
+  d.players.forEach((p,i)=>{
+    h+=`<tr><td>${i+1}</td><td style="text-align:left"><strong>${esc(p)}</strong></td>`;
+    d.players.forEach((q,j)=>{
+      if(i===j){h+='<td style="background:#e5e7eb">-</td>';return;}
+      const m=(d.matches||[]).find(x=>(x.player1===p&&x.player2===q)||(x.player1===q&&x.player2===p));
+      if(!m||m.winner===undefined){h+='<td>-</td>';return;}
+      const isP1=m.player1===p;
+      if(m.score1==='W.O.'||m.score2==='W.O.'){
+        const iWon=(isP1&&m.winner===1)||(!isP1&&m.winner===2);
+        h+=`<td style="color:${iWon?'#10B981':'#DC2626'};font-weight:700">${iWon?'W':'L'}</td>`;
+        return;
+      }
+      h+=`<td>${m.score1!==undefined&&m.score1!==''?(isP1?`${m.score1}-${m.score2}`:`${m.score2}-${m.score1}`):'-'}</td>`;
+    });
+    let w=0,l=0;
+    (d.matches||[]).forEach(m=>{
+      if(m.winner===undefined)return;
+      const isP1=m.player1===p;const isP2=m.player2===p;
+      if(!isP1&&!isP2)return;
+      if((isP1&&m.winner===1)||(isP2&&m.winner===2))w++;
+      if((isP1&&m.winner===2)||(isP2&&m.winner===1))l++;
+    });
+    h+=`<td>${w}</td><td>${l}</td><td><strong>${w*2}</strong></td></tr>`;
+  });
+  h+='</tbody></table>';
+  return h;
+}
+
+function reportResults(){
+  const matches=tournament.matches||[];
+  const finished=matches.filter(m=>m.status==='Finalizada'||m.status==='WO'||m.status==='Desistencia'||m.status==='Desqualificacao');
+  if(!finished.length)return'<p>Nenhum resultado registrado.</p>';
+  let h='<h2 style="color:#1E3A8A;margin-bottom:12px">Resultados</h2>';
+  const groups={};
+  finished.forEach(m=>{const k=m.drawName||'Sem chave';if(!groups[k])groups[k]=[];groups[k].push(m);});
+  Object.keys(groups).sort().forEach(key=>{
+    const list=groups[key];
+    h+=`<div class="cat-title">${esc(key)}</div>`;
+    h+='<table><thead><tr><th>Jogo</th><th>Rodada</th><th>Jogador 1</th><th>Placar</th><th>Jogador 2</th><th>Quadra</th><th>Arbitro</th></tr></thead><tbody>';
+    list.forEach(m=>{
+      const p1Style=m.winner===1?'class="winner"':'';
+      const p2Style=m.winner===2?'class="winner"':'';
+      let scoreStr=m.score||'-';
+      h+=`<tr><td>${m.num}</td><td>${esc(m.roundName||'R'+m.round)}</td><td ${p1Style}>${esc(m.player1||'-')}</td><td style="text-align:center;font-weight:700">${esc(scoreStr)}</td><td ${p2Style}>${esc(m.player2||'-')}</td><td>${esc(m.court||'-')}</td><td>${esc(m.umpire||'-')}</td></tr>`;
+    });
+    h+='</tbody></table>';
+  });
+  return h;
+}
+
+function reportOOP(){
+  const matches=tournament.matches||[];
+  if(!matches.length)return'<p>Sem partidas agendadas.</p>';
+  const sorted=[...matches].sort((a,b)=>{
+    const ta=a.time?timeToMin(a.time):9999;
+    const tb2=b.time?timeToMin(b.time):9999;
+    return ta-tb2||a.num-b.num;
+  });
+  let h='<h2 style="color:#1E3A8A;margin-bottom:12px">Ordem de Jogo</h2>';
+  h+='<table><thead><tr><th>Hora</th><th>Jogo</th><th>Chave</th><th>Rodada</th><th>Jogador 1</th><th>x</th><th>Jogador 2</th><th>Quadra</th><th>Status</th></tr></thead><tbody>';
+  sorted.forEach(m=>{
+    const done=m.status==='Finalizada'||m.status==='WO';
+    const p1Style=m.winner===1?'class="winner"':'';
+    const p2Style=m.winner===2?'class="winner"':'';
+    h+=`<tr${done?' style="color:#888"':''}>
+      <td>${esc(m.time||'-')}</td><td>${m.num}</td><td>${esc(m.drawName||'-')}</td><td>${esc(m.roundName||'R'+m.round)}</td>
+      <td ${p1Style}>${esc(m.player1Display||m.player1||'A definir')}</td><td style="text-align:center">x</td>
+      <td ${p2Style}>${esc(m.player2Display||m.player2||'A definir')}</td><td>${esc(m.court||'-')}</td><td>${esc(m.status)}</td></tr>`;
+  });
+  h+='</tbody></table>';
+  return h;
+}
+
+function reportWinners(){
+  const draws=tournament.draws||[];
+  if(!draws.length)return'<p>Nenhuma chave criada.</p>';
+  let h='<h2 style="color:#1E3A8A;margin-bottom:12px">Premiacao</h2>';
+  draws.forEach(d=>{
+    const ranking=computeDrawRanking(d);
+    if(!ranking||!ranking.length)return;
+    h+=`<div class="cat-title">${esc(d.name)}</div>`;
+    h+='<table><thead><tr><th>Pos.</th><th>Medalha</th><th>Jogador</th></tr></thead><tbody>';
+    ranking.forEach(r=>{
+      const medalClass=r.pos===1?'medal-gold':r.pos===2?'medal-silver':'medal-bronze';
+      const medalLabel=r.pos===1?'Ouro':r.pos===2?'Prata':'Bronze';
+      const medalIcon=r.pos===1?'\uD83E\uDD47':r.pos===2?'\uD83E\uDD48':'\uD83E\uDD49';
+      h+=`<tr><td class="${medalClass}">${r.pos}o</td><td class="${medalClass}">${medalIcon} ${medalLabel}</td><td class="${medalClass}">${esc(r.name)}</td></tr>`;
+    });
+    h+='</tbody></table>';
+  });
+  return h;
+}
+
+function reportPlayers(){
+  if(!players.length)return'<p>Nenhum jogador cadastrado.</p>';
+  let h='<h2 style="color:#1E3A8A;margin-bottom:12px">Lista de Jogadores</h2>';
+  h+='<table><thead><tr><th>#</th><th>Nome</th><th>Genero</th><th>Data Nasc.</th><th>Categoria</th><th>Clube</th><th>Estado</th><th>Inscricoes</th></tr></thead><tbody>';
+  players.forEach((p,i)=>{
+    const cat=calculateCategory(p.dob);
+    const inscs=(p.inscriptions||[]).map(x=>x.key).join(', ');
+    h+=`<tr><td>${i+1}</td><td>${esc(p.firstName)} ${esc(p.lastName)}</td><td>${p.gender==='M'?'Masc':'Fem'}</td><td>${fmtDate(p.dob)}</td><td>${esc(cat)}</td><td>${esc(p.club||'-')}</td><td>${esc(p.state||'-')}</td><td style="font-size:11px">${esc(inscs)||'-'}</td></tr>`;
+  });
+  h+='</tbody></table>';
+  return h;
+}
+
+// === RANKING / PREMIACAO ===
+function computeDrawRanking(d){
+  if(!d.matches?.length)return null;
+  if(d.type==='Eliminatoria')return computeEliminationRanking(d);
+  return computeRoundRobinRanking(d);
+}
+
+function computeEliminationRanking(d){
+  const totalRounds=Math.max(...d.matches.map(m=>m.round));
+  const finalMatch=d.matches.find(m=>m.round===totalRounds);
+  if(!finalMatch||!finalMatch.winner)return null;
+  const first=finalMatch.winner===1?finalMatch.player1:finalMatch.player2;
+  const second=finalMatch.winner===1?finalMatch.player2:finalMatch.player1;
+  const ranking=[{pos:1,name:first},{pos:2,name:second}];
+  // 3rd place: losers of semifinals
+  if(totalRounds>=2){
+    const semis=d.matches.filter(m=>m.round===totalRounds-1);
+    semis.forEach(sm=>{
+      if(!sm.winner)return;
+      const loser=sm.winner===1?sm.player2:sm.player1;
+      if(loser&&loser!=='BYE'&&loser!==first&&loser!==second){
+        ranking.push({pos:3,name:loser});
+      }
+    });
+  }
+  return ranking;
+}
+
+function computeRoundRobinRanking(d){
+  if(!d.players?.length)return null;
+  // Compute stats for each player
+  const stats={};
+  d.players.forEach(p=>{stats[p]={name:p,wins:0,losses:0,ptsFor:0,ptsAgainst:0,headToHead:{}};});
+  (d.matches||[]).forEach(m=>{
+    if(m.winner===undefined)return;
+    const p1=m.player1,p2=m.player2;
+    if(!stats[p1]||!stats[p2])return;
+    // Parse scores for point difference
+    let p1Pts=0,p2Pts=0;
+    if(m.score1&&m.score2&&m.score1!=='W.O.'&&m.score2!=='W.O.'){
+      const s1Parts=String(m.score1).split(' ').map(Number).filter(n=>!isNaN(n));
+      const s2Parts=String(m.score2).split(' ').map(Number).filter(n=>!isNaN(n));
+      s1Parts.forEach(v=>p1Pts+=v);
+      s2Parts.forEach(v=>p2Pts+=v);
+    }
+    if(m.winner===1){
+      stats[p1].wins++;stats[p2].losses++;
+      stats[p1].headToHead[p2]=1;stats[p2].headToHead[p1]=0;
+    } else if(m.winner===2){
+      stats[p2].wins++;stats[p1].losses++;
+      stats[p2].headToHead[p1]=1;stats[p1].headToHead[p2]=0;
+    }
+    stats[p1].ptsFor+=p1Pts;stats[p1].ptsAgainst+=p2Pts;
+    stats[p2].ptsFor+=p2Pts;stats[p2].ptsAgainst+=p1Pts;
+  });
+  // Sort by BWF rules: wins > head-to-head > point difference > points scored
+  const arr=Object.values(stats);
+  arr.sort((a,b)=>{
+    if(b.wins!==a.wins)return b.wins-a.wins;
+    // Head-to-head
+    if(a.headToHead[b.name]!==undefined){
+      if(a.headToHead[b.name]===1)return-1;
+      if(a.headToHead[b.name]===0)return 1;
+    }
+    // Point difference
+    const diffA=a.ptsFor-a.ptsAgainst;
+    const diffB=b.ptsFor-b.ptsAgainst;
+    if(diffB!==diffA)return diffB-diffA;
+    // Points scored
+    return b.ptsFor-a.ptsFor;
+  });
+  // Assign positions
+  const ranking=[];
+  arr.forEach((s,i)=>{
+    const pos=i<1?1:i<2?2:3;
+    ranking.push({pos:Math.min(pos,3),name:s.name,wins:s.wins,losses:s.losses,ptsFor:s.ptsFor,ptsAgainst:s.ptsAgainst,ptsDiff:s.ptsFor-s.ptsAgainst});
+  });
+  return ranking;
+}
 
 // === TOAST ===
 function showToast(msg,type='success'){document.querySelectorAll('.toast').forEach(t=>t.remove());const c={success:{bg:'#D1FAE5',b:'#10B981',c:'#065F46',i:'&#10003;'},error:{bg:'#FEE2E2',b:'#EF4444',c:'#991B1B',i:'&#10007;'},warning:{bg:'#FEF3C7',b:'#F59E0B',c:'#92400E',i:'&#9888;'},info:{bg:'#DBEAFE',b:'#3B82F6',c:'#1E3A8A',i:'&#8505;'}}[type]||{bg:'#D1FAE5',b:'#10B981',c:'#065F46',i:'&#10003;'};const t=document.createElement('div');t.className='toast';t.style.cssText=`position:fixed;bottom:24px;right:24px;z-index:999;padding:12px 20px;border-radius:8px;background:${c.bg};border:1px solid ${c.b};color:${c.c};font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:400px;display:flex;align-items:center;gap:8px;`;t.innerHTML=`<span>${c.i}</span> ${esc(msg)}`;document.body.appendChild(t);setTimeout(()=>{if(t.parentNode)t.remove();},4000);}
