@@ -121,11 +121,21 @@
 
           h+=`<div class="match-live${isActive?' active':''}">`;
           h+=`<div class="top-row"><span class="badge badge-blue">${esc(m.court)}</span><span class="badge badge-gray">${esc(m.draw_name)} - ${esc(m.round_name||'')}</span></div>`;
-          h+=`<div class="scoreboard"><div class="player"><div class="name${w===1?' winner':''}">${esc(m.player1)}</div><div class="points">${p1S}</div>${(sw1||sw2)?`<div class="sets-won">${sw1} sets</div>`:''}</div>`;
-          h+=`<div class="vs">VS</div>`;
-          h+=`<div class="player"><div class="name${w===2?' winner':''}">${esc(m.player2)}</div><div class="points">${p2S}</div>${(sw1||sw2)?`<div class="sets-won">${sw2} sets</div>`:''}</div></div>`;
-          if(!w)h+=`<div class="set-info">Set ${curSet}</div>`;
-          if(s1.length){h+=`<div class="set-history">`;s1.forEach((v,i)=>{h+=`<span class="set-score">${v}-${s2[i]}</span>`;});h+=`</div>`;}
+          // Scoreboard com sets no centro
+          h+=`<div class="scoreboard">`;
+          h+=`<div class="player"><div class="name${w===1?' winner':''}">${esc(m.player1)}</div><div class="points">${p1S}</div>${(sw1||sw2)?`<div class="sets-won">${sw1} sets</div>`:''}</div>`;
+          // Centro: sets anteriores + set atual
+          h+=`<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:70px">`;
+          if(s1.length){
+            s1.forEach((v,i)=>{
+              h+=`<div style="font-size:11px;color:#64748B">Set ${i+1}</div>`;
+              h+=`<div class="set-score" style="font-size:15px">${v} : ${s2[i]}</div>`;
+            });
+          }
+          if(!w){h+=`<div style="font-size:11px;color:#F59E0B;font-weight:700;margin-top:4px">Set ${curSet}</div>`;}
+          h+=`</div>`;
+          h+=`<div class="player"><div class="name${w===2?' winner':''}">${esc(m.player2)}</div><div class="points">${p2S}</div>${(sw1||sw2)?`<div class="sets-won">${sw2} sets</div>`:''}</div>`;
+          h+=`</div>`;
           if(w){h+=`<div style="text-align:center;margin-top:8px"><span class="badge badge-green">Finalizada - ${esc(w===1?m.player1:m.player2)} venceu</span></div>`;}
           h+=`</div>`;
         });
@@ -172,15 +182,19 @@
             h+=`<div class="hist-match">`;
             h+=`<div class="hist-players">`;
             h+=`<div class="hist-name left${w===1?' win':''}">${esc(m.player1)}</div>`;
-            // Placar por set
+            // Placar por set - um abaixo do outro
+            h+=`<div class="hist-score" style="display:flex;flex-direction:column;align-items:center;gap:2px">`;
             if(setsP1.length){
-              let sc='';setsP1.forEach((v,i)=>{sc+=(i?' / ':'')+v+'-'+setsP2[i];});
-              h+=`<div class="hist-score">${esc(sc)}</div>`;
+              setsP1.forEach((v,i)=>{
+                h+=`<div style="font-size:10px;color:#64748B">Set ${i+1}</div>`;
+                h+=`<div style="font-size:15px;font-weight:700">${v} : ${setsP2[i]}</div>`;
+              });
             } else if(finalScore){
-              h+=`<div class="hist-score">${esc(finalScore)}</div>`;
+              h+=`<div>${esc(finalScore)}</div>`;
             } else {
-              h+=`<div class="hist-score">-</div>`;
+              h+=`<div>-</div>`;
             }
+            h+=`</div>`;
             h+=`<div class="hist-name right${w===2?' win':''}">${esc(m.player2)}</div>`;
             h+=`</div>`;
             h+=`<div class="hist-meta">`;

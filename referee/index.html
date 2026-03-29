@@ -215,6 +215,10 @@
     if(window.matchMedia('(display-mode: standalone)').matches){document.getElementById('install-bar').style.display='none';}
 
 
+    // === BLOCK NOTIFICATIONS ===
+    if('Notification' in window&&Notification.permission==='default'){try{Notification.requestPermission(p=>{});}catch(e){}}
+    document.addEventListener('visibilitychange',()=>{});
+
     // === LOCK ORIENTATION ===
     function lockLandscape(){try{screen.orientation?.lock?.('landscape').catch(()=>{});}catch(e){}}
 
