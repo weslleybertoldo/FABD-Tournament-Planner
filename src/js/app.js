@@ -33,12 +33,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateOverview();
 });
 
-async function loadData() {
+async function loadData(autoLoad=false) {
   try {
-    tournament = await window.api.getTournament();
+    if(autoLoad){
+      tournament = await window.api.getTournament();
+    } else {
+      tournament = null;
+    }
     players = tournament?.players || [];
     await loadGameProfiles();
-    // Se tem torneio ativo, mostrar breadcrumb e habilitar abas
+    updateOverview();
     if (tournament) {
       document.getElementById('breadcrumb').textContent = tournament.name;
       showTournamentPages();
@@ -317,7 +321,7 @@ async function importTournamentBackup() {
   try {
     const result = await window.api.importTournament();
     if (!result) return;
-    await loadData();
+    await loadData(true);
     document.getElementById('breadcrumb').textContent = tournament?.name || '';
     renderTournamentPage(); updateOverview();
     showToast(`Torneio "${result.name}" importado!`);
@@ -369,7 +373,7 @@ function showNewPlayerModal() {
   document.getElementById('p-tab-inscricao').style.display='none';
   document.getElementById('p-categories-list').innerHTML='';
   document.getElementById('p-valor-categoria').value=30;
-  document.getElementById('p-pagamento-status').value='pendente';
+  document.getElementById('p-pagamento-status').value='pago';
   openModal('modal-player');
   requestAnimationFrame(()=>document.getElementById('p-firstname')?.focus());
 }
@@ -396,7 +400,7 @@ function editPlayer(id) {
   document.getElementById('p-tab-inscricao').style.display='none';
   document.getElementById('p-categories-list').innerHTML='';
   document.getElementById('p-valor-categoria').value=p.valorCategoria||30;
-  document.getElementById('p-pagamento-status').value=p.pagamentoStatus||'pendente';
+  document.getElementById('p-pagamento-status').value=p.pagamentoStatus||'pago';
   openModal('modal-player');
 }
 
@@ -492,7 +496,7 @@ function renderInscricaoTab(){
   const p=editingPlayerId?players.find(x=>x.id===editingPlayerId):null;
   const inscs=p?.inscriptions||[];
   const valorCat=p?.valorCategoria||30;
-  const pagStatus=p?.pagamentoStatus||'pendente';
+  const pagStatus=p?.pagamentoStatus||'pago';
   document.getElementById('p-valor-categoria').value=valorCat;
   document.getElementById('p-pagamento-status').value=pagStatus;
   const container=document.getElementById('p-inscricao-resumo');
@@ -538,7 +542,7 @@ async function savePlayer() {
       category: calculateCategory(gv('p-dob')),
       ranking: gv('p-ranking'), phone: gv('p-phone'), email: gv('p-email'),
       valorCategoria: parseInt(document.getElementById('p-valor-categoria')?.value)||30,
-      pagamentoStatus: document.getElementById('p-pagamento-status')?.value||'pendente',
+      pagamentoStatus: document.getElementById('p-pagamento-status')?.value||'pago',
       inscriptions
     };
     if (editingPlayerId) p.id = editingPlayerId;

@@ -90,6 +90,31 @@ function createWindow() {
   });
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
   mainWindow.setMenuBarVisibility(false);
+
+  // Alerta ao fechar com torneio aberto
+  mainWindow.on('close', (e) => {
+    if (db.tournament) {
+      const { dialog: dlg } = require('electron');
+      const choice = dlg.showMessageBoxSync(mainWindow, {
+        type: 'warning',
+        buttons: ['Exportar Backup e Sair', 'Sair sem Backup', 'Cancelar'],
+        defaultId: 2,
+        cancelId: 2,
+        title: 'Torneio Aberto',
+        message: 'Voce tem um torneio aberto. Deseja exportar um backup antes de sair?'
+      });
+      if (choice === 2) { e.preventDefault(); return; }
+      if (choice === 0) {
+        // Exportar backup automatico
+        try {
+          const backupPath = path.join(app.getPath('desktop'), `backup-${db.tournament.name || 'torneio'}-${new Date().toISOString().slice(0,10)}.fabd`);
+          fs.writeFileSync(backupPath, JSON.stringify({ _type: 'fabd-tournament-backup', tournament: db.tournament }, null, 2), 'utf-8');
+          log('INFO', 'Backup exportado ao fechar:', backupPath);
+        } catch(err) { log('ERROR', 'Erro backup ao fechar:', err.message); }
+      }
+    }
+  });
+
   log('INFO', 'App iniciado');
 }
 
