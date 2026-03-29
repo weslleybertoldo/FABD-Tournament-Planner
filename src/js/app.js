@@ -3310,6 +3310,31 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-game')renderGameProfiles();
   if(panelId==='settings-umpires')renderUmpires();
 }
+const APP_VERSION='3.0.0';
+
+async function checkForUpdates(){
+  const statusEl=document.getElementById('update-status');
+  statusEl.textContent='Verificando...';statusEl.style.color='var(--fabd-gray-500)';
+  try{
+    const resp=await fetch('https://api.github.com/repos/weslleybertoldo/FABD-Tournament-Planner/releases/latest');
+    if(!resp.ok)throw new Error('Erro ao buscar');
+    const data=await resp.json();
+    const latestVersion=(data.tag_name||'').replace('v','');
+    if(latestVersion&&latestVersion!==APP_VERSION){
+      // Buscar asset .exe
+      const exeAsset=(data.assets||[]).find(a=>a.name.endsWith('.exe'));
+      statusEl.innerHTML=`<span style="color:#F59E0B;font-weight:600">Nova versao disponivel: v${esc(latestVersion)}</span>`;
+      if(exeAsset){
+        statusEl.innerHTML+=` <button class="btn btn-sm btn-primary" style="margin-left:8px" onclick="window.api.openExternal('${exeAsset.browser_download_url}')">Baixar v${esc(latestVersion)}</button>`;
+      }
+    } else {
+      statusEl.innerHTML=`<span style="color:#10B981;font-weight:600">&#10003; App atualizado (v${APP_VERSION})</span>`;
+    }
+  }catch(e){
+    statusEl.innerHTML=`<span style="color:#DC2626">Erro ao verificar: ${esc(e.message)}</span>`;
+  }
+}
+
 async function saveSettings(){
   if(!tournament) tournament={};
   if(!tournament.settings) tournament.settings={};

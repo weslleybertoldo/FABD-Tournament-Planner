@@ -263,12 +263,10 @@
             <div class="form-group"><label>E-mail de Contato</label><input type="email" class="form-control" id="cfg-email" placeholder="contato@fabd.org.br"></div>
             <button class="btn btn-primary" onclick="saveSettings()">&#128190; Salvar</button>
             <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--fabd-gray-200)">
-              <h4 style="margin-bottom:12px;color:var(--fabd-gray-700)">Backup de Dados</h4>
-              <div style="display:flex;gap:8px">
-                <button class="btn btn-secondary" onclick="exportBackup()">&#128230; Exportar Backup</button>
-                <button class="btn btn-secondary" onclick="importBackup()">&#128229; Importar Backup</button>
-              </div>
-              <div class="form-hint" style="margin-top:8px">O backup automatico e feito a cada salvamento (ultimos 20 backups mantidos)</div>
+              <h4 style="margin-bottom:8px;color:var(--fabd-gray-700)">Atualizacao</h4>
+              <p style="font-size:12px;color:var(--fabd-gray-500);margin-bottom:8px" id="current-version">Versao atual: v3.0.0</p>
+              <button class="btn btn-secondary" onclick="checkForUpdates()">&#128260; Verificar Atualizacoes</button>
+              <span id="update-status" style="margin-left:8px;font-size:13px"></span>
             </div>
           </div>
 

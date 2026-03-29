@@ -158,6 +158,8 @@ ipcMain.handle('db:newTournament', (_, tournament) => {
   return tournament;
 });
 
+ipcMain.handle('app:openExternal', (_, url) => { const { shell } = require('electron'); shell.openExternal(url); });
+
 ipcMain.handle('db:closeTournament', async () => {
   // Limpar dados do Supabase antes de fechar
   if (db.tournament?.id) {
