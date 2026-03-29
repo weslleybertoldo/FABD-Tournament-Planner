@@ -369,17 +369,22 @@
       });
       document.getElementById('div-history').innerHTML=hist;
 
-      // Peteca (servico) - regra badminton: score par = lado direito (parte de baixo da tela)
+      // Peteca (servico) - quadra espelhada como na realidade
+      // Lado azul (esquerdo): par=baixo(65%), impar=cima(35%)
+      // Lado vermelho (direito): ESPELHADO - par=cima(35%), impar=baixo(65%)
       const serverSide=state.server===leftPlayer?'left':'right';
       document.getElementById('shuttle-left').style.display=serverSide==='left'?'block':'none';
       document.getElementById('shuttle-right').style.display=serverSide==='right'?'block':'none';
       const serverScore=state.server===1?state.p1:state.p2;
       const isEven=serverScore%2===0;
-      // Par = direito do jogador = parte de baixo da tela (65%)
-      // Impar = esquerdo do jogador = parte de cima da tela (35%)
       const shuttle=document.getElementById('shuttle-'+serverSide);
       if(shuttle){
-        shuttle.style.top=isEven?'65%':'35%';
+        // Lado esquerdo: par=baixo, impar=cima / Lado direito: invertido (espelho)
+        if(serverSide==='left'){
+          shuttle.style.top=isEven?'65%':'35%';
+        } else {
+          shuttle.style.top=isEven?'35%':'65%';
+        }
         shuttle.style[serverSide==='left'?'right':'left']='15px';
         shuttle.style[serverSide==='left'?'left':'right']='auto';
       }
