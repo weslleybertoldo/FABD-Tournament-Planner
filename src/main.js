@@ -1,6 +1,13 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { createClient } = require('@supabase/supabase-js');
+
+// === SUPABASE ===
+const SUPABASE_URL = 'https://zwjgjtrmsqtyyjtuotuo.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let realtimeChannel = null;
 
 // === PATHS ===
 const DB_PATH = path.join(app.getPath('userData'), 'fabd-data.json');
@@ -250,3 +257,104 @@ ipcMain.handle('db:importFullBackup', async () => {
 ipcMain.handle('db:getSettings', () => db.settings);
 ipcMain.handle('db:saveSettings', (_, settings) => { db.settings = settings; saveDatabase(db); return settings; });
 ipcMain.on('log', (_, level, msg) => { log(level, '[renderer]', msg); });
+
+// === IPC: SUPABASE REALTIME ===
+ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name) => {
+  try {
+    const { error } = await supabase.from('tournaments').upsert({ id: tournamentId, name, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    if (error) throw error;
+    return true;
+  } catch(e) { log('ERROR', 'Supabase upsertTournament:', e.message); return false; }
+});
+
+ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
+  try {
+    const id = `${tournamentId}_${matchData.num}`;
+    const row = {
+      id, tournament_id: tournamentId, match_num: matchData.num,
+      draw_name: matchData.drawName || '', round: matchData.round || 1,
+      round_name: matchData.roundName || '', player1: matchData.player1 || '',
+      player2: matchData.player2 || '', court: matchData.court || '',
+      umpire: matchData.umpire || '', status: matchData.status || 'Em Quadra',
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await supabase.from('live_matches').upsert(row, { onConflict: 'id' });
+    if (error) throw error;
+    // Criar registro de score se nao existir
+    const { data: existing } = await supabase.from('live_scores').select('id').eq('match_id', id).limit(1);
+    if (!existing?.length) {
+      await supabase.from('live_scores').insert({ match_id: id, tournament_id: tournamentId });
+    }
+    log('INFO', 'Supabase match upserted:', id);
+    return true;
+  } catch(e) { log('ERROR', 'Supabase upsertMatch:', e.message); return false; }
+});
+
+ipcMain.handle('supabase:removeFromCourt', async (_, tournamentId, matchNum) => {
+  try {
+    const id = `${tournamentId}_${matchNum}`;
+    await supabase.from('live_scores').delete().eq('match_id', id);
+    await supabase.from('live_matches').delete().eq('id', id);
+    log('INFO', 'Supabase match removed:', id);
+    return true;
+  } catch(e) { log('ERROR', 'Supabase removeFromCourt:', e.message); return false; }
+});
+
+let pollingInterval = null;
+let lastPollData = {};
+
+ipcMain.handle('supabase:subscribe', async (_, tournamentId) => {
+  try {
+    // Parar polling anterior
+    if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+    lastPollData = {};
+
+    // Tentar Realtime primeiro
+    if (realtimeChannel) { supabase.removeChannel(realtimeChannel); realtimeChannel = null; }
+    realtimeChannel = supabase.channel(`scores_${tournamentId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_scores', filter: `tournament_id=eq.${tournamentId}` },
+        (payload) => {
+          log('INFO', 'Realtime score update:', JSON.stringify(payload.new?.match_id));
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('supabase:scoreUpdate', payload.new);
+          }
+        })
+      .subscribe((status) => {
+        log('INFO', 'Realtime status:', status);
+        if (status === 'SUBSCRIBED') {
+          // Realtime funcionou, parar polling se estiver rodando
+          if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; log('INFO', 'Polling parado (Realtime ativo)'); }
+        }
+        if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+          // Fallback: usar polling a cada 3 segundos
+          if (!pollingInterval) {
+            log('INFO', 'Realtime indisponivel, usando polling (3s)');
+            pollingInterval = setInterval(async () => {
+              try {
+                const { data } = await supabase.from('live_scores').select('*').eq('tournament_id', tournamentId);
+                if (data) {
+                  data.forEach(row => {
+                    const key = row.match_id;
+                    const prev = lastPollData[key];
+                    if (!prev || prev.updated_at !== row.updated_at || prev.score_p1 !== row.score_p1 || prev.score_p2 !== row.score_p2 || prev.winner !== row.winner) {
+                      lastPollData[key] = row;
+                      if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('supabase:scoreUpdate', row);
+                      }
+                    }
+                  });
+                }
+              } catch(e) { /* silencioso */ }
+            }, 3000);
+          }
+        }
+      });
+    return true;
+  } catch(e) { log('ERROR', 'Supabase subscribe:', e.message); return false; }
+});
+
+ipcMain.handle('supabase:unsubscribe', async () => {
+  if (realtimeChannel) { supabase.removeChannel(realtimeChannel); realtimeChannel = null; }
+  if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+  return true;
+});

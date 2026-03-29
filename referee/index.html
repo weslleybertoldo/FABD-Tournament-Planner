@@ -80,6 +80,23 @@
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
   </div>
 
+  <!-- AGUARDANDO AUTORIZACAO -->
+  <div id="page-pending" style="display:none">
+    <div class="header">
+      <h1>FABD Arbitro</h1>
+      <div class="user">
+        <span id="pending-user-name"></span>
+        <button class="btn btn-danger" style="padding:6px 12px;font-size:11px" onclick="logout()">Sair</button>
+      </div>
+    </div>
+    <div class="empty" style="padding-top:100px">
+      <div class="icon">&#9203;</div>
+      <h3 style="color:#F59E0B;font-size:20px;margin-bottom:12px">Aguardando Autorizacao</h3>
+      <p style="color:#94A3B8;font-size:14px;max-width:300px;margin:0 auto">Seu acesso foi solicitado ao organizador do torneio. Aguarde a liberacao para iniciar a arbitragem.</p>
+      <p style="color:#475569;font-size:12px;margin-top:24px">Verificando a cada 5 segundos...</p>
+    </div>
+  </div>
+
   <!-- LISTA DE JOGOS -->
   <div id="page-matches" style="display:none">
     <div class="header">
@@ -168,35 +185,74 @@
     function logout(){
       currentUser=null;
       supabase.auth.signOut();
+      hideAllPages();
       document.getElementById('page-login').style.display='flex';
-      document.getElementById('page-matches').style.display='none';
-      document.getElementById('page-scorer').style.display='none';
       if(pollInterval)clearInterval(pollInterval);
     }
 
+    function hideAllPages(){
+      ['page-login','page-pending','page-matches','page-scorer'].forEach(id=>{document.getElementById(id).style.display='none';});
+    }
+
+    async function registerReferee(user){
+      try{
+        await supabase.from('referees').upsert({
+          id:user.id, name:user.name, email:user.email||'', photo:user.photo||'',
+          updated_at:new Date().toISOString()
+        },{onConflict:'id',ignoreDuplicates:false});
+      }catch(e){console.warn('Erro ao registrar arbitro:',e);}
+    }
+
+    async function checkRefereeStatus(){
+      if(!currentUser)return'pendente';
+      try{
+        const{data}=await supabase.from('referees').select('status').eq('id',currentUser.id).single();
+        return data?.status||'pendente';
+      }catch(e){return'pendente';}
+    }
+
+    async function handleLogin(user){
+      currentUser=user;
+      await registerReferee(user);
+      const status=await checkRefereeStatus();
+      if(status==='autorizado'){
+        showMatchesPage();
+      } else {
+        showPendingPage();
+      }
+    }
+
+    function showPendingPage(){
+      hideAllPages();
+      document.getElementById('page-pending').style.display='block';
+      document.getElementById('pending-user-name').textContent=currentUser.name;
+      // Polling para verificar autorizacao
+      if(pollInterval)clearInterval(pollInterval);
+      pollInterval=setInterval(async()=>{
+        const status=await checkRefereeStatus();
+        if(status==='autorizado')showMatchesPage();
+      },5000);
+    }
+
     async function checkAuth(){
-      // Verificar Google auth (inclui callback apos redirect)
       const{data:{session}}=await supabase.auth.getSession();
       if(session?.user){
-        currentUser={
+        await handleLogin({
           name:session.user.user_metadata?.full_name||session.user.user_metadata?.name||session.user.email,
           id:session.user.id,
           email:session.user.email,
           photo:session.user.user_metadata?.avatar_url||session.user.user_metadata?.picture
-        };
-        showMatchesPage();
+        });
         return;
       }
-      // Escutar mudancas de auth (para capturar o callback do OAuth)
-      supabase.auth.onAuthStateChange((event,session)=>{
+      supabase.auth.onAuthStateChange(async(event,session)=>{
         if(event==='SIGNED_IN'&&session?.user){
-          currentUser={
+          await handleLogin({
             name:session.user.user_metadata?.full_name||session.user.user_metadata?.name||session.user.email,
             id:session.user.id,
             email:session.user.email,
             photo:session.user.user_metadata?.avatar_url||session.user.user_metadata?.picture
-          };
-          showMatchesPage();
+          });
         }
       });
       document.getElementById('page-login').style.display='flex';
@@ -204,12 +260,10 @@
 
     // === MATCHES LIST ===
     function showMatchesPage(){
-      document.getElementById('page-login').style.display='none';
+      hideAllPages();
       document.getElementById('page-matches').style.display='block';
-      document.getElementById('page-scorer').style.display='none';
       document.getElementById('user-name').textContent=currentUser.name;
       loadMatches();
-      // Polling para atualizar lista
       if(pollInterval)clearInterval(pollInterval);
       pollInterval=setInterval(loadMatches,5000);
     }

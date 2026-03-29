@@ -73,6 +73,13 @@ async function loadData() {
       });
 
       if (changed) window.api.saveTournament(tournament);
+
+      // Conectar Supabase Realtime
+      try {
+        await window.api.supabaseUpsertTournament(tournament.id, tournament.name);
+        await window.api.supabaseSubscribe(tournament.id);
+        window.api.onScoreUpdate(handleRealtimeScoreUpdate);
+      } catch(e) { console.warn('Supabase connect:', e); }
     }
   } catch(e) { console.error('Erro:', e); }
 }
@@ -2133,16 +2140,54 @@ function renderCourtsPanel() {
     if(!emQuadra){
       h+='Quadra livre';
     } else {
+      const live=emQuadra.liveScore||'';
       h+=`<div class="court-match">
         <span class="match-num">#${emQuadra.num}</span>
         <span class="match-players">${esc(emQuadra.player1)} vs ${esc(emQuadra.player2)}</span>
         <span class="match-draw">${esc(emQuadra.drawName)}</span>
+        ${live?`<span class="match-score" style="color:#F59E0B;font-size:16px;font-weight:700">${esc(live)}</span>`:''}
         ${emQuadra.score?`<span class="match-score">${esc(emQuadra.score)}</span>`:''}
       </div>`;
     }
     h+='</div></div>';
   }
   panel.innerHTML=h;
+}
+
+// Receber atualizacao de placar em tempo real do Supabase
+async function handleRealtimeScoreUpdate(data){
+  if(!data||!tournament?.matches?.length)return;
+  // Extrair match_num do match_id (formato: tournamentId_matchNum)
+  const parts=(data.match_id||'').split('_');
+  const matchNum=parseInt(parts[parts.length-1]);
+  if(!matchNum)return;
+  const m=tournament.matches.find(x=>x.num===matchNum);
+  if(!m)return;
+  // Se jogo ja foi finalizado localmente, ignorar
+  if(m.status==='Finalizada'||m.status==='WO')return;
+
+  // Atualizar placar ao vivo para exibicao
+  const s1=data.score_p1||0, s2=data.score_p2||0, set=data.current_set||1;
+  m.liveScore=`${s1} - ${s2} (Set ${set})`;
+
+  // Se arbitro finalizou o jogo (winner definido)
+  if(data.winner&&data.final_score){
+    m.score=data.final_score;
+    m.status='Finalizada';
+    m.winner=data.winner;
+    m.finishedAt=new Date().toISOString();
+    m.liveScore='';
+    // Adicionar arbitro se veio do app
+    if(data.umpire_name)m.umpire=data.umpire_name;
+    propagateResultToDraws(m);
+    await window.api.saveTournament(tournament);
+    showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
+    // Remover do Supabase
+    try{await window.api.supabaseRemoveFromCourt(tournament.id,m.num);}catch(e){}
+  }
+
+  renderCourtsPanel();
+  renderMatches();
 }
 
 function getCourtOptions(sel) {
@@ -2186,7 +2231,13 @@ async function assignCourt(idx, value) {
   m.court=value;
   if(value&&m.status==='Pendente'){m.status='Em Quadra';if(!m.startedAt)m.startedAt=new Date().toISOString();}
   if(!value&&m.status==='Em Quadra'){m.status='Pendente';m.startedAt=undefined;}
-  await window.api.saveTournament(tournament);renderCourtsPanel();renderMatches();
+  await window.api.saveTournament(tournament);
+  // Sincronizar com Supabase
+  try{
+    if(value&&m.status==='Em Quadra'){await window.api.supabaseUpsertMatch(tournament.id,m);}
+    else if(!value){await window.api.supabaseRemoveFromCourt(tournament.id,m.num);}
+  }catch(e){console.warn('Supabase sync:',e);}
+  renderCourtsPanel();renderMatches();
 }
 
 async function updateMatchField(idx, field, value) {
@@ -2632,7 +2683,90 @@ function getDrawTypeForCount(t,count){if(!t.gameProfileId)return null;const p=ga
 // === UMPIRES ===
 function loadUmpires(){try{return JSON.parse(localStorage.getItem('fabd-umpires')||'[]');}catch{return[];}}
 function saveUmpires(l){localStorage.setItem('fabd-umpires',JSON.stringify(l));}
-function renderUmpires(){const u=loadUmpires(),tb=document.getElementById('umpires-table-body');if(!u.length){tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--fabd-gray-500);padding:24px">Nenhum arbitro</td></tr>';return;}let h='';u.forEach((x,i)=>{h+=`<tr><td>${i+1}</td><td><strong>${esc(x.name)}</strong></td><td><span class="tag tag-blue">${esc(x.level)}</span></td><td><button class="btn btn-sm btn-danger" onclick="removeUmpire(${i})">Remover</button></td></tr>`;});tb.innerHTML=h;}
+function renderUmpires(){
+  const u=loadUmpires(),tb=document.getElementById('umpires-table-body');
+  let h='';
+  // Arbitros locais
+  if(u.length){
+    u.forEach((x,i)=>{h+=`<tr><td>${i+1}</td><td><strong>${esc(x.name)}</strong></td><td><span class="tag tag-blue">${esc(x.level)}</span></td><td><button class="btn btn-sm btn-danger" onclick="removeUmpire(${i})">Remover</button></td></tr>`;});
+  }
+  tb.innerHTML=h||'<tr><td colspan="4" style="text-align:center;color:var(--fabd-gray-500);padding:24px">Nenhum arbitro local</td></tr>';
+  // Carregar arbitros online do Supabase
+  loadOnlineReferees();
+}
+
+async function loadOnlineReferees(){
+  let container=document.getElementById('online-referees-container');
+  if(!container){
+    // Criar container se nao existe
+    const parent=document.getElementById('umpires-table-body')?.closest('.card');
+    if(!parent)return;
+    const div=document.createElement('div');
+    div.id='online-referees-container';
+    div.style.cssText='margin-top:24px;padding-top:16px;border-top:1px solid var(--fabd-gray-200)';
+    parent.appendChild(div);
+    container=div;
+  }
+  try{
+    const response=await fetch('https://zwjgjtrmsqtyyjtuotuo.supabase.co/rest/v1/referees?select=*&order=created_at.desc',{
+      headers:{'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY'}
+    });
+    const referees=await response.json();
+    if(!referees?.length){container.innerHTML='<h4 style="color:var(--fabd-gray-600);margin-bottom:8px">Arbitros Online</h4><p style="color:var(--fabd-gray-500);font-size:13px">Nenhum arbitro conectado.</p>';return;}
+    let h='<h4 style="color:var(--fabd-gray-600);margin-bottom:12px">Arbitros Online (via App)</h4>';
+    h+='<table><thead><tr><th>Nome</th><th>Email</th><th>Status</th><th>Acoes</th></tr></thead><tbody>';
+    referees.forEach(r=>{
+      const stClass=r.status==='autorizado'?'tag-green':r.status==='bloqueado'?'tag-red':'tag-yellow';
+      const stText=r.status==='autorizado'?'Autorizado':r.status==='bloqueado'?'Bloqueado':'Pendente';
+      h+=`<tr>
+        <td><strong>${esc(r.name)}</strong></td>
+        <td style="font-size:12px;color:var(--fabd-gray-500)">${esc(r.email||'')}</td>
+        <td><span class="tag ${stClass}">${stText}</span></td>
+        <td>`;
+      if(r.status!=='autorizado'){
+        h+=`<button class="btn btn-sm btn-success" onclick="authorizeReferee('${esc(r.id)}','autorizado')">Liberar</button> `;
+      }
+      if(r.status!=='bloqueado'){
+        h+=`<button class="btn btn-sm btn-danger" onclick="authorizeReferee('${esc(r.id)}','bloqueado')">Bloquear</button>`;
+      }
+      if(r.status==='autorizado'){
+        h+=`<button class="btn btn-sm btn-secondary" onclick="authorizeReferee('${esc(r.id)}','pendente')" style="margin-left:4px">Revogar</button>`;
+      }
+      h+=`</td></tr>`;
+    });
+    h+='</tbody></table>';
+    container.innerHTML=h;
+  }catch(e){container.innerHTML='<p style="color:var(--fabd-gray-500);font-size:12px">Erro ao carregar arbitros online</p>';}
+}
+
+async function authorizeReferee(id,status){
+  try{
+    await fetch('https://zwjgjtrmsqtyyjtuotuo.supabase.co/rest/v1/referees?id=eq.'+id,{
+      method:'PATCH',
+      headers:{
+        'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY',
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({status,updated_at:new Date().toISOString()})
+    });
+    // Se autorizou, adicionar na lista local de umpires
+    if(status==='autorizado'){
+      const resp=await fetch('https://zwjgjtrmsqtyyjtuotuo.supabase.co/rest/v1/referees?id=eq.'+id+'&select=name',{
+        headers:{'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY'}
+      });
+      const data=await resp.json();
+      if(data?.[0]?.name){
+        const umps=loadUmpires();
+        if(!umps.some(u=>u.name===data[0].name)){
+          umps.push({name:data[0].name,level:'Online'});
+          saveUmpires(umps);
+        }
+      }
+    }
+    showToast(status==='autorizado'?'Arbitro autorizado!':status==='bloqueado'?'Arbitro bloqueado':'Acesso revogado');
+    renderUmpires();
+  }catch(e){showToast('Erro: '+e.message,'error');}
+}
 function addUmpire(){const n=gv('umpire-name');if(!n){alert('Nome');return;}const l=document.getElementById('umpire-level').value;const u=loadUmpires();if(u.some(x=>x.name.toLowerCase()===n.toLowerCase())){alert('Ja existe');return;}u.push({name:n,level:l});saveUmpires(u);document.getElementById('umpire-name').value='';renderUmpires();showToast('Arbitro adicionado!');}
 function removeUmpire(i){if(!confirm('Remover?'))return;const u=loadUmpires();u.splice(i,1);saveUmpires(u);renderUmpires();showToast('Removido');}
 

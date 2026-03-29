@@ -19,5 +19,8 @@
       "target": "nsis",
       "icon": "src/assets/logo-fabd.jpg"
     }
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.100.1"
   }
 }
