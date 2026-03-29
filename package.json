@@ -1,0 +1,23 @@
+{
+  "name": "fabd-tournament-planner",
+  "version": "1.0.0",
+  "description": "Planejador de Torneios - Federação Alagoana de Badminton",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "author": "FABD - Federação Alagoana de Badminton",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0"
+  },
+  "build": {
+    "appId": "com.fabd.tournament-planner",
+    "productName": "FABD Tournament Planner",
+    "win": {
+      "target": "nsis",
+      "icon": "src/assets/logo-fabd.jpg"
+    }
+  }
+}

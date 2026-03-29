@@ -1,0 +1,5 @@
+Nome,Sobrenome,Genero,DataNascimento,Clube,Estado,Ranking,Telefone,Email,Inscricoes,Dupla_DM,Dupla_DF,Dupla_DX
+Joao,Silva,M,15/05/2000,Clube Exemplo,AL,1,(82) 99999-0001,joao@email.com,SM Principal;DM Principal;DX Principal,Pedro Costa,,Maria Santos
+Maria,Santos,F,20/10/1998,Clube Exemplo,AL,1,(82) 99999-0002,maria@email.com,SF Principal;DF Principal;DX Principal,,Ana Lima,Joao Silva
+Pedro,Costa,M,08/03/2000,Clube Exemplo,AL,2,(82) 99999-0003,pedro@email.com,SM Principal;DM Principal,Joao Silva,,
+Ana,Lima,F,25/07/2001,Clube Exemplo,AL,2,(82) 99999-0004,ana@email.com,SF Principal;DF Principal,,Maria Santos,
