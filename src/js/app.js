@@ -190,7 +190,15 @@ function updateOverview() {
   const tm = tournament?.matches?.length || 0;
   const done = (tournament?.matches||[]).filter(m=>m.status==='Finalizada'||m.status==='WO').length;
   document.getElementById('stat-matches').textContent = tm;
-  document.getElementById('stat-active').textContent = tournament ? '1' : '0';
+  // Calcular total de inscricoes arrecadadas
+  let totalArrecadado=0;
+  players.forEach(p=>{
+    const catCount=(p.inscriptions||[]).length;
+    const valor=p.valorCategoria||30;
+    if(p.pagamentoStatus!=='isento')totalArrecadado+=catCount*valor;
+  });
+  const statActive=document.getElementById('stat-active');
+  if(statActive)statActive.textContent=`R$ ${totalArrecadado.toFixed(2)}`;
 
   const c = document.getElementById('recent-tournaments');
   if (!tournament) {
@@ -358,7 +366,10 @@ function showNewPlayerModal() {
   document.querySelectorAll('#player-tabs .tab').forEach((t,i)=>t.classList.toggle('active',i===0));
   document.getElementById('p-tab-dados').style.display='';
   document.getElementById('p-tab-categorias').style.display='none';
+  document.getElementById('p-tab-inscricao').style.display='none';
   document.getElementById('p-categories-list').innerHTML='';
+  document.getElementById('p-valor-categoria').value=30;
+  document.getElementById('p-pagamento-status').value='pendente';
   openModal('modal-player');
   requestAnimationFrame(()=>document.getElementById('p-firstname')?.focus());
 }
@@ -382,7 +393,10 @@ function editPlayer(id) {
   document.querySelectorAll('#player-tabs .tab').forEach((t,i)=>t.classList.toggle('active',i===0));
   document.getElementById('p-tab-dados').style.display='';
   document.getElementById('p-tab-categorias').style.display='none';
+  document.getElementById('p-tab-inscricao').style.display='none';
   document.getElementById('p-categories-list').innerHTML='';
+  document.getElementById('p-valor-categoria').value=p.valorCategoria||30;
+  document.getElementById('p-pagamento-status').value=p.pagamentoStatus||'pendente';
   openModal('modal-player');
 }
 
@@ -464,13 +478,40 @@ function setPlayerTab(el, panelId) {
   el.classList.add('active');
   document.getElementById('p-tab-dados').style.display = panelId==='p-tab-dados' ? '' : 'none';
   document.getElementById('p-tab-categorias').style.display = panelId==='p-tab-categorias' ? '' : 'none';
+  document.getElementById('p-tab-inscricao').style.display = panelId==='p-tab-inscricao' ? '' : 'none';
   if (panelId === 'p-tab-categorias') {
     const p = editingPlayerId ? players.find(x=>x.id===editingPlayerId) : null;
-    // Se checkboxes existem, coletar estado atual; senao, usar inscricoes originais do jogador
     const hasCheckboxes = document.querySelectorAll('.p-cat-check').length > 0;
     const currentInscs = hasCheckboxes ? collectInscriptions() : (p?.inscriptions || []);
     renderPlayerCategories(p ? {...p, inscriptions: currentInscs} : {inscriptions: currentInscs, gender: document.getElementById('p-gender').value, dob: document.getElementById('p-dob').value});
   }
+  if (panelId === 'p-tab-inscricao') renderInscricaoTab();
+}
+
+function renderInscricaoTab(){
+  const p=editingPlayerId?players.find(x=>x.id===editingPlayerId):null;
+  const inscs=p?.inscriptions||[];
+  const valorCat=p?.valorCategoria||30;
+  const pagStatus=p?.pagamentoStatus||'pendente';
+  document.getElementById('p-valor-categoria').value=valorCat;
+  document.getElementById('p-pagamento-status').value=pagStatus;
+  const container=document.getElementById('p-inscricao-resumo');
+  const catCount=inscs.length;
+  const total=catCount*valorCat;
+  let h=`<h4 style="margin-bottom:12px;color:var(--fabd-blue)">Resumo de Inscricao</h4>`;
+  if(catCount){
+    h+=`<table style="width:100%;border-collapse:collapse;font-size:13px">`;
+    h+=`<thead><tr style="background:var(--fabd-gray-200)"><th style="padding:6px 10px;text-align:left">Categoria</th><th style="padding:6px 10px;text-align:right">Valor</th></tr></thead><tbody>`;
+    inscs.forEach(i=>{h+=`<tr><td style="padding:6px 10px">${esc(i.key)}</td><td style="padding:6px 10px;text-align:right">R$ ${valorCat.toFixed(2)}</td></tr>`;});
+    h+=`<tr style="background:var(--fabd-gray-200);font-weight:700"><td style="padding:8px 10px">Total (${catCount} categoria${catCount>1?'s':''})</td><td style="padding:8px 10px;text-align:right;color:var(--fabd-blue);font-size:16px">R$ ${total.toFixed(2)}</td></tr>`;
+    h+=`</tbody></table>`;
+  } else {
+    h+=`<p style="color:var(--fabd-gray-500)">Nenhuma categoria inscrita.</p>`;
+  }
+  const stColors={pendente:'#F59E0B',pago:'#10B981',isento:'#6B7280'};
+  const stLabels={pendente:'Pendente',pago:'Pago',isento:'Isento'};
+  h+=`<div style="margin-top:12px;padding:10px;background:${stColors[pagStatus]}22;border-radius:8px;border-left:4px solid ${stColors[pagStatus]}"><span style="font-weight:700;color:${stColors[pagStatus]}">${stLabels[pagStatus]}</span></div>`;
+  container.innerHTML=h;
 }
 
 function onGenderChange() {
@@ -496,6 +537,8 @@ async function savePlayer() {
       dob: gv('p-dob'), club: gv('p-club'), state: gv('p-state'),
       category: calculateCategory(gv('p-dob')),
       ranking: gv('p-ranking'), phone: gv('p-phone'), email: gv('p-email'),
+      valorCategoria: parseInt(document.getElementById('p-valor-categoria')?.value)||30,
+      pagamentoStatus: document.getElementById('p-pagamento-status')?.value||'pendente',
       inscriptions
     };
     if (editingPlayerId) p.id = editingPlayerId;
@@ -3034,16 +3077,16 @@ function removeUmpire(i){if(!confirm('Remover?'))return;const u=loadUmpires();u.
 
 // === IMPORT ===
 let importedRows=[];
-const IMPORT_TEMPLATE_HEADER='Nome,Sobrenome,Genero,DataNascimento,Clube,Estado,Ranking,Telefone,Email,Inscricoes,Dupla_DM,Dupla_DF,Dupla_DX';
+const IMPORT_TEMPLATE_HEADER='Nome;Sobrenome;Genero;DataNascimento;Clube;Estado;Ranking;Telefone;Email;Inscricoes;Dupla_DM;Dupla_DF;Dupla_DX';
 const IMPORT_TEMPLATE_EXAMPLE=[
-  'Joao,Silva,M,15/05/2000,Clube Maceio,AL,1,(82) 99999-0001,joao@email.com,SM Principal;DM Principal;DX Principal,Pedro Oliveira,,Maria Santos',
-  'Maria,Santos,F,20/10/1998,AABB Alagoas,AL,2,(82) 99999-0002,maria@email.com,SF Principal;DF Principal;DX Principal,,Ana Costa,Joao Silva',
+  'Joao;Silva;M;15/05/2000;Clube Maceio;AL;1;(82) 99999-0001;joao@email.com;SM Principal|DM Principal|DX Principal;Pedro Oliveira;;Maria Santos',
+  'Maria;Santos;F;20/10/1998;AABB Alagoas;AL;2;(82) 99999-0002;maria@email.com;SF Principal|DF Principal|DX Principal;;Ana Costa;Joao Silva',
 ];
 function downloadImportTemplate(){const c=IMPORT_TEMPLATE_HEADER+'\n'+IMPORT_TEMPLATE_EXAMPLE.join('\n')+'\n';if(window.api?.saveFile)window.api.saveFile([{name:'CSV',extensions:['csv']}],'\uFEFF'+c).then(s=>{if(s)showToast('Modelo salvo!');});else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+c],{type:'text/csv'}));a.download='modelo-importacao-FABD.csv';a.click();}}
 function showImportModal(){importedRows=[];document.getElementById('import-step-1').style.display='';document.getElementById('import-step-2').style.display='none';document.getElementById('import-btn-confirm').style.display='none';openModal('modal-import');}
 function importBackToStep1(){document.getElementById('import-step-1').style.display='';document.getElementById('import-step-2').style.display='none';document.getElementById('import-btn-confirm').style.display='none';}
 async function selectImportFile(){try{const fp=await window.api.selectFile([{name:'CSV',extensions:['csv','txt']}]);if(!fp)return;const c=await window.api.readFile(fp);if(!c?.trim()){showToast('Arquivo vazio','warning');return;}parseCSV(c,fp);}catch(e){showToast('Erro: '+e.message,'error');}}
-function parseCSV(content,filePath){const fl=content.split('\n')[0];const sep=(fl.match(/;/g)||[]).length>(fl.match(/,/g)||[]).length?';':',';document.getElementById('import-separator').textContent=sep===';'?'Ponto e virgula':'Virgula';const lines=content.split('\n').map(l=>l.trim()).filter(l=>l);if(lines.length<2){showToast('Arquivo precisa de cabecalho + dados','warning');return;}const headers=parseCSVLine(lines[0],sep);const colMap=mapColumns(headers);importedRows=[];for(let i=1;i<lines.length;i++){const cols=parseCSVLine(lines[i],sep);if(cols.length<2)continue;const row={firstName:getCol(cols,colMap.firstName),lastName:getCol(cols,colMap.lastName),gender:normalizeGender(getCol(cols,colMap.gender)),dob:normalizeDate(getCol(cols,colMap.dob)),club:getCol(cols,colMap.club),state:getCol(cols,colMap.state)||'AL',ranking:getCol(cols,colMap.ranking),phone:getCol(cols,colMap.phone),email:getCol(cols,colMap.email),inscricoesRaw:getCol(cols,colMap.inscricoes),duplaDM:getCol(cols,colMap.duplaDM),duplaDF:getCol(cols,colMap.duplaDF),duplaDX:getCol(cols,colMap.duplaDX),valid:true,error:''};if(!row.firstName&&!row.lastName){row.valid=false;row.error='Nome vazio';}if(row.gender!=='M'&&row.gender!=='F'){row.valid=false;row.error='Genero invalido';}row.category=calculateCategory(row.dob);importedRows.push(row);}document.getElementById('import-file-name').textContent=filePath.split(/[/\\]/).pop();document.getElementById('import-count').textContent=`${importedRows.length} linha(s)`;const vc=importedRows.filter(r=>r.valid).length,ic=importedRows.filter(r=>!r.valid).length;document.getElementById('import-preview-head').innerHTML='<tr><th>#</th><th>Nome</th><th>Sobrenome</th><th>Gen.</th><th>Nasc.</th><th>Cat.</th><th>Clube</th><th>Inscricoes</th><th>Status</th></tr>';let tb='';importedRows.forEach((r,i)=>{const inscs=(r.inscricoesRaw||'').split(';').filter(x=>x.trim()).map(x=>`<span class="tag tag-blue" style="margin:1px;font-size:9px">${esc(x.trim())}</span>`).join(' ')||'-';tb+=`<tr style="${r.valid?'':'background:#FEE2E2'}"><td>${i+1}</td><td>${esc(r.firstName)}</td><td>${esc(r.lastName)}</td><td>${esc(r.gender)}</td><td>${esc(r.dob)}</td><td>${esc(r.category)}</td><td>${esc(r.club)}</td><td>${inscs}</td><td>${r.valid?'<span class="tag tag-green">OK</span>':`<span class="tag tag-red">${esc(r.error)}</span>`}</td></tr>`;});document.getElementById('import-preview-body').innerHTML=tb;document.getElementById('import-summary').innerHTML=`<strong>${vc}</strong> valido(s)${ic?`<br><span style="color:var(--fabd-red)">${ic} com erro</span>`:''}`;document.getElementById('import-step-1').style.display='none';document.getElementById('import-step-2').style.display='';document.getElementById('import-btn-confirm').style.display=vc?'':'none';}
+function parseCSV(content,filePath){const fl=content.split('\n')[0];const sep=(fl.match(/;/g)||[]).length>(fl.match(/,/g)||[]).length?';':',';document.getElementById('import-separator').textContent=sep===';'?'Ponto e virgula':'Virgula';const lines=content.split('\n').map(l=>l.trim()).filter(l=>l);if(lines.length<2){showToast('Arquivo precisa de cabecalho + dados','warning');return;}const headers=parseCSVLine(lines[0],sep);const colMap=mapColumns(headers);importedRows=[];for(let i=1;i<lines.length;i++){const cols=parseCSVLine(lines[i],sep);if(cols.length<2)continue;const row={firstName:getCol(cols,colMap.firstName),lastName:getCol(cols,colMap.lastName),gender:normalizeGender(getCol(cols,colMap.gender)),dob:normalizeDate(getCol(cols,colMap.dob)),club:getCol(cols,colMap.club),state:getCol(cols,colMap.state)||'AL',ranking:getCol(cols,colMap.ranking),phone:getCol(cols,colMap.phone),email:getCol(cols,colMap.email),inscricoesRaw:getCol(cols,colMap.inscricoes),duplaDM:getCol(cols,colMap.duplaDM),duplaDF:getCol(cols,colMap.duplaDF),duplaDX:getCol(cols,colMap.duplaDX),valid:true,error:''};if(!row.firstName&&!row.lastName){row.valid=false;row.error='Nome vazio';}if(row.gender!=='M'&&row.gender!=='F'){row.valid=false;row.error='Genero invalido';}row.category=calculateCategory(row.dob);importedRows.push(row);}document.getElementById('import-file-name').textContent=filePath.split(/[/\\]/).pop();document.getElementById('import-count').textContent=`${importedRows.length} linha(s)`;const vc=importedRows.filter(r=>r.valid).length,ic=importedRows.filter(r=>!r.valid).length;document.getElementById('import-preview-head').innerHTML='<tr><th>#</th><th>Nome</th><th>Sobrenome</th><th>Gen.</th><th>Nasc.</th><th>Cat.</th><th>Clube</th><th>Inscricoes</th><th>Status</th></tr>';let tb='';importedRows.forEach((r,i)=>{const inscs=(r.inscricoesRaw||'').split(/[;|]/).filter(x=>x.trim()).map(x=>`<span class="tag tag-blue" style="margin:1px;font-size:9px">${esc(x.trim())}</span>`).join(' ')||'-';tb+=`<tr style="${r.valid?'':'background:#FEE2E2'}"><td>${i+1}</td><td>${esc(r.firstName)}</td><td>${esc(r.lastName)}</td><td>${esc(r.gender)}</td><td>${esc(r.dob)}</td><td>${esc(r.category)}</td><td>${esc(r.club)}</td><td>${inscs}</td><td>${r.valid?'<span class="tag tag-green">OK</span>':`<span class="tag tag-red">${esc(r.error)}</span>`}</td></tr>`;});document.getElementById('import-preview-body').innerHTML=tb;document.getElementById('import-summary').innerHTML=`<strong>${vc}</strong> valido(s)${ic?`<br><span style="color:var(--fabd-red)">${ic} com erro</span>`:''}`;document.getElementById('import-step-1').style.display='none';document.getElementById('import-step-2').style.display='';document.getElementById('import-btn-confirm').style.display=vc?'':'none';}
 function parseCSVLine(line,sep){const r=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(q&&line[i+1]==='"'){c+='"';i++;}else q=!q;}else if(ch===sep&&!q){r.push(c.trim());c='';}else c+=ch;}r.push(c.trim());return r;}
 function mapColumns(h){const m={firstName:-1,lastName:-1,gender:-1,dob:-1,club:-1,state:-1,ranking:-1,phone:-1,email:-1,inscricoes:-1,duplaDM:-1,duplaDF:-1,duplaDX:-1};const a={firstName:['nome','firstname','first name'],lastName:['sobrenome','lastname','last name'],gender:['genero','gender','sexo'],dob:['data nascimento','datanascimento','dob','date of birth','data nasc','dt nascimento'],club:['clube','club'],state:['estado','state','uf'],ranking:['ranking','classificacao','rank'],phone:['telefone','phone','tel','celular','mobile'],email:['email','e-mail','mail'],inscricoes:['inscricoes','inscricao','categories','categorias'],duplaDM:['dupla_dm','dupladm','parceiro_dm'],duplaDF:['dupla_df','dupladf','parceira_df'],duplaDX:['dupla_dx','duladx','parceiro_dx','parceira_dx']};h.forEach((x,i)=>{const l=x.toLowerCase().replace(/[^a-z0-9_ ]/g,'').trim();Object.keys(a).forEach(k=>{if(a[k].some(al=>l===al||l.includes(al))&&m[k]===-1)m[k]=i;});});if(m.firstName===-1)m.firstName=0;if(m.lastName===-1)m.lastName=1;if(m.gender===-1)m.gender=2;if(m.dob===-1)m.dob=3;if(m.club===-1)m.club=4;if(m.state===-1)m.state=5;if(m.ranking===-1)m.ranking=6;if(m.phone===-1)m.phone=7;if(m.email===-1)m.email=8;if(m.inscricoes===-1)m.inscricoes=9;if(m.duplaDM===-1)m.duplaDM=10;if(m.duplaDF===-1)m.duplaDF=11;if(m.duplaDX===-1)m.duplaDX=12;return m;}
 function getCol(c,i){return i>=0&&i<c.length?c[i].replace(/^["']|["']$/g,'').trim():'';}
@@ -3062,7 +3105,7 @@ async function confirmImport(){
       // Processar inscricoes do CSV
       const inscriptions=[];
       if(row.inscricoesRaw){
-        row.inscricoesRaw.split(';').forEach(raw=>{
+        row.inscricoesRaw.split(/[;|]/).forEach(raw=>{
           const key=raw.trim();
           if(!key)return;
           // Extrair mod e cat de "SM Principal" ou "DX Sub 13"

@@ -55,7 +55,7 @@
             <div class="stat-card"><div class="stat-value" id="stat-tournaments">0</div><div class="stat-label">Torneios</div></div>
             <div class="stat-card red"><div class="stat-value" id="stat-players">0</div><div class="stat-label">Jogadores Cadastrados</div></div>
             <div class="stat-card green"><div class="stat-value" id="stat-matches">0</div><div class="stat-label">Partidas Realizadas</div></div>
-            <div class="stat-card yellow"><div class="stat-value" id="stat-active">0</div><div class="stat-label">Torneios Ativos</div></div>
+            <div class="stat-card yellow"><div class="stat-value" id="stat-active" style="font-size:20px">R$ 0,00</div><div class="stat-label">Inscricoes Arrecadadas</div></div>
           </div>
           <div class="quick-actions">
             <div class="quick-action" onclick="navigateTo('tournaments'); setTimeout(showNewTournamentModal, 100)"><div class="icon">&#10133;</div><div class="label">Novo Torneio</div></div>
@@ -408,6 +408,7 @@
         <div class="tabs" id="player-tabs">
           <div class="tab active" onclick="setPlayerTab(this,'p-tab-dados')">Dados</div>
           <div class="tab" onclick="setPlayerTab(this,'p-tab-categorias')">Categorias</div>
+          <div class="tab" onclick="setPlayerTab(this,'p-tab-inscricao')">Inscricao</div>
         </div>
 
         <!-- Aba Dados -->
@@ -439,6 +440,28 @@
             Marque as categorias em que este jogador esta inscrito. Para duplas, selecione o parceiro(a).
           </p>
           <div id="p-categories-list" style="max-height:400px;overflow-y:auto"></div>
+        </div>
+        <div id="p-tab-inscricao" style="display:none">
+          <div style="margin-bottom:16px">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Valor por categoria (R$)</label>
+                <div class="spinner">
+                  <input type="number" class="form-control" id="p-valor-categoria" value="30" min="0" max="500" step="5">
+                  <div class="spinner-btns"><button onclick="spinUp('p-valor-categoria',500)">&#9650;</button><button onclick="spinDown('p-valor-categoria',0)">&#9660;</button></div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Status Pagamento</label>
+                <select class="form-control" id="p-pagamento-status">
+                  <option value="pendente">Pendente</option>
+                  <option value="pago">Pago</option>
+                  <option value="isento">Isento</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div id="p-inscricao-resumo" style="background:var(--fabd-gray-100);border-radius:8px;padding:16px"></div>
         </div>
       </div>
       <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-player')">Cancelar</button><button class="btn btn-primary" onclick="savePlayer()">&#128190; Salvar Jogador</button></div>
