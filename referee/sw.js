@@ -1,8 +1,12 @@
-const CACHE='fabd-referee-v3';
-const URLS=['./index.html'];
+const CACHE='fabd-referee-v4';
 
 self.addEventListener('install',e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(URLS)));
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll([
+    './index.html',
+    './manifest.webmanifest',
+    './icon-192.png',
+    './icon-512.png'
+  ])));
   self.skipWaiting();
 });
 
@@ -12,9 +16,15 @@ self.addEventListener('activate',e=>{
 });
 
 self.addEventListener('fetch',e=>{
+  // Network only for API and auth
   if(e.request.url.includes('supabase.co')||e.request.url.includes('googleapis.com')||e.request.url.includes('cdn.jsdelivr.net')){
     e.respondWith(fetch(e.request));
     return;
   }
-  e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));
+  // Network first, fallback to cache
+  e.respondWith(fetch(e.request).then(r=>{
+    const c=r.clone();
+    caches.open(CACHE).then(cache=>cache.put(e.request,c));
+    return r;
+  }).catch(()=>caches.match(e.request)));
 });
