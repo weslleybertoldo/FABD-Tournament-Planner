@@ -42,6 +42,14 @@ async function loadData(autoLoad=false) {
     }
     players = tournament?.players || [];
     await loadGameProfiles();
+    // Carregar arbitros do banco se localStorage vazio
+    try{
+      const umps=loadUmpires();
+      if(!umps.length){
+        const s=await window.api.getSettings();
+        if(s?.umpires?.length){saveUmpires(s.umpires);}
+      }
+    }catch(e){}
     updateOverview();
     if (tournament) {
       document.getElementById('breadcrumb').textContent = tournament.name;
@@ -3458,8 +3466,28 @@ async function saveTournamentConfig(){
 }
 
 // === GAME PROFILES ===
-async function loadGameProfiles(){try{gameProfiles=JSON.parse(localStorage.getItem('fabd-game-profiles')||'[]');}catch{gameProfiles=[];}if(!gameProfiles.length){gameProfiles=[{id:'default-1',name:'Padrao FABD',mode:'custom',fixedType:'Eliminatoria',ranges:[{min:2,max:4,type:'Todos contra Todos'},{min:5,max:7,type:'Grupos + Eliminatoria'},{min:8,max:99,type:'Eliminatoria'}]},{id:'default-2',name:'Somente Mata-Mata',mode:'fixed',fixedType:'Eliminatoria',ranges:[]},{id:'default-3',name:'Somente Round Robin',mode:'fixed',fixedType:'Todos contra Todos',ranges:[]}];saveGameProfiles();}}
-function saveGameProfiles(){localStorage.setItem('fabd-game-profiles',JSON.stringify(gameProfiles));}
+async function loadGameProfiles(){
+  try{
+    const settings=await window.api.getSettings();
+    if(settings?.gameProfiles?.length){gameProfiles=settings.gameProfiles;}
+    else{
+      // Fallback: tentar localStorage (migracao)
+      try{gameProfiles=JSON.parse(localStorage.getItem('fabd-game-profiles')||'[]');}catch{gameProfiles=[];}
+    }
+  }catch{gameProfiles=[];}
+  if(!gameProfiles.length){
+    gameProfiles=[
+      {id:'default-1',name:'Padrao FABD',mode:'custom',fixedType:'Eliminatoria',ranges:[{min:2,max:4,type:'Todos contra Todos'},{min:5,max:7,type:'Grupos + Eliminatoria'},{min:8,max:99,type:'Eliminatoria'}]},
+      {id:'default-2',name:'Somente Mata-Mata',mode:'fixed',fixedType:'Eliminatoria',ranges:[]},
+      {id:'default-3',name:'Somente Round Robin',mode:'fixed',fixedType:'Todos contra Todos',ranges:[]}
+    ];
+    saveGameProfiles();
+  }
+}
+async function saveGameProfiles(){
+  localStorage.setItem('fabd-game-profiles',JSON.stringify(gameProfiles));
+  try{const s=await window.api.getSettings()||{};s.gameProfiles=gameProfiles;await window.api.saveSettings(s);}catch(e){}
+}
 function renderGameProfiles(){const c=document.getElementById('game-profiles-list');if(!gameProfiles.length){c.innerHTML='<p style="text-align:center;color:var(--fabd-gray-500)">Sem perfis</p>';return;}let h='<table><thead><tr><th>Nome</th><th>Modo</th><th>Detalhes</th><th>Acoes</th></tr></thead><tbody>';gameProfiles.forEach(p=>{h+=`<tr><td><strong>${esc(p.name)}</strong></td><td>${p.mode==='fixed'?'Fixo':'Personalizado'}</td><td style="font-size:12px">${p.mode==='fixed'?esc(p.fixedType):(p.ranges||[]).map(r=>`${r.min}-${r.max}: ${r.type}`).join(' | ')}</td><td><button class="btn btn-sm btn-secondary" onclick="editGameProfile('${p.id}')">Editar</button> <button class="btn btn-sm btn-danger" onclick="deleteGameProfile('${p.id}')">Excluir</button></td></tr>`;});c.innerHTML=h+'</tbody></table>';}
 function addGameProfile(){document.getElementById('profile-editor-title').textContent='Novo Perfil';document.getElementById('gp-name').value='';document.getElementById('gp-mode').value='custom';onGameModeChange();setRanges([{min:2,max:4,type:'Todos contra Todos'},{min:5,max:7,type:'Grupos + Eliminatoria'},{min:8,max:99,type:'Eliminatoria'}]);document.getElementById('game-profile-editor').style.display='';}
 function editGameProfile(id){const p=gameProfiles.find(x=>x.id===id);if(!p)return;document.getElementById('profile-editor-title').textContent='Editar';document.getElementById('gp-name').value=p.name;document.getElementById('gp-mode').value=p.mode;document.getElementById('gp-fixed-type').value=p.fixedType||'Eliminatoria';onGameModeChange();if(p.mode==='custom')setRanges(p.ranges||[]);document.getElementById('game-profile-editor').style.display='';editingProfileId=p.id;}
@@ -3491,8 +3519,14 @@ function saveGameProfile(){const name=gv('gp-name');if(!name){alert('Nome');retu
 function getDrawTypeForCount(t,count){if(!t.gameProfileId)return null;const p=gameProfiles.find(x=>x.id===t.gameProfileId);if(!p)return null;if(p.mode==='fixed')return p.fixedType;for(const r of(p.ranges||[]))if(count>=r.min&&count<=r.max)return r.type;if(p.ranges?.length)return p.ranges[p.ranges.length-1].type;return null;}
 
 // === UMPIRES ===
-function loadUmpires(){try{return JSON.parse(localStorage.getItem('fabd-umpires')||'[]');}catch{return[];}}
-function saveUmpires(l){localStorage.setItem('fabd-umpires',JSON.stringify(l));}
+function loadUmpires(){
+  try{return JSON.parse(localStorage.getItem('fabd-umpires')||'[]');}catch{return[];}
+}
+function saveUmpires(l){
+  localStorage.setItem('fabd-umpires',JSON.stringify(l));
+  // Salvar no banco tambem para persistir
+  window.api.getSettings().then(s=>{s=s||{};s.umpires=l;window.api.saveSettings(s);}).catch(()=>{});
+}
 function renderUmpires(){
   const u=loadUmpires(),tb=document.getElementById('umpires-table-body');
   let h='';

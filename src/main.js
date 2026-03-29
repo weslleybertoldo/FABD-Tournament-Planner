@@ -49,6 +49,8 @@ function loadDatabase() {
     if (fs.existsSync(DB_PATH)) {
       const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
       if (!data.settings) data.settings = {};
+      if (!data.settings.gameProfiles) data.settings.gameProfiles = null;
+      if (!data.settings.umpires) data.settings.umpires = null;
       if (!data.tournament) data.tournament = null;
       log('INFO', 'Banco carregado');
       return data;
