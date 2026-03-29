@@ -2031,6 +2031,20 @@ function renderMatches() {
   document.getElementById('matches-no-tournament').style.display='none';document.getElementById('matches-content').style.display='block';
   repropagateAllResults();
   renderCourtsPanel();
+  // Populate day filter
+  const dayFilter=document.getElementById('match-day-filter');
+  if(dayFilter){
+    const prevVal=dayFilter.value;
+    dayFilter.innerHTML='<option value="">Todos os dias</option>';
+    if(tournament.daySchedule?.length){
+      tournament.daySchedule.forEach((day,idx)=>{
+        const d=new Date(day.date+'T00:00:00');
+        const label=`Dia ${idx+1} - ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+        dayFilter.innerHTML+=`<option value="${day.date}">${label}</option>`;
+      });
+    }
+    dayFilter.value=prevVal||'';
+  }
   const tb=document.getElementById('matches-table-body'),countEl=document.getElementById('matches-count');
   const matches=tournament.matches||[];
   const doneMatches=matches.filter(m=>m.status==='Finalizada'||m.status==='WO'||m.status==='Desistencia'||m.status==='Desqualificacao');
@@ -2125,7 +2139,7 @@ function renderMatches() {
 
     const isFinished=m.status==='Finalizada'||m.status==='WO'||m.status==='Desistencia'||m.status==='Desqualificacao';
     const resetBtn=isFinished?`<button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA;margin-left:4px;padding:2px 6px;font-size:11px" onclick="resetMatch(${i})" title="Desfazer resultado">&#8635;</button>`:'';
-    h+=`<tr data-status="${m.status}" style="${rs}"><td>${esc(m.time)||'-'}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" onchange="assignCourt(${i},this.value)"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" onchange="updateMatchField(${i},'umpire',this.value)"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" onclick="showScoreModal(${i})">Placar</button>${resetBtn}`}</td></tr>`;
+    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" style="${rs}"><td>${esc(m.time)||'-'}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" onchange="assignCourt(${i},this.value)"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" onchange="updateMatchField(${i},'umpire',this.value)"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" onclick="showScoreModal(${i})">Placar</button>${resetBtn}`}</td></tr>`;
   });
   tb.innerHTML=h;
 }
@@ -2136,8 +2150,18 @@ function filterMatches() {
   _filterMatchesTimer = setTimeout(() => {
     const q=(document.getElementById('search-matches')?.value||'').toLowerCase();
     const st=document.getElementById('match-status-filter')?.value||'';
+    const dayVal=document.getElementById('match-day-filter')?.value||'';
+    // Build set of draw names for selected day
+    let dayDraws=null;
+    if(dayVal&&tournament?.daySchedule){
+      const day=tournament.daySchedule.find(d=>d.date===dayVal);
+      if(day)dayDraws=new Set(day.draws||[]);
+    }
     document.querySelectorAll('#matches-table-body tr').forEach(r=>{
-      r.style.display=(r.textContent.toLowerCase().includes(q)&&(!st||(r.dataset.status||'')===st))?'':'none';
+      const matchQ=r.textContent.toLowerCase().includes(q);
+      const matchSt=!st||(r.dataset.status||'')===st;
+      const matchDay=!dayDraws||(dayDraws.has(r.dataset.draw||''));
+      r.style.display=(matchQ&&matchSt&&matchDay)?'':'none';
     });
   }, 150);
 }
@@ -2548,67 +2572,98 @@ function renderSchedule() {
     if(cur+dur>bs&&cur<bs){cur=be;continue;}
     slots.push(cur);cur+=slot;
   }
-  if(infoEl){const done=matches.filter(m=>m.status==='Finalizada'||m.status==='WO').length;infoEl.textContent=`${matches.length} jogos | ${done} finalizados | ${startT}-${endT} | Pausa: ${bS}-${bE}`;}
+  if(infoEl){const done=matches.filter(m=>m.status==='Finalizada'||m.status==='WO').length;infoEl.textContent=`${matches.length} jogos | ${done} finalizados`;}
 
-  // Ordenar partidas por horario
-  const sorted=[...matches].sort((a,b)=>{
-    const ta=a.time?timeToMin(a.time):9999;
-    const tb2=b.time?timeToMin(b.time):9999;
-    return ta-tb2||a.num-b.num;
-  });
-
+  // Agrupar por dia se daySchedule existe
+  const hasDaySchedule=tournament.daySchedule?.length>0;
   let h='';
-  let pausaRendered=false;
-  sorted.forEach(m=>{
-    // Inserir pausa antes do primeiro jogo pos-pausa, ou quando ultrapassa o horario de pausa
-    const mTime=m.time?timeToMin(m.time):0;
-    if(!pausaRendered&&m.time&&mTime>=bs){
-      pausaRendered=true;
-      h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${bS} - ${bE})</div>`;
+
+  if(hasDaySchedule){
+    // Agrupar matches por dia
+    tournament.daySchedule.forEach((day,dayIdx)=>{
+      const dayMatches=matches.filter(m=>day.draws?.includes(m.drawName));
+      if(!dayMatches.length)return;
+      const dObj=new Date(day.date+'T00:00:00');
+      const dayLabel=`Dia ${dayIdx+1} - ${String(dObj.getDate()).padStart(2,'0')}/${String(dObj.getMonth()+1).padStart(2,'0')}/${dObj.getFullYear()}`;
+      h+=`<div style="background:#1E3A8A;color:white;padding:12px 16px;border-radius:8px;margin-bottom:8px;font-weight:700;font-size:16px">${dayLabel} <span style="font-size:12px;font-weight:400;opacity:0.8">${day.startTime||'08:00'} - ${day.endTime||'18:00'}</span></div>`;
+      const dayBs=timeToMin(day.breakStart||bS);const dayBe=timeToMin(day.breakEnd||bE);
+      const sorted=[...dayMatches].sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;});
+      let pausaRendered=false;
+      sorted.forEach(m=>{
+        const mTime=m.time?timeToMin(m.time):0;
+        if(!pausaRendered&&m.time&&mTime>=dayBs){
+          pausaRendered=true;
+          h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${day.breakStart||bS} - ${day.breakEnd||bE})</div>`;
+        }
+        h+=renderScheduleMatch(m);
+      });
+      if(!pausaRendered&&dayBs<end)h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${day.breakStart||bS} - ${day.breakEnd||bE})</div>`;
+    });
+    // Matches sem dia atribuido
+    const assignedDraws=new Set();tournament.daySchedule.forEach(d=>(d.draws||[]).forEach(n=>assignedDraws.add(n)));
+    const unassigned=matches.filter(m=>!assignedDraws.has(m.drawName));
+    if(unassigned.length){
+      h+=`<div style="background:#334155;color:white;padding:12px 16px;border-radius:8px;margin:16px 0 8px;font-weight:700">Sem dia definido</div>`;
+      unassigned.sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;}).forEach(m=>{h+=renderScheduleMatch(m);});
     }
+  } else {
+    // Sem daySchedule: layout original
+    const sorted=[...matches].sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;});
+    let pausaRendered=false;
+    sorted.forEach(m=>{
+      const mTime=m.time?timeToMin(m.time):0;
+      if(!pausaRendered&&m.time&&mTime>=bs){
+        pausaRendered=true;
+        h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${bS} - ${bE})</div>`;
+      }
+      h+=renderScheduleMatch(m);
+    });
+    if(!pausaRendered&&sorted.length&&bs<end)h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${bS} - ${bE})</div>`;
+  }
 
-    const done=m.status==='Finalizada'||m.status==='WO',eq=m.status==='Em Quadra',adef=m.status==='A definir';
-    let bg='#fff';if(eq)bg='#FFF3E0';if(done)bg='#D1FAE5';if(adef)bg='#F9FAFB';
-    const border=done?'#10B981':eq?'#F59E0B':adef?'var(--fabd-gray-300)':'var(--fabd-blue)';
-    const p1=esc(m.player1||'A definir'),p2=esc(m.player2||'A definir');
-    const p1Style=m.winner===1?'color:#10B981;font-weight:700':'font-weight:600';
-    const p2Style=m.winner===2?'color:#10B981;font-weight:700':'font-weight:600';
-
-    // Placar formatado
-    let scoreHtml='';
-    if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
-      const sets=m.score.split('/').map(s=>s.trim());let s1=[],s2=[];
-      sets.forEach(s=>{const p=s.split('-');if(p.length===2){s1.push(p[0].trim());s2.push(p[1].trim());}});
-      scoreHtml=`<span style="color:${m.winner===1?'#10B981':'var(--fabd-gray-700)'}; font-weight:700">${s1.join(' ')}</span><span style="color:var(--fabd-gray-400);margin:0 6px">x</span><span style="color:${m.winner===2?'#10B981':'var(--fabd-gray-700)'}; font-weight:700">${s2.join(' ')}</span>`;
-    } else if(m.score==='W.O.'||m.score==='DSQ'||m.score==='RET'){
-      scoreHtml=`<span style="color:var(--fabd-red);font-weight:700">${esc(m.score)}</span>`;
-    } else {
-      scoreHtml='<span style="color:var(--fabd-gray-400);font-weight:700">x</span>';
-    }
-
-    h+=`<div style="background:${bg};border-left:4px solid ${border};border-radius:8px;padding:12px 16px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">`;
-    h+=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">`;
-    h+=`<div style="display:flex;align-items:center;gap:12px">`;
-    h+=`<span style="font-weight:700;color:var(--fabd-blue);font-size:14px">Jogo ${m.num}</span>`;
-    h+=`<span style="font-size:12px;color:var(--fabd-gray-500)">${esc(m.time||'-')}</span>`;
-    h+=`<span style="font-size:12px;color:var(--fabd-gray-500)">${esc(m.drawName)}</span>`;
-    h+=`<span style="font-size:11px;color:var(--fabd-gray-500)">${esc(m.roundName||'R'+m.round)}</span>`;
-    h+=`</div>`;
-    h+=`<div style="display:flex;align-items:center;gap:8px">`;
-    if(m.court)h+=`<span style="font-size:11px;background:var(--fabd-blue);color:white;padding:2px 8px;border-radius:4px">${esc(m.court)}</span>`;
-    if(m.umpire)h+=`<span style="font-size:11px;background:var(--fabd-gray-200);color:var(--fabd-gray-700);padding:2px 8px;border-radius:4px">${esc(m.umpire)}</span>`;
-    h+=`</div></div>`;
-    h+=`<div style="display:flex;align-items:center;justify-content:center;gap:16px;font-size:15px">`;
-    h+=`<span style="${p1Style}">${p1}</span>`;
-    h+=`<span style="font-size:14px">${scoreHtml}</span>`;
-    h+=`<span style="${p2Style}">${p2}</span>`;
-    h+=`</div></div>`;
-  });
-  // Se nenhum jogo pos-pausa mas pausa existe, mostrar no final
-  if(!pausaRendered&&sorted.length&&bs<end){
-    h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${bS} - ${bE})</div>`;
+      h+=renderScheduleMatch(m);
+    });
+    if(!pausaRendered&&sorted.length&&bs<end)h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${bS} - ${bE})</div>`;
   }
   container.innerHTML=h;
+}
+
+function renderScheduleMatch(m){
+  const done=m.status==='Finalizada'||m.status==='WO',eq=m.status==='Em Quadra',adef=m.status==='A definir';
+  let bg='#fff';if(eq)bg='#FFF3E0';if(done)bg='#D1FAE5';if(adef)bg='#F9FAFB';
+  const border=done?'#10B981':eq?'#F59E0B':adef?'var(--fabd-gray-300)':'var(--fabd-blue)';
+  const p1=esc(m.player1||'A definir'),p2=esc(m.player2||'A definir');
+  const p1Style=m.winner===1?'color:#10B981;font-weight:700':'font-weight:600';
+  const p2Style=m.winner===2?'color:#10B981;font-weight:700':'font-weight:600';
+  let scoreHtml='';
+  if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
+    const sets=m.score.split('/').map(s=>s.trim());let s1=[],s2=[];
+    sets.forEach(s=>{const p=s.split('-');if(p.length===2){s1.push(p[0].trim());s2.push(p[1].trim());}});
+    scoreHtml=`<span style="color:${m.winner===1?'#10B981':'var(--fabd-gray-700)'}; font-weight:700">${s1.join(' ')}</span><span style="color:var(--fabd-gray-400);margin:0 6px">x</span><span style="color:${m.winner===2?'#10B981':'var(--fabd-gray-700)'}; font-weight:700">${s2.join(' ')}</span>`;
+  } else if(m.score==='W.O.'||m.score==='DSQ'||m.score==='RET'){
+    scoreHtml=`<span style="color:var(--fabd-red);font-weight:700">${esc(m.score)}</span>`;
+  } else {
+    scoreHtml='<span style="color:var(--fabd-gray-400);font-weight:700">x</span>';
+  }
+  let r='';
+  r+=`<div style="background:${bg};border-left:4px solid ${border};border-radius:8px;padding:12px 16px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">`;
+  r+=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">`;
+  r+=`<div style="display:flex;align-items:center;gap:12px">`;
+  r+=`<span style="font-weight:700;color:var(--fabd-blue);font-size:14px">Jogo ${m.num}</span>`;
+  r+=`<span style="font-size:12px;color:var(--fabd-gray-500)">${esc(m.time||'-')}</span>`;
+  r+=`<span style="font-size:12px;color:var(--fabd-gray-500)">${esc(m.drawName)}</span>`;
+  r+=`<span style="font-size:11px;color:var(--fabd-gray-500)">${esc(m.roundName||'R'+m.round)}</span>`;
+  r+=`</div>`;
+  r+=`<div style="display:flex;align-items:center;gap:8px">`;
+  if(m.court)r+=`<span style="font-size:11px;background:var(--fabd-blue);color:white;padding:2px 8px;border-radius:4px">${esc(m.court)}</span>`;
+  if(m.umpire)r+=`<span style="font-size:11px;background:var(--fabd-gray-200);color:var(--fabd-gray-700);padding:2px 8px;border-radius:4px">${esc(m.umpire)}</span>`;
+  r+=`</div></div>`;
+  r+=`<div style="display:flex;align-items:center;justify-content:center;gap:16px;font-size:15px">`;
+  r+=`<span style="${p1Style}">${p1}</span>`;
+  r+=`<span style="font-size:14px">${scoreHtml}</span>`;
+  r+=`<span style="${p2Style}">${p2}</span>`;
+  r+=`</div></div>`;
+  return r;
 }
 
 // === DRAW WIZARD ===
@@ -2762,6 +2817,7 @@ function showTournamentConfig(){
   document.getElementById('tc-tab-system').style.display='';
   document.getElementById('tc-tab-scoring').style.display='none';
   document.getElementById('tc-tab-courts').style.display='none';
+  document.getElementById('tc-tab-schedule').style.display='none';
   const sel=document.getElementById('tc-profile-select');sel.innerHTML='<option value="">Nenhum</option>';
   gameProfiles.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;if(tournament.gameProfileId===p.id)o.selected=true;sel.appendChild(o);});
   updateTournamentConfigPreview();
@@ -2779,8 +2835,84 @@ function showTournamentConfig(){
   openModal('modal-tournament-config');
 }
 
-function setTcTab(el,id){document.querySelectorAll('#tc-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['tc-tab-system','tc-tab-scoring','tc-tab-courts'].forEach(i=>document.getElementById(i).style.display=i===id?'':'none');if(id==='tc-tab-courts')renderCourtNames();}
+function setTcTab(el,id){document.querySelectorAll('#tc-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['tc-tab-system','tc-tab-scoring','tc-tab-courts','tc-tab-schedule'].forEach(i=>document.getElementById(i).style.display=i===id?'':'none');if(id==='tc-tab-courts')renderCourtNames();if(id==='tc-tab-schedule')renderDaySchedule();}
 function renderCourtNames(){const c=parseInt(document.getElementById('tc-courts').value)||4;const n=tournament?.courtNames||[];let h='';for(let i=0;i<c;i++)h+=`<div style="margin-bottom:4px"><input type="text" class="form-control tc-court-name" value="${esc(n[i]||'Quadra '+(i+1))}" style="padding:4px 8px;font-size:13px"></div>`;document.getElementById('tc-court-names').innerHTML=h;}
+
+function getDaysBetween(startDate,endDate){
+  const days=[];
+  if(!startDate)return days;
+  const end=endDate||startDate;
+  let cur=new Date(startDate+'T00:00:00');
+  const last=new Date(end+'T00:00:00');
+  while(cur<=last){
+    days.push(cur.toISOString().slice(0,10));
+    cur.setDate(cur.getDate()+1);
+  }
+  return days;
+}
+
+function renderDaySchedule(){
+  if(!tournament)return;
+  const container=document.getElementById('tc-day-schedule-container');
+  const days=getDaysBetween(tournament.startDate,tournament.endDate);
+  if(!days.length){container.innerHTML='<div style="color:var(--fabd-gray-500);text-align:center;padding:24px">Defina as datas do torneio para configurar a programacao por dia.</div>';return;}
+  const existing=tournament.daySchedule||[];
+  const drawNames=(tournament.draws||[]).map(d=>d.name);
+  let h='';
+  days.forEach((date,idx)=>{
+    const saved=existing.find(d=>d.date===date)||{};
+    const dObj=new Date(date+'T00:00:00');
+    const label=`Dia ${idx+1} - ${String(dObj.getDate()).padStart(2,'0')}/${String(dObj.getMonth()+1).padStart(2,'0')}/${dObj.getFullYear()}`;
+    const st=saved.startTime||tournament.startTime||'08:00';
+    const et=saved.endTime||tournament.endTime||'18:00';
+    const bs=saved.breakStart||tournament.breakStart||'12:00';
+    const be=saved.breakEnd||tournament.breakEnd||'13:30';
+    const selectedDraws=saved.draws||[];
+    h+=`<div style="background:var(--fabd-gray-100);border-radius:8px;padding:16px;margin-bottom:12px" data-day-date="${date}">`;
+    h+=`<h4 style="margin-bottom:12px;color:var(--fabd-blue)">${label}</h4>`;
+    h+=`<div class="form-row">`;
+    h+=`<div class="form-group"><label>Inicio</label><input type="time" class="form-control ds-start" value="${st}"></div>`;
+    h+=`<div class="form-group"><label>Termino</label><input type="time" class="form-control ds-end" value="${et}"></div>`;
+    h+=`<div class="form-group"><label>Pausa inicio</label><input type="time" class="form-control ds-break-start" value="${bs}"></div>`;
+    h+=`<div class="form-group"><label>Pausa fim</label><input type="time" class="form-control ds-break-end" value="${be}"></div>`;
+    h+=`</div>`;
+    if(drawNames.length){
+      h+=`<div style="margin-top:8px"><label style="font-weight:600;font-size:13px;margin-bottom:6px;display:block">Categorias/Chaves neste dia:</label>`;
+      h+=`<div style="display:flex;flex-wrap:wrap;gap:8px">`;
+      drawNames.forEach(dn=>{
+        const checked=selectedDraws.length?selectedDraws.includes(dn):true;
+        h+=`<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="ds-draw" value="${esc(dn)}" ${checked?'checked':''}> ${esc(dn)}</label>`;
+      });
+      h+=`</div></div>`;
+    }
+    h+=`</div>`;
+  });
+  container.innerHTML=h;
+}
+
+function collectDaySchedule(){
+  const panels=document.querySelectorAll('#tc-day-schedule-container [data-day-date]');
+  const schedule=[];
+  panels.forEach(panel=>{
+    const date=panel.dataset.dayDate;
+    const startTime=panel.querySelector('.ds-start')?.value||'08:00';
+    const endTime=panel.querySelector('.ds-end')?.value||'18:00';
+    const breakStart=panel.querySelector('.ds-break-start')?.value||'12:00';
+    const breakEnd=panel.querySelector('.ds-break-end')?.value||'13:30';
+    const draws=Array.from(panel.querySelectorAll('.ds-draw:checked')).map(cb=>cb.value);
+    schedule.push({date,startTime,endTime,breakStart,breakEnd,draws});
+  });
+  return schedule;
+}
+
+function getMatchDay(match){
+  if(!tournament?.daySchedule?.length)return null;
+  for(const day of tournament.daySchedule){
+    if(day.draws&&day.draws.includes(match.drawName))return day;
+  }
+  return null;
+}
+
 function updateTournamentConfigPreview(){const id=document.getElementById('tc-profile-select').value;const p=gameProfiles.find(x=>x.id===id);const el=document.getElementById('tc-profile-preview');if(!id||!p){el.innerHTML='<span style="color:var(--fabd-gray-500)">Sem perfil</span>';return;}let h=`<strong>${esc(p.name)}</strong><br>`;if(p.mode==='fixed')h+=`Fixo: ${esc(p.fixedType)}`;else{h+='<table style="width:100%;font-size:13px;margin-top:8px"><thead><tr><th>De</th><th>Ate</th><th>Sistema</th></tr></thead><tbody>';(p.ranges||[]).forEach(r=>h+=`<tr><td>${r.min}</td><td>${r.max}</td><td>${esc(r.type)}</td></tr>`);h+='</tbody></table>';}el.innerHTML=h;}
 
 async function saveTournamentConfig(){
@@ -2792,6 +2924,8 @@ async function saveTournamentConfig(){
     tournament.restMinBetweenGames=parseInt(document.getElementById('tc-rest-min').value)||20;tournament.restBetweenSets=parseInt(document.getElementById('tc-rest-sets').value)||2;tournament.restMidSet=parseInt(document.getElementById('tc-rest-mid').value)||1;
     tournament.breakStart=document.getElementById('tc-break-start').value||'12:00';tournament.breakEnd=document.getElementById('tc-break-end').value||'13:30';
     tournament.courtNames=Array.from(document.querySelectorAll('.tc-court-name')).map((inp,i)=>inp.value.trim()||`Quadra ${i+1}`);
+    // Salvar programacao por dia
+    tournament.daySchedule=collectDaySchedule();
     // Re-sincronizar chaves com novo perfil/config
     syncEntriesFromPlayers();
     await window.api.saveTournament(tournament);closeModal('modal-tournament-config');renderTournamentPage();showToast('Configuracao salva!');
