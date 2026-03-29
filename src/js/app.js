@@ -2320,17 +2320,27 @@ function repropagateAllResults(){
       // Sync group matches
       d.groupsData.groups.forEach(g=>{
         g.matches.forEach(dm=>{
+          const dmInDraw=d.matches.find(m=>m.phase==='group'&&m.group===dm.group&&m.player1===dm.player1&&m.player2===dm.player2);
+          const tm=(tournament.matches||[]).find(m=>m.drawName===d.name&&m.phase==='group'&&m.player1===dm.player1&&m.player2===dm.player2);
           if(!dm.winner){
-            // Find in d.matches
-            const dmInDraw=d.matches.find(m=>m.phase==='group'&&m.group===dm.group&&m.player1===dm.player1&&m.player2===dm.player2);
             if(dmInDraw&&dmInDraw.winner){dm.winner=dmInDraw.winner;dm.score1=dmInDraw.score1;dm.score2=dmInDraw.score2;changed=true;}
-            // Find in tournament.matches
-            const tm=(tournament.matches||[]).find(m=>m.drawName===d.name&&m.phase==='group'&&m.player1===dm.player1&&m.player2===dm.player2);
             if(tm&&tm.winner&&tm.score&&tm.score!==''){
               dm.winner=tm.winner;dm.score1=tm.score1||dm.score1;dm.score2=tm.score2||dm.score2;
-              // Also update d.matches
               if(dmInDraw){dmInDraw.winner=tm.winner;dmInDraw.score1=tm.score1;dmInDraw.score2=tm.score2;}
               changed=true;
+            }
+          }
+          // Sync inverso: draw→tournament.match
+          if(dm.winner&&tm&&(!tm.winner||tm.status==='Pendente')){
+            const s1=dm.score1||'',s2=dm.score2||'';
+            if(s1||s2){
+              const s1P=String(s1).split(' ').filter(x=>x);
+              const s2P=String(s2).split(' ').filter(x=>x);
+              if(s1P.length&&s2P.length){
+                tm.score=s1P.map((v,idx)=>v+'-'+(s2P[idx]||'0')).join(' / ');
+                tm.winner=dm.winner;tm.status='Finalizada';tm.finishedAt=tm.finishedAt||new Date().toISOString();
+                changed=true;
+              }
             }
           }
         });
@@ -2385,13 +2395,32 @@ function repropagateAllResults(){
     d.matches.forEach((m,i)=>{if(!byRound[m.round])byRound[m.round]=[];byRound[m.round].push({match:m,globalIdx:i});});
     const totalRounds=Math.max(...d.matches.map(m=>m.round));
 
-    // Round Robin: apenas sincronizar resultados, sem propagar advancers
+    // Round Robin: sincronizar resultados bidirecionalmente
     if(!isElim){
       (d.matches||[]).forEach((dm,i)=>{
-        if(!dm.winner){
-          const tm=findTournamentMatch(d.name,i,dm);
-          // So sincronizar se o tournament.match tem score real (nao apenas winner sem score)
-          if(tm&&tm.winner&&tm.score&&tm.score!==''){dm.winner=tm.winner;changed=true;}
+        const tm=findTournamentMatch(d.name,i,dm);
+        if(!tm)return;
+        if(!dm.winner&&tm.winner&&tm.score&&tm.score!==''){
+          // tournament.match → draw
+          dm.winner=tm.winner;changed=true;
+        } else if(dm.winner&&(!tm.winner||tm.status==='Pendente')){
+          // draw → tournament.match (draw tem resultado mas tournament nao)
+          const s1=dm.score1||'',s2=dm.score2||'';
+          if(s1||s2){
+            // Converter scores da draw para formato de placar
+            const s1Parts=String(s1).split(' ').filter(x=>x);
+            const s2Parts=String(s2).split(' ').filter(x=>x);
+            if(s1Parts.length&&s2Parts.length){
+              const score=s1Parts.map((v,idx)=>v+'-'+(s2Parts[idx]||'0')).join(' / ');
+              tm.score=score;
+              tm.winner=dm.winner;
+              tm.status='Finalizada';
+              tm.finishedAt=tm.finishedAt||new Date().toISOString();
+              changed=true;
+            }
+          } else if(dm.score1==='W.O.'||dm.score2==='W.O.'){
+            tm.score='W.O.';tm.winner=dm.winner;tm.status='WO';changed=true;
+          }
         }
       });
       return;
