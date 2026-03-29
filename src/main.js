@@ -112,6 +112,17 @@ function createWindow() {
           log('INFO', 'Backup exportado ao fechar:', backupPath);
         } catch(err) { log('ERROR', 'Erro backup ao fechar:', err.message); }
       }
+      // Limpar Supabase ao fechar
+      try {
+        const tid = db.tournament.id;
+        supabase.from('live_scores').delete().eq('tournament_id', tid).then(()=>{});
+        supabase.from('live_matches').delete().eq('tournament_id', tid).then(()=>{});
+        supabase.from('tournaments').delete().eq('id', tid).then(()=>{});
+        log('INFO', 'Supabase cleanup ao fechar app');
+      } catch(err) { log('ERROR', 'Erro cleanup Supabase:', err.message); }
+      // Limpar torneio local
+      db.tournament = null;
+      saveDatabaseSync(db);
     }
   });
 

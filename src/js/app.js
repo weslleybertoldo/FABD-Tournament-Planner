@@ -199,7 +199,8 @@ function updateOverview() {
   players.forEach(p=>{
     const catCount=(p.inscriptions||[]).length;
     const valor=p.valorCategoria||30;
-    if(p.pagamentoStatus==='pago')totalArrecadado+=catCount*valor;
+    const pStatus=p.pagamentoStatus||'pago';
+    if(pStatus==='pago')totalArrecadado+=catCount*valor;
   });
   const statActive=document.getElementById('stat-active');
   if(statActive)statActive.textContent=`R$ ${totalArrecadado.toFixed(2)}`;
@@ -2440,7 +2441,11 @@ async function assignCourt(idx, value) {
   await window.api.saveTournament(tournament);
   // Sincronizar com Supabase
   try{
-    if(value&&m.status==='Em Quadra'){const ok=await window.api.supabaseUpsertMatch(tournament.id,m);if(!ok)showToast('Aviso: sincronizacao online falhou','warning');}
+    if(value&&m.status==='Em Quadra'){
+      await window.api.supabaseUpsertTournament(tournament.id,tournament.name);
+      const ok=await window.api.supabaseUpsertMatch(tournament.id,m);
+      if(!ok)showToast('Aviso: sincronizacao online falhou','warning');
+    }
     else if(!value){await window.api.supabaseRemoveFromCourt(tournament.id,m);}
   }catch(e){console.warn('Supabase sync:',e);showToast('Aviso: sincronizacao online falhou','warning');}
   renderCourtsPanel();renderMatches();
@@ -3102,6 +3107,10 @@ async function confirmImport(){
     if(!vr.length)return;
     let added=0,updated=0;
 
+    // Recarregar jogadores atuais para evitar duplicatas
+    tournament=await window.api.getTournament();
+    players=tournament?.players||[];
+
     // Primeira passada: criar/atualizar jogadores com inscricoes
     for(const row of vr){
       const ex=players.find(p=>p.firstName.toLowerCase()===row.firstName.toLowerCase()&&p.lastName.toLowerCase()===row.lastName.toLowerCase());
@@ -3128,12 +3137,11 @@ async function confirmImport(){
         _duplaDM:row.duplaDM||'',_duplaDF:row.duplaDF||'',_duplaDX:row.duplaDX||''
       };
       if(ex){p.id=ex.id;updated++;}else added++;
-      await window.api.savePlayer(p);
+      const saved=await window.api.savePlayer(p);
+      // Atualizar players em memoria para evitar duplicatas no proximo loop
+      tournament=await window.api.getTournament();
+      players=tournament?.players||[];
     }
-
-    // Recarregar para pegar os IDs gerados
-    tournament=await window.api.getTournament();
-    players=tournament?.players||[];
 
     // Segunda passada: vincular duplas
     for(const p of players){
