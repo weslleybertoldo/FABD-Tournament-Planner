@@ -669,7 +669,7 @@
         <!-- Aba: Quadras e Tempo -->
         <div id="tc-tab-courts" style="display:none">
           <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
-            Configure quadras, horarios e tempo de descanso para este torneio.
+            Configure quadras e tempo de descanso para este torneio. Horarios e pausas sao configurados na aba Programacao.
           </p>
           <div class="form-row">
             <div class="form-group">
@@ -687,26 +687,15 @@
               </div>
             </div>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Horario de inicio</label>
-              <input type="time" class="form-control" id="tc-start-time" value="08:00">
-            </div>
-            <div class="form-group">
-              <label>Horario de termino</label>
-              <input type="time" class="form-control" id="tc-end-time" value="18:00">
-            </div>
-          </div>
           <div style="background:var(--fabd-gray-100);border-radius:8px;padding:16px;margin:16px 0">
-            <h4 style="margin-bottom:12px;color:var(--fabd-blue)">Tempo de Descanso entre Jogos</h4>
+            <h4 style="margin-bottom:12px;color:var(--fabd-blue)">Tempo de Descanso</h4>
             <div class="form-row">
               <div class="form-group">
-                <label>Descanso minimo (min)</label>
+                <label>Descanso minimo entre jogos (min)</label>
                 <div class="spinner">
                   <input type="number" class="form-control" id="tc-rest-min" value="20" min="0" max="120">
                   <div class="spinner-btns"><button onclick="spinUp('tc-rest-min',120)">&#9650;</button><button onclick="spinDown('tc-rest-min',0)">&#9660;</button></div>
                 </div>
-                <div class="form-hint">Tempo minimo que um jogador deve descansar entre dois jogos</div>
               </div>
               <div class="form-group">
                 <label>Descanso entre sets (min)</label>
@@ -714,36 +703,19 @@
                   <input type="number" class="form-control" id="tc-rest-sets" value="2" min="0" max="10">
                   <div class="spinner-btns"><button onclick="spinUp('tc-rest-sets',10)">&#9650;</button><button onclick="spinDown('tc-rest-sets',0)">&#9660;</button></div>
                 </div>
-                <div class="form-hint">Intervalo entre sets na mesma partida</div>
-              </div>
-            </div>
-            <div class="form-group">
-              <label>Intervalo no meio do set (ao atingir 11 pontos)</label>
-              <div class="spinner">
-                <input type="number" class="form-control" id="tc-rest-mid" value="1" min="0" max="5">
-                <div class="spinner-btns"><button onclick="spinUp('tc-rest-mid',5)">&#9650;</button><button onclick="spinDown('tc-rest-mid',0)">&#9660;</button></div>
-              </div>
-              <div class="form-hint">Regra BWF: 1 minuto quando um lado atinge 11 pontos</div>
-            </div>
-          </div>
-          <div style="background:#FEF3C7;border-radius:8px;padding:16px;margin:16px 0">
-            <h4 style="margin-bottom:12px;color:#92400E">Periodo de Pausa (almoco/intervalo)</h4>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Inicio da pausa</label>
-                <input type="time" class="form-control" id="tc-break-start" value="12:00">
               </div>
               <div class="form-group">
-                <label>Fim da pausa</label>
-                <input type="time" class="form-control" id="tc-break-end" value="13:30">
+                <label>Intervalo aos 11 pontos (min)</label>
+                <div class="spinner">
+                  <input type="number" class="form-control" id="tc-rest-mid" value="1" min="0" max="5">
+                  <div class="spinner-btns"><button onclick="spinUp('tc-rest-mid',5)">&#9650;</button><button onclick="spinDown('tc-rest-mid',0)">&#9660;</button></div>
+                </div>
               </div>
             </div>
-            <div class="form-hint" style="color:#92400E">Nenhum jogo sera agendado neste periodo</div>
           </div>
           <div class="form-group">
             <label>Nomes das quadras</label>
             <div id="tc-court-names" style="font-size:13px;color:var(--fabd-gray-600)"></div>
-            <div class="form-hint">Edite os nomes acima conforme necessario</div>
           </div>
         </div>
 
