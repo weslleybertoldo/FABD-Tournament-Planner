@@ -2197,7 +2197,7 @@ async function handleRealtimeScoreUpdate(data){
     m.liveScore='';
     // Adicionar arbitro se veio do app
     if(data.umpire_name)m.umpire=data.umpire_name;
-    propagateResultToDraws(m);
+    try{propagateResultToDraws(m);}catch(e){console.warn('Erro ao propagar resultado:',e);}
     await window.api.saveTournament(tournament);
     showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
   }
@@ -2250,9 +2250,9 @@ async function assignCourt(idx, value) {
   await window.api.saveTournament(tournament);
   // Sincronizar com Supabase
   try{
-    if(value&&m.status==='Em Quadra'){await window.api.supabaseUpsertMatch(tournament.id,m);}
+    if(value&&m.status==='Em Quadra'){const ok=await window.api.supabaseUpsertMatch(tournament.id,m);if(!ok)showToast('Aviso: sincronizacao online falhou','warning');}
     else if(!value){await window.api.supabaseRemoveFromCourt(tournament.id,m.num);}
-  }catch(e){console.warn('Supabase sync:',e);}
+  }catch(e){console.warn('Supabase sync:',e);showToast('Aviso: sincronizacao online falhou','warning');}
   renderCourtsPanel();renderMatches();
 }
 
@@ -2353,7 +2353,7 @@ async function resetMatch(idx){
   // Reverter avanço na draw antes de limpar o winner
   reverseResultInDraws(m);
   // Remover do Supabase (historico publico)
-  try{await window.api.supabaseRemoveFromCourt(tournament.id,m.num);}catch(e){}
+  try{await window.api.supabaseRemoveFromCourt(tournament.id,m.num);}catch(e){console.warn('Supabase cleanup:',e);}
   m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;m.liveScore='';m.liveSets=undefined;
   await window.api.saveTournament(tournament);
   renderMatches();renderFinishedMatches();showToast('Jogo resetado');

@@ -140,7 +140,7 @@
           h+=`</div>`;
         });
         document.getElementById('tab-live').innerHTML=h;
-      }catch(e){console.error(e);}
+      }catch(e){console.error(e);document.getElementById('tab-live').innerHTML='<div class="empty"><div class="icon">&#9888;</div><h3>Erro de conexao</h3><p style="color:#64748B">Tentando reconectar...</p></div>';}
     }
 
     // === HISTORICO ===

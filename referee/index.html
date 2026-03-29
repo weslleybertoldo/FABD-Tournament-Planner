@@ -391,7 +391,7 @@
         state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
         // Carregar score existente
         const{data:sc}=await sb.from('live_scores').select('*').eq('match_id',matchId).single();
-        if(sc){state.set=sc.current_set;state.p1=sc.score_p1;state.p2=sc.score_p2;state.setsP1=sc.sets_p1||[];state.setsP2=sc.sets_p2||[];state.setsWonP1=sc.sets_won_p1||0;state.setsWonP2=sc.sets_won_p2||0;}
+        if(sc){state.set=sc.current_set||1;state.p1=sc.score_p1||0;state.p2=sc.score_p2||0;state.setsP1=sc.sets_p1||[];state.setsP2=sc.sets_p2||[];state.setsWonP1=sc.sets_won_p1||0;state.setsWonP2=sc.sets_won_p2||0;}
 
         hideAll();document.getElementById('page-scorer').style.display='flex';
         if(pollInterval)clearInterval(pollInterval);

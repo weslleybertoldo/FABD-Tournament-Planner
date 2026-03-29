@@ -281,8 +281,8 @@ ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
     const { error } = await supabase.from('live_matches').upsert(row, { onConflict: 'id' });
     if (error) throw error;
     // Criar registro de score se nao existir (upsert para evitar race condition)
-    const { error: scoreError } = await supabase.from('live_scores').upsert({ match_id: id, tournament_id: tournamentId }, { onConflict: 'match_id', ignoreDuplicates: true });
-    if (scoreError) log('WARN', 'Supabase score upsert:', scoreError.message);
+    const { error: scoreError } = await supabase.from('live_scores').upsert({ match_id: id, tournament_id: tournamentId }, { onConflict: 'match_id' });
+    if (scoreError) { log('ERROR', 'Supabase score upsert:', scoreError.message); return false; }
     log('INFO', 'Supabase match upserted:', id);
     return true;
   } catch(e) { log('ERROR', 'Supabase upsertMatch:', e.message); return false; }
