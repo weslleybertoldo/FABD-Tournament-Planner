@@ -234,12 +234,12 @@ ipcMain.handle('db:importFullBackup', async () => {
     const data = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf-8'));
     createBackup();
     // Aceitar tanto backup completo quanto backup de torneio
-    const result = { umpires: null, gameProfiles: null };
+    const importResult = { umpires: null, gameProfiles: null };
     if (data._type === 'fabd-full-backup') {
       db.tournament = data.tournament || null;
       db.settings = data.settings || {};
-      if (data.umpires) result.umpires = data.umpires;
-      if (data.gameProfiles) result.gameProfiles = data.gameProfiles;
+      if (data.umpires) importResult.umpires = data.umpires;
+      if (data.gameProfiles) importResult.gameProfiles = data.gameProfiles;
     } else if (data._type === 'fabd-tournament-backup') {
       db.tournament = data.tournament || null;
     } else if (data.tournament) {
@@ -250,7 +250,7 @@ ipcMain.handle('db:importFullBackup', async () => {
     }
     saveDatabaseSync(db);
     log('INFO', 'Backup completo importado');
-    return result;
+    return importResult;
   } catch(e) { throw new Error('Erro: ' + e.message); }
 });
 
@@ -280,11 +280,9 @@ ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
     };
     const { error } = await supabase.from('live_matches').upsert(row, { onConflict: 'id' });
     if (error) throw error;
-    // Criar registro de score se nao existir
-    const { data: existing } = await supabase.from('live_scores').select('id').eq('match_id', id).limit(1);
-    if (!existing?.length) {
-      await supabase.from('live_scores').insert({ match_id: id, tournament_id: tournamentId });
-    }
+    // Criar registro de score se nao existir (upsert para evitar race condition)
+    const { error: scoreError } = await supabase.from('live_scores').upsert({ match_id: id, tournament_id: tournamentId }, { onConflict: 'match_id', ignoreDuplicates: true });
+    if (scoreError) log('WARN', 'Supabase score upsert:', scoreError.message);
     log('INFO', 'Supabase match upserted:', id);
     return true;
   } catch(e) { log('ERROR', 'Supabase upsertMatch:', e.message); return false; }
@@ -302,11 +300,13 @@ ipcMain.handle('supabase:removeFromCourt', async (_, tournamentId, matchNum) => 
 
 let pollingInterval = null;
 let lastPollData = {};
+let realtimeRetryInterval = null;
 
 ipcMain.handle('supabase:subscribe', async (_, tournamentId) => {
   try {
-    // Parar polling anterior
+    // Parar polling e retry anteriores
     if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+    if (realtimeRetryInterval) { clearInterval(realtimeRetryInterval); realtimeRetryInterval = null; }
     lastPollData = {};
 
     // Tentar Realtime primeiro
@@ -347,6 +347,29 @@ ipcMain.handle('supabase:subscribe', async (_, tournamentId) => {
               } catch(e) { /* silencioso */ }
             }, 3000);
           }
+          // Tentar reconectar realtime a cada 30s
+          if (!realtimeRetryInterval) {
+            realtimeRetryInterval = setInterval(() => {
+              log('INFO', 'Tentando reconectar Realtime...');
+              if (realtimeChannel) { supabase.removeChannel(realtimeChannel); realtimeChannel = null; }
+              realtimeChannel = supabase.channel(`scores_retry_${tournamentId}_${Date.now()}`)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'live_scores', filter: `tournament_id=eq.${tournamentId}` },
+                  (payload) => {
+                    log('INFO', 'Realtime score update:', JSON.stringify(payload.new?.match_id));
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                      mainWindow.webContents.send('supabase:scoreUpdate', payload.new);
+                    }
+                  })
+                .subscribe((retryStatus) => {
+                  log('INFO', 'Realtime retry status:', retryStatus);
+                  if (retryStatus === 'SUBSCRIBED') {
+                    log('INFO', 'Realtime reconectado! Parando polling.');
+                    if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+                    if (realtimeRetryInterval) { clearInterval(realtimeRetryInterval); realtimeRetryInterval = null; }
+                  }
+                });
+            }, 30000);
+          }
         }
       });
     return true;
@@ -356,6 +379,7 @@ ipcMain.handle('supabase:subscribe', async (_, tournamentId) => {
 ipcMain.handle('supabase:unsubscribe', async () => {
   if (realtimeChannel) { supabase.removeChannel(realtimeChannel); realtimeChannel = null; }
   if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+  if (realtimeRetryInterval) { clearInterval(realtimeRetryInterval); realtimeRetryInterval = null; }
   return true;
 });
 

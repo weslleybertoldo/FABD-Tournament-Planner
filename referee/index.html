@@ -139,6 +139,7 @@
       <button class="back" onclick="exitScorer()">&#8592; Voltar</button>
       <span id="scorer-info"></span>
       <span id="scorer-court" style="color:#60A5FA"></span>
+      <span id="sync-status" style="width:8px;height:8px;border-radius:50%;background:#10B981;display:inline-block"></span>
     </div>
     <div class="court-container">
       <div class="court-side court-left" id="court-left" onclick="addPoint('left')">
@@ -278,7 +279,7 @@
         state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
         // Carregar score existente
         const{data:sc}=await sb.from('live_scores').select('*').eq('match_id',matchId).single();
-        if(sc&&sc.current_set>1){state.set=sc.current_set;state.p1=sc.score_p1;state.p2=sc.score_p2;state.setsP1=sc.sets_p1||[];state.setsP2=sc.sets_p2||[];state.setsWonP1=sc.sets_won_p1||0;state.setsWonP2=sc.sets_won_p2||0;}
+        if(sc){state.set=sc.current_set;state.p1=sc.score_p1;state.p2=sc.score_p2;state.setsP1=sc.sets_p1||[];state.setsP2=sc.sets_p2||[];state.setsWonP1=sc.sets_won_p1||0;state.setsWonP2=sc.sets_won_p2||0;}
 
         hideAll();document.getElementById('page-scorer').style.display='flex';
         if(pollInterval)clearInterval(pollInterval);
@@ -386,7 +387,7 @@
 
     async function syncScore(){
       if(!currentMatch||!sb)return;
-      try{await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,current_set:state.set,score_p1:state.p1,score_p2:state.p2,sets_p1:state.setsP1,sets_p2:state.setsP2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,updated_at:new Date().toISOString()},{onConflict:'match_id'});}catch(e){}
+      try{await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,current_set:state.set,score_p1:state.p1,score_p2:state.p2,sets_p1:state.setsP1,sets_p2:state.setsP2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,updated_at:new Date().toISOString()},{onConflict:'match_id'});document.getElementById('sync-status').style.background='#10B981';}catch(e){document.getElementById('sync-status').style.background='#EF4444';try{localStorage.setItem('fabd_score_backup_'+currentMatch.id,JSON.stringify(state));}catch(le){}}
     }
 
     function showConfirm(winner){
@@ -402,8 +403,9 @@
       const m=document.getElementById('modal-confirm');
       const winner=parseInt(m.dataset.winner),finalScore=m.dataset.score;
       try{
-        await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,current_set:state.set,score_p1:state.p1,score_p2:state.p2,sets_p1:state.setsP1,sets_p2:state.setsP2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,winner,final_score:finalScore,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'});
-        await sb.from('live_matches').update({status:'Finalizada',umpire:currentUser?.name||''}).eq('id',currentMatch.id);
+        const r1=await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,current_set:state.set,score_p1:state.p1,score_p2:state.p2,sets_p1:state.setsP1,sets_p2:state.setsP2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,winner,final_score:finalScore,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'});
+        const r2=await sb.from('live_matches').update({status:'Finalizada',umpire:currentUser?.name||''}).eq('id',currentMatch.id);
+        if(r1.error||r2.error){alert('Erro ao finalizar: '+(r1.error?.message||r2.error?.message));return;}
         closeModal();alert('Placar registrado!');exitScorer();
       }catch(e){alert('Erro: '+e.message);}
     }

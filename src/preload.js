@@ -37,7 +37,7 @@ contextBridge.exposeInMainWorld('api', {
   supabaseRemoveFromCourt: (tid, num) => ipcRenderer.invoke('supabase:removeFromCourt', tid, num),
   supabaseSubscribe: (tid) => ipcRenderer.invoke('supabase:subscribe', tid),
   supabaseUnsubscribe: () => ipcRenderer.invoke('supabase:unsubscribe'),
-  onScoreUpdate: (cb) => ipcRenderer.on('supabase:scoreUpdate', (_, data) => cb(data)),
+  onScoreUpdate: (cb) => { ipcRenderer.removeAllListeners('supabase:scoreUpdate'); ipcRenderer.on('supabase:scoreUpdate', (_, data) => cb(data)); },
   supabaseGetReferees: () => ipcRenderer.invoke('supabase:getReferees'),
   supabaseUpdateRefereeStatus: (id, status) => ipcRenderer.invoke('supabase:updateRefereeStatus', id, status),
   supabaseGetRefereeName: (id) => ipcRenderer.invoke('supabase:getRefereeByName', id),
