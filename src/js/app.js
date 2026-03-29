@@ -1008,8 +1008,9 @@ function renderDrawDetail(idx) {
     </div>`;
   }
 
-  // Ranking section (shown when draw has matches)
-  if(has){
+  // Ranking section (shown only when ALL matches of this draw are finished)
+  const allDrawMatchesFinished=has&&d.matches.filter(m=>!m.isBye&&m.player1&&m.player2&&m.player2!=='BYE'&&m.player1!=='BYE').every(m=>m.winner!==undefined&&m.winner!==null);
+  if(has&&allDrawMatchesFinished){
     const ranking=computeDrawRanking(d);
     if(ranking&&ranking.length){
       h+=`<div style="margin-top:24px;background:linear-gradient(135deg,#FEF3C7 0%,#FFFBEB 100%);border-radius:12px;padding:20px;border:2px solid #F59E0B">
@@ -1045,6 +1046,12 @@ function renderDrawDetail(idx) {
 
 async function toggleAwarded(idx){
   const d=tournament.draws[idx];if(!d)return;
+  // Verificar se todos os jogos estao finalizados antes de premiar
+  if(!d.awarded){
+    const realMatches=(d.matches||[]).filter(m=>!m.isBye&&m.player1&&m.player2&&m.player2!=='BYE'&&m.player1!=='BYE');
+    const allFinished=realMatches.every(m=>m.winner!==undefined&&m.winner!==null);
+    if(!allFinished){showToast('Finalize todos os jogos desta categoria antes de premiar.','warning');return;}
+  }
   d.awarded=!d.awarded;
   await window.api.saveTournament(tournament);
   renderDraws();
@@ -3253,21 +3260,23 @@ function computeRoundRobinRanking(d){
     stats[p1].ptsFor+=p1Pts;stats[p1].ptsAgainst+=p2Pts;
     stats[p2].ptsFor+=p2Pts;stats[p2].ptsAgainst+=p1Pts;
   });
-  // Sort by BWF rules: wins > head-to-head > point difference > points scored
+  // Calcular ptsDiff
+  Object.values(stats).forEach(s=>{s.ptsDiff=s.ptsFor-s.ptsAgainst;});
+  // Ordenar: 1) mais vitorias, 2) diferenca de pontos, 3) mais pontos marcados, 4) confronto direto
   const arr=Object.values(stats);
   arr.sort((a,b)=>{
+    // 1. Mais vitorias
     if(b.wins!==a.wins)return b.wins-a.wins;
-    // Head-to-head
+    // 2. Diferenca de pontos
+    if(b.ptsDiff!==a.ptsDiff)return b.ptsDiff-a.ptsDiff;
+    // 3. Mais pontos marcados
+    if(b.ptsFor!==a.ptsFor)return b.ptsFor-a.ptsFor;
+    // 4. Confronto direto
     if(a.headToHead[b.name]!==undefined){
       if(a.headToHead[b.name]===1)return-1;
       if(a.headToHead[b.name]===0)return 1;
     }
-    // Point difference
-    const diffA=a.ptsFor-a.ptsAgainst;
-    const diffB=b.ptsFor-b.ptsAgainst;
-    if(diffB!==diffA)return diffB-diffA;
-    // Points scored
-    return b.ptsFor-a.ptsFor;
+    return 0;
   });
   // Assign positions
   const ranking=[];
