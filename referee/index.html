@@ -213,8 +213,6 @@
     // Esconder se ja esta instalado
     if(window.matchMedia('(display-mode: standalone)').matches){document.getElementById('install-bar').style.display='none';}
 
-    // === BLOCK NOTIFICATIONS ===
-    if('Notification' in window){try{Notification.requestPermission().then(p=>{});}catch(e){}}
 
     // === LOCK ORIENTATION ===
     function lockLandscape(){try{screen.orientation?.lock?.('landscape').catch(()=>{});}catch(e){}}

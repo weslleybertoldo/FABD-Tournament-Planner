@@ -2200,8 +2200,6 @@ async function handleRealtimeScoreUpdate(data){
     propagateResultToDraws(m);
     await window.api.saveTournament(tournament);
     showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
-    // Remover do Supabase
-    try{await window.api.supabaseRemoveFromCourt(tournament.id,m.num);}catch(e){}
   }
 
   renderCourtsPanel();
