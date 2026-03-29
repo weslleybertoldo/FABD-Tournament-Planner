@@ -2139,7 +2139,9 @@ function renderMatches() {
 
     const isFinished=m.status==='Finalizada'||m.status==='WO'||m.status==='Desistencia'||m.status==='Desqualificacao';
     const resetBtn=isFinished?`<button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA;margin-left:4px;padding:2px 6px;font-size:11px" onclick="resetMatch(${i})" title="Desfazer resultado">&#8635;</button>`:'';
-    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" style="${rs}"><td>${esc(m.time)||'-'}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" onchange="assignCourt(${i},this.value)"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" onchange="updateMatchField(${i},'umpire',this.value)"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" onclick="showScoreModal(${i})">Placar</button>${resetBtn}`}</td></tr>`;
+    const matchDay=getMatchDay(m);
+    const dayLabel=matchDay?((d)=>{const o=new Date(d+'T00:00:00');return`${String(o.getDate()).padStart(2,'0')}/${String(o.getMonth()+1).padStart(2,'0')}`;})(matchDay.date):'-';
+    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" style="${rs}"><td style="font-size:12px">${dayLabel}</td><td>${esc(m.time)||'-'}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" onchange="assignCourt(${i},this.value)"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" onchange="updateMatchField(${i},'umpire',this.value)"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" onclick="showScoreModal(${i})">Placar</button>${resetBtn}`}</td></tr>`;
   });
   tb.innerHTML=h;
 }
@@ -2265,7 +2267,7 @@ function renderCourtsPanel() {
       const live=emQuadra.liveScore||'';
       // Parsear live score: "15 - 12 (Set 2)"
       let liveP1='0',liveP2='0',liveSet='1';
-      if(live){
+      if(live&&typeof live==='string'){
         const m=live.match(/(\d+)\s*-\s*(\d+)\s*\(Set\s*(\d+)\)/);
         if(m){liveP1=m[1];liveP2=m[2];liveSet=m[3];}
       }
@@ -2404,7 +2406,7 @@ async function updateMatchField(idx, field, value) {
 }
 
 function showScoreModal(idx) {
-  scoringMatchIdx=idx;const m=tournament.matches[idx];if(!m)return;
+  const m=tournament.matches[idx];if(!m)return;scoringMatchIdx=idx;
   document.getElementById('score-p1').textContent=m.player1;
   document.getElementById('score-p2').textContent=m.player2;
   document.getElementById('score-winner').value='';
@@ -2495,7 +2497,7 @@ async function resetMatch(idx){
   reverseResultInDraws(m);
   // Remover do Supabase (historico publico)
   try{await window.api.supabaseRemoveFromCourt(tournament.id,m);}catch(e){console.warn('Supabase cleanup:',e);}
-  m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;m.liveScore='';m.liveSets=undefined;
+  m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;m.liveScore='';m.liveSets=[];
   await window.api.saveTournament(tournament);
   renderMatches();renderFinishedMatches();showToast('Jogo resetado');
 }
@@ -2882,9 +2884,15 @@ function renderDaySchedule(){
     if(modeDraws.length)h+=`<div style="margin-top:8px;font-size:12px;color:var(--fabd-gray-500)">Categorias: ${modeDraws.join(', ')}</div>`;
     h+=`</div></div>`;
   });
-  // Adicionar listener para atualizar visual ao trocar radio
   container.innerHTML=h;
-  container.querySelectorAll('.ds-mode').forEach(r=>{r.addEventListener('change',()=>renderDaySchedule());});
+  // Listener: ao trocar radio, salvar estado atual e re-renderizar
+  container.querySelectorAll('.ds-mode').forEach(r=>{
+    r.addEventListener('change',()=>{
+      // Salvar estado temporario antes de re-renderizar
+      tournament.daySchedule=collectDaySchedule();
+      renderDaySchedule();
+    });
+  });
 }
 
 function collectDaySchedule(){
@@ -3363,23 +3371,64 @@ function reportResults(){
 function reportOOP(){
   const matches=tournament.matches||[];
   if(!matches.length)return'<p>Sem partidas agendadas.</p>';
-  const sorted=[...matches].sort((a,b)=>{
-    const ta=a.time?timeToMin(a.time):9999;
-    const tb2=b.time?timeToMin(b.time):9999;
-    return ta-tb2||a.num-b.num;
-  });
   let h='<h2 style="color:#1E3A8A;margin-bottom:12px">Ordem de Jogo</h2>';
-  h+='<table><thead><tr><th>Hora</th><th>Jogo</th><th>Chave</th><th>Rodada</th><th>Jogador 1</th><th>x</th><th>Jogador 2</th><th>Quadra</th><th>Status</th></tr></thead><tbody>';
-  sorted.forEach(m=>{
-    const done=m.status==='Finalizada'||m.status==='WO';
-    const p1Style=m.winner===1?'class="winner"':'';
-    const p2Style=m.winner===2?'class="winner"':'';
-    h+=`<tr${done?' style="color:#888"':''}>
-      <td>${esc(m.time||'-')}</td><td>${m.num}</td><td>${esc(m.drawName||'-')}</td><td>${esc(m.roundName||'R'+m.round)}</td>
-      <td ${p1Style}>${esc(m.player1Display||m.player1||'A definir')}</td><td style="text-align:center">x</td>
-      <td ${p2Style}>${esc(m.player2Display||m.player2||'A definir')}</td><td>${esc(m.court||'-')}</td><td>${esc(m.status)}</td></tr>`;
-  });
-  h+='</tbody></table>';
+
+  const renderMatchTable=(list)=>{
+    let t='<table><thead><tr><th>Hora</th><th>Jogo</th><th>Chave</th><th>Rodada</th><th>Jogador 1</th><th>x</th><th>Jogador 2</th><th>Quadra</th><th>Status</th></tr></thead><tbody>';
+    list.forEach(m=>{
+      const done=m.status==='Finalizada'||m.status==='WO';
+      const p1Style=m.winner===1?'class="winner"':'';
+      const p2Style=m.winner===2?'class="winner"':'';
+      t+=`<tr${done?' style="color:#888"':''}>
+        <td>${esc(m.time||'-')}</td><td>${m.num}</td><td>${esc(m.drawName||'-')}</td><td>${esc(m.roundName||'R'+m.round)}</td>
+        <td ${p1Style}>${esc(m.player1Display||m.player1||'A definir')}</td><td style="text-align:center">x</td>
+        <td ${p2Style}>${esc(m.player2Display||m.player2||'A definir')}</td><td>${esc(m.court||'-')}</td><td>${esc(m.status)}</td></tr>`;
+    });
+    t+='</tbody></table>';
+    return t;
+  };
+
+  if(tournament.daySchedule?.length){
+    // Agrupar por dia
+    const modeLabels={'todas':'Todas as categorias','simples':'Simples (SM/SF)','duplas':'Duplas (DM/DF/DX)'};
+    tournament.daySchedule.forEach((day,idx)=>{
+      const dObj=new Date(day.date+'T00:00:00');
+      const dayLabel=`Dia ${idx+1} - ${String(dObj.getDate()).padStart(2,'0')}/${String(dObj.getMonth()+1).padStart(2,'0')}/${dObj.getFullYear()}`;
+      const modLabel=modeLabels[day.mode||'todas']||'Todas';
+      // Filtrar matches deste dia pelo mode
+      const mode=day.mode||'todas';
+      const dayMatches=matches.filter(m=>{
+        const dn=m.drawName||'';
+        if(mode==='todas')return true;
+        if(mode==='simples')return dn.startsWith('SM ')||dn.startsWith('SF ');
+        if(mode==='duplas')return dn.startsWith('DM ')||dn.startsWith('DF ')||dn.startsWith('DX ');
+        return false;
+      });
+      if(!dayMatches.length)return;
+      const sorted=[...dayMatches].sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;});
+      h+=`<div class="cat-title" style="margin-top:${idx?'24':'0'}px">${dayLabel} - ${modLabel}</div>`;
+      h+=renderMatchTable(sorted);
+    });
+    // Matches sem dia
+    const assignedModes=tournament.daySchedule.map(d=>d.mode||'todas');
+    if(!assignedModes.includes('todas')){
+      const unassigned=matches.filter(m=>{
+        const dn=m.drawName||'';
+        const isSimples=dn.startsWith('SM ')||dn.startsWith('SF ');
+        const isDupla=dn.startsWith('DM ')||dn.startsWith('DF ')||dn.startsWith('DX ');
+        return !(assignedModes.includes('simples')&&isSimples)&&!(assignedModes.includes('duplas')&&isDupla);
+      });
+      if(unassigned.length){
+        const sorted=[...unassigned].sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;});
+        h+=`<div class="cat-title" style="margin-top:24px">Sem dia definido</div>`;
+        h+=renderMatchTable(sorted);
+      }
+    }
+  } else {
+    // Sem programacao: lista unica
+    const sorted=[...matches].sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;});
+    h+=renderMatchTable(sorted);
+  }
   return h;
 }
 

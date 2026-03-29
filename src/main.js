@@ -68,8 +68,9 @@ function loadDatabase() {
 let saveTimeout = null;
 function saveDatabase(data) {
   if (saveTimeout) clearTimeout(saveTimeout);
+  createBackup();
   saveTimeout = setTimeout(() => {
-    try { createBackup(); fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8'); } catch(e) { log('ERROR', 'Erro salvar:', e.message); }
+    try { fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8'); } catch(e) { log('ERROR', 'Erro salvar:', e.message); }
   }, 300);
 }
 
@@ -332,7 +333,7 @@ ipcMain.handle('supabase:subscribe', async (_, tournamentId) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'live_scores', filter: `tournament_id=eq.${tournamentId}` },
         (payload) => {
           log('INFO', 'Realtime score update:', JSON.stringify(payload.new?.match_id));
-          if (mainWindow && !mainWindow.isDestroyed()) {
+          if (mainWindow && !mainWindow.isDestroyed() && payload && payload.new) {
             mainWindow.webContents.send('supabase:scoreUpdate', payload.new);
           }
         })
@@ -373,7 +374,7 @@ ipcMain.handle('supabase:subscribe', async (_, tournamentId) => {
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'live_scores', filter: `tournament_id=eq.${tournamentId}` },
                   (payload) => {
                     log('INFO', 'Realtime score update:', JSON.stringify(payload.new?.match_id));
-                    if (mainWindow && !mainWindow.isDestroyed()) {
+                    if (mainWindow && !mainWindow.isDestroyed() && payload && payload.new) {
                       mainWindow.webContents.send('supabase:scoreUpdate', payload.new);
                     }
                   })
