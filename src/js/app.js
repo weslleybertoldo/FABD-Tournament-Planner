@@ -2821,12 +2821,9 @@ function showTournamentConfig(){
   document.getElementById('tc-maxpoints').value=sc.maxPoints||30;document.getElementById('tc-interval').value=sc.interval!=null?sc.interval:1;
   document.getElementById('tc-deciding').value=sc.deciding||'normal';
   document.getElementById('tc-courts').value=tournament.courts||4;document.getElementById('tc-duration').value=tournament.matchDuration||30;
-  document.getElementById('tc-start-time').value=tournament.startTime||'08:00';document.getElementById('tc-end-time').value=tournament.endTime||'18:00';
   document.getElementById('tc-rest-min').value=tournament.restMinBetweenGames!=null?tournament.restMinBetweenGames:20;
   document.getElementById('tc-rest-sets').value=tournament.restBetweenSets!=null?tournament.restBetweenSets:2;
   document.getElementById('tc-rest-mid').value=tournament.restMidSet!=null?tournament.restMidSet:1;
-  document.getElementById('tc-break-start').value=tournament.breakStart||'12:00';
-  document.getElementById('tc-break-end').value=tournament.breakEnd||'13:30';
   openModal('modal-tournament-config');
 }
 
@@ -2853,6 +2850,9 @@ function renderDaySchedule(){
   if(!days.length){container.innerHTML='<div style="color:var(--fabd-gray-500);text-align:center;padding:24px">Defina as datas do torneio para configurar a programacao por dia.</div>';return;}
   const existing=tournament.daySchedule||[];
   const drawNames=(tournament.draws||[]).map(d=>d.name);
+  // Separar simples e duplas
+  const simples=drawNames.filter(n=>n.startsWith('SM ')||n.startsWith('SF '));
+  const duplas=drawNames.filter(n=>n.startsWith('DM ')||n.startsWith('DF ')||n.startsWith('DX '));
   let h='';
   days.forEach((date,idx)=>{
     const saved=existing.find(d=>d.date===date)||{};
@@ -2862,7 +2862,7 @@ function renderDaySchedule(){
     const et=saved.endTime||tournament.endTime||'18:00';
     const bs=saved.breakStart||tournament.breakStart||'12:00';
     const be=saved.breakEnd||tournament.breakEnd||'13:30';
-    const selectedDraws=saved.draws||[];
+    const mode=saved.mode||'todas';
     h+=`<div style="background:var(--fabd-gray-100);border-radius:8px;padding:16px;margin-bottom:12px" data-day-date="${date}">`;
     h+=`<h4 style="margin-bottom:12px;color:var(--fabd-blue)">${label}</h4>`;
     h+=`<div class="form-row">`;
@@ -2871,22 +2871,27 @@ function renderDaySchedule(){
     h+=`<div class="form-group"><label>Pausa inicio</label><input type="time" class="form-control ds-break-start" value="${bs}"></div>`;
     h+=`<div class="form-group"><label>Pausa fim</label><input type="time" class="form-control ds-break-end" value="${be}"></div>`;
     h+=`</div>`;
-    if(drawNames.length){
-      h+=`<div style="margin-top:8px"><label style="font-weight:600;font-size:13px;margin-bottom:6px;display:block">Categorias/Chaves neste dia:</label>`;
-      h+=`<div style="display:flex;flex-wrap:wrap;gap:8px">`;
-      drawNames.forEach(dn=>{
-        const checked=selectedDraws.length?selectedDraws.includes(dn):true;
-        h+=`<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="ds-draw" value="${esc(dn)}" ${checked?'checked':''}> ${esc(dn)}</label>`;
-      });
-      h+=`</div></div>`;
-    }
+    h+=`<div style="margin-top:12px"><label style="font-weight:600;font-size:13px;margin-bottom:8px;display:block">Modalidades neste dia:</label>`;
+    h+=`<div style="display:flex;gap:12px;flex-wrap:wrap">`;
+    h+=`<label style="font-size:14px;display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;background:${mode==='todas'?'#2563EB':'#fff'};color:${mode==='todas'?'#fff':'#333'};border-radius:8px;border:2px solid ${mode==='todas'?'#2563EB':'#cbd5e1'}"><input type="radio" name="ds-mode-${idx}" class="ds-mode" value="todas" ${mode==='todas'?'checked':''} style="display:none"> Todas as categorias</label>`;
+    h+=`<label style="font-size:14px;display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;background:${mode==='simples'?'#2563EB':'#fff'};color:${mode==='simples'?'#fff':'#333'};border-radius:8px;border:2px solid ${mode==='simples'?'#2563EB':'#cbd5e1'}"><input type="radio" name="ds-mode-${idx}" class="ds-mode" value="simples" ${mode==='simples'?'checked':''} style="display:none"> Simples (SM/SF)</label>`;
+    h+=`<label style="font-size:14px;display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;background:${mode==='duplas'?'#2563EB':'#fff'};color:${mode==='duplas'?'#fff':'#333'};border-radius:8px;border:2px solid ${mode==='duplas'?'#2563EB':'#cbd5e1'}"><input type="radio" name="ds-mode-${idx}" class="ds-mode" value="duplas" ${mode==='duplas'?'checked':''} style="display:none"> Duplas (DM/DF/DX)</label>`;
     h+=`</div>`;
+    // Mostrar quais categorias ficam neste dia
+    const modeDraws=mode==='simples'?simples:mode==='duplas'?duplas:drawNames;
+    if(modeDraws.length)h+=`<div style="margin-top:8px;font-size:12px;color:var(--fabd-gray-500)">Categorias: ${modeDraws.join(', ')}</div>`;
+    h+=`</div></div>`;
   });
+  // Adicionar listener para atualizar visual ao trocar radio
   container.innerHTML=h;
+  container.querySelectorAll('.ds-mode').forEach(r=>{r.addEventListener('change',()=>renderDaySchedule());});
 }
 
 function collectDaySchedule(){
   const panels=document.querySelectorAll('#tc-day-schedule-container [data-day-date]');
+  const drawNames=(tournament?.draws||[]).map(d=>d.name);
+  const simples=drawNames.filter(n=>n.startsWith('SM ')||n.startsWith('SF '));
+  const duplas=drawNames.filter(n=>n.startsWith('DM ')||n.startsWith('DF ')||n.startsWith('DX '));
   const schedule=[];
   panels.forEach(panel=>{
     const date=panel.dataset.dayDate;
@@ -2894,16 +2899,24 @@ function collectDaySchedule(){
     const endTime=panel.querySelector('.ds-end')?.value||'18:00';
     const breakStart=panel.querySelector('.ds-break-start')?.value||'12:00';
     const breakEnd=panel.querySelector('.ds-break-end')?.value||'13:30';
-    const draws=Array.from(panel.querySelectorAll('.ds-draw:checked')).map(cb=>cb.value);
-    schedule.push({date,startTime,endTime,breakStart,breakEnd,draws});
+    const modeEl=panel.querySelector('.ds-mode:checked');
+    const mode=modeEl?.value||'todas';
+    const draws=mode==='simples'?simples:mode==='duplas'?duplas:drawNames;
+    schedule.push({date,startTime,endTime,breakStart,breakEnd,mode,draws});
   });
   return schedule;
 }
 
 function getMatchDay(match){
   if(!tournament?.daySchedule?.length)return null;
+  const dn=match.drawName||'';
+  const isSimples=dn.startsWith('SM ')||dn.startsWith('SF ');
+  const isDupla=dn.startsWith('DM ')||dn.startsWith('DF ')||dn.startsWith('DX ');
   for(const day of tournament.daySchedule){
-    if(day.draws&&day.draws.includes(match.drawName))return day;
+    const mode=day.mode||'todas';
+    if(mode==='todas')return day;
+    if(mode==='simples'&&isSimples)return day;
+    if(mode==='duplas'&&isDupla)return day;
   }
   return null;
 }
@@ -2915,9 +2928,10 @@ async function saveTournamentConfig(){
     tournament.gameProfileId=document.getElementById('tc-profile-select').value||'';
     tournament.scoring={sets:parseInt(document.getElementById('tc-sets').value)||3,points:parseInt(document.getElementById('tc-points').value)||21,maxPoints:parseInt(document.getElementById('tc-maxpoints').value)||30,interval:parseInt(document.getElementById('tc-interval').value)||1,deciding:document.getElementById('tc-deciding').value||'normal'};
     tournament.courts=parseInt(document.getElementById('tc-courts').value)||4;tournament.matchDuration=parseInt(document.getElementById('tc-duration').value)||30;
-    tournament.startTime=document.getElementById('tc-start-time').value||'08:00';tournament.endTime=document.getElementById('tc-end-time').value||'18:00';
     tournament.restMinBetweenGames=parseInt(document.getElementById('tc-rest-min').value)||20;tournament.restBetweenSets=parseInt(document.getElementById('tc-rest-sets').value)||2;tournament.restMidSet=parseInt(document.getElementById('tc-rest-mid').value)||1;
-    tournament.breakStart=document.getElementById('tc-break-start').value||'12:00';tournament.breakEnd=document.getElementById('tc-break-end').value||'13:30';
+    // Pegar horarios do primeiro dia da programacao (ou manter os existentes)
+    const ds=collectDaySchedule();
+    if(ds.length){tournament.startTime=ds[0].startTime;tournament.endTime=ds[0].endTime;tournament.breakStart=ds[0].breakStart;tournament.breakEnd=ds[0].breakEnd;}
     tournament.courtNames=Array.from(document.querySelectorAll('.tc-court-name')).map((inp,i)=>inp.value.trim()||`Quadra ${i+1}`);
     // Salvar programacao por dia
     tournament.daySchedule=collectDaySchedule();
