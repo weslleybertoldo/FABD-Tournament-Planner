@@ -199,7 +199,7 @@ function updateOverview() {
   players.forEach(p=>{
     const catCount=(p.inscriptions||[]).length;
     const valor=p.valorCategoria||30;
-    if(p.pagamentoStatus!=='isento')totalArrecadado+=catCount*valor;
+    if(p.pagamentoStatus==='pago')totalArrecadado+=catCount*valor;
   });
   const statActive=document.getElementById('stat-active');
   if(statActive)statActive.textContent=`R$ ${totalArrecadado.toFixed(2)}`;
