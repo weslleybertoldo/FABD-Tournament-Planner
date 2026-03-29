@@ -1805,12 +1805,12 @@ function renderGroupsElimination(d) {
   const groups = d.groupsData.groups;
   const hasElim = groupsFinished && d.groupsData.eliminationMatches?.length;
 
-  // Abas: Grupo A | Grupo B | ... | Eliminatorias
+  // Abas: Grupo A | Grupo B | ... | Eliminatorias (sempre visivel)
   h += `<div class="tabs" id="ge-tabs" style="margin-bottom:16px">`;
   groups.forEach((g, i) => {
     h += `<div class="tab${i === 0 ? ' active' : ''}" onclick="setGeTab(${i})">${esc(g.name)}</div>`;
   });
-  if (hasElim) h += `<div class="tab" onclick="setGeTab(${groups.length})">Eliminatorias</div>`;
+  h += `<div class="tab" onclick="setGeTab(${groups.length})">Eliminatorias</div>`;
   h += `</div>`;
 
   // Paineis dos grupos
@@ -1851,19 +1851,45 @@ function renderGroupsElimination(d) {
     h += '</tbody></table></div></div>';
   });
 
-  // Painel Eliminatorias (como aba)
+  // Painel Eliminatorias (sempre como aba)
+  h += `<div class="ge-panel" id="ge-panel-${groups.length}" style="display:none">`;
   if (hasElim) {
-    h += `<div class="ge-panel" id="ge-panel-${groups.length}" style="display:none">`;
     const elimDraw = { matches: d.groupsData.eliminationMatches, players: d.groupsData.eliminationMatches.filter(m => m.round === 1).flatMap(m => [m.player1, m.player2]).filter(p => p && p !== 'BYE') };
     h += renderBracket(elimDraw);
-    h += '</div>';
-  } else if (!groupsFinished) {
-    const totalGM = d.groupsData.groups.reduce((s, g) => s + g.matches.filter(m => m.player1 && m.player2 && m.player1 !== 'BYE' && m.player2 !== 'BYE').length, 0);
-    const doneGM = d.groupsData.groups.reduce((s, g) => s + g.matches.filter(m => m.winner !== undefined && m.winner !== null).length, 0);
-    h += `<div style="margin-top:16px;padding:16px;background:var(--fabd-gray-100);border-radius:8px;text-align:center">
-      <p style="color:var(--fabd-gray-600)">Fase de grupos: ${doneGM}/${totalGM} partidas</p>
-      <p style="color:var(--fabd-gray-500);font-size:12px">Eliminatoria sera gerada ao concluir todos os jogos dos grupos.</p></div>`;
+  } else {
+    // Mostrar preview das eliminatorias com placeholders
+    const totalGM = groups.reduce((s, g) => s + g.matches.filter(m => m.player1 && m.player2 && m.player1 !== 'BYE' && m.player2 !== 'BYE').length, 0);
+    const doneGM = groups.reduce((s, g) => s + g.matches.filter(m => m.winner !== undefined && m.winner !== null).length, 0);
+    h += `<div style="padding:16px;background:var(--fabd-gray-100);border-radius:8px;margin-bottom:16px;text-align:center">
+      <p style="color:var(--fabd-gray-600);font-weight:600">Fase de grupos: ${doneGM}/${totalGM} partidas concluidas</p>
+      <p style="color:var(--fabd-gray-500);font-size:12px;margin-top:4px">Os jogos abaixo serao preenchidos ao concluir os grupos.</p></div>`;
+    // Gerar preview dos confrontos da eliminatoria
+    const totalQualified = groups.length * qualifiers;
+    const elimSlots = Math.pow(2, Math.ceil(Math.log2(totalQualified)));
+    const semis = elimSlots / 2;
+    h += `<div style="display:flex;flex-direction:column;gap:12px;max-width:500px;margin:0 auto">`;
+    for (let i = 0; i < semis; i++) {
+      const gIdxA = i % groups.length;
+      const gIdxB = (i + 1) % groups.length;
+      const posA = Math.floor(i / groups.length) + 1;
+      const posB = qualifiers - Math.floor(i / groups.length);
+      const labelA = `${posA}o do ${groups[gIdxA]?.name || 'Grupo '+(gIdxA+1)}`;
+      const labelB = `${posB}o do ${groups[gIdxB]?.name || 'Grupo '+(gIdxB+1)}`;
+      h += `<div style="background:#fff;border:2px dashed var(--fabd-gray-300);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-weight:600;color:var(--fabd-blue)">${esc(labelA)}</span>
+        <span style="color:var(--fabd-gray-400);font-weight:700">VS</span>
+        <span style="font-weight:600;color:#DC2626">${esc(labelB)}</span>
+      </div>`;
+    }
+    if (semis > 1) {
+      h += `<div style="background:#FEF3C7;border:2px dashed #F59E0B;border-radius:8px;padding:12px 16px;text-align:center">
+        <span style="font-weight:700;color:#92400E">FINAL</span>
+        <p style="font-size:12px;color:#92400E;margin-top:4px">Vencedores das semifinais</p>
+      </div>`;
+    }
+    h += `</div>`;
   }
+  h += '</div>';
 
   return h;
 }
@@ -3408,8 +3434,8 @@ function setRanges(ranges){const c=document.getElementById('gp-ranges-container'
     <div class="form-group" style="margin-bottom:0">${i===0?'<label style="font-size:12px">De</label>':''}<input type="number" class="form-control range-min" value="${r.min}" min="1" max="99"></div>
     <div class="form-group" style="margin-bottom:0">${i===0?'<label style="font-size:12px">Ate</label>':''}<input type="number" class="form-control range-max" value="${r.max}" min="1" max="99"></div>
     <div class="form-group" style="margin-bottom:0">${i===0?'<label style="font-size:12px">Sistema</label>':''}<select class="form-control range-type" onchange="onRangeTypeChange()"><option value="Todos contra Todos"${r.type==='Todos contra Todos'?' selected':''}>Todos contra Todos</option><option value="Grupos + Eliminatoria"${isGrupos?' selected':''}>Grupos + Elim.</option><option value="Eliminatoria"${r.type==='Eliminatoria'?' selected':''}>Eliminatoria</option></select></div>
-    <div class="form-group" style="margin-bottom:0;${isGrupos?'':'display:none'}" data-grupos-config>${i===0?'<label style="font-size:12px">Grupos</label>':''}<input type="number" class="form-control range-groups" value="${r.numGroups||2}" min="2" max="8" style="width:50px"></div>
-    <div class="form-group" style="margin-bottom:0;${isGrupos?'':'display:none'}" data-qualif-config>${i===0?'<label style="font-size:12px">Classif.</label>':''}<input type="number" class="form-control range-qualifiers" value="${r.groupQualifiers||2}" min="1" max="4" style="width:50px"></div>
+    <div class="form-group" style="margin-bottom:0;${isGrupos?'':'display:none'}" data-grupos-config><label style="font-size:11px;color:var(--fabd-gray-500)">Qtd Grupos</label><input type="number" class="form-control range-groups" value="${r.numGroups||2}" min="2" max="8" style="width:55px" title="Quantidade de grupos"></div>
+    <div class="form-group" style="margin-bottom:0;${isGrupos?'':'display:none'}" data-qualif-config><label style="font-size:11px;color:var(--fabd-gray-500)">Classif/Grupo</label><input type="number" class="form-control range-qualifiers" value="${r.groupQualifiers||2}" min="1" max="4" style="width:55px" title="Quantos classificam por grupo para a eliminatoria"></div>
     <div><button class="btn btn-sm btn-danger" onclick="removeRange(${i})">&times;</button></div></div>`;
 });c.innerHTML=h;}
 function onRangeTypeChange(){
@@ -3555,8 +3581,13 @@ async function confirmImport(){
       let changed=false;
       const linkDupla=(modCode,duplaName)=>{
         if(!duplaName)return;
-        const parts=duplaName.trim().split(' ');
-        const partner=players.find(x=>x.id!==p.id&&x.firstName.toLowerCase()===parts[0]?.toLowerCase()&&x.lastName?.toLowerCase()===(parts.slice(1).join(' ')).toLowerCase());
+        const dn=duplaName.trim().toLowerCase();
+        // Buscar parceiro por nome completo (firstName + lastName)
+        const partner=players.find(x=>{
+          if(x.id===p.id)return false;
+          const fullName=`${x.firstName} ${x.lastName}`.toLowerCase().trim();
+          return fullName===dn;
+        });
         if(!partner)return;
         // Encontrar inscricao de dupla deste mod
         (p.inscriptions||[]).forEach(insc=>{
