@@ -154,11 +154,12 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
     const SUPABASE_URL='https://zwjgjtrmsqtyyjtuotuo.supabase.co';
     const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY';
-    const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+    if(!window.supabase){document.getElementById('login-error').textContent='Erro: Supabase nao carregou. Verifique sua conexao.';document.getElementById('login-error').style.display='block';}
+    const supabase=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
 
     let currentUser=null;
     let currentMatch=null;
@@ -168,17 +169,20 @@
 
     // === AUTH ===
     async function loginGoogle(){
+      const errEl=document.getElementById('login-error');
+      errEl.style.display='none';
+      if(!supabase){errEl.textContent='Erro: Supabase nao inicializado. Recarregue a pagina.';errEl.style.display='block';return;}
       try{
-        const errEl=document.getElementById('login-error');
-        errEl.style.display='none';
-        const{error}=await supabase.auth.signInWithOAuth({
+        errEl.textContent='Redirecionando para Google...';errEl.style.display='block';errEl.style.color='#60A5FA';
+        const{data,error}=await supabase.auth.signInWithOAuth({
           provider:'google',
           options:{redirectTo:window.location.href.split('#')[0].split('?')[0]}
         });
-        if(error){errEl.textContent='Erro: '+error.message;errEl.style.display='block';}
+        if(error){errEl.style.color='#EF4444';errEl.textContent='Erro: '+error.message;}
+        else if(data?.url){window.location.href=data.url;}
       }catch(e){
-        const errEl=document.getElementById('login-error');
-        errEl.textContent='Erro: '+e.message;errEl.style.display='block';
+        errEl.style.color='#EF4444';
+        errEl.textContent='Erro: '+e.message;
       }
     }
 
