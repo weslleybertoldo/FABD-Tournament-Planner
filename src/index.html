@@ -140,7 +140,6 @@
           <div class="empty-state" id="draws-no-tournament"><div class="icon">&#127960;</div><h3>Nenhum torneio selecionado</h3><p>Selecione um torneio para gerenciar as chaves</p><button class="btn btn-primary" onclick="navigateTo('tournaments')">Ir para Torneios</button></div>
           <div id="draws-content" style="display:none">
             <div class="toolbar">
-              <button class="btn btn-primary" onclick="showDrawWizard()">&#10133; Nova Chave (Assistente)</button>
               <button class="btn btn-success" onclick="generateAllDraws()">&#127922; Sortear Todas</button>
               <button class="btn btn-secondary" onclick="syncDrawsWithPlayers()">&#128260; Sincronizar Atletas</button>
             </div>
@@ -171,7 +170,6 @@
               <select class="form-control" style="width:150px" id="match-status-filter" onchange="filterMatches()">
                 <option value="">Todas</option><option value="Pendente">Pendentes</option><option value="Em Quadra">Em Quadra</option><option value="Finalizada">Finalizadas</option><option value="A definir">A definir</option>
               </select>
-              <button class="btn btn-secondary" onclick="syncMatchesWithDraws()">&#128260; Sincronizar Partidas</button>
             </div>
 
             <!-- PAINEIS DE QUADRAS -->

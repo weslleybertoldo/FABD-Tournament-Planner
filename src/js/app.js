@@ -118,6 +118,27 @@ function calculateCategory(dob) {
   return 'Principal';
 }
 
+function checkCategoryConflict(dob, inscriptions){
+  if(!dob||!inscriptions?.length)return false;
+  const birth=new Date(dob+'T00:00:00');
+  const age=new Date().getFullYear()-birth.getFullYear();
+  const catLimits={'Sub 13':13,'Sub 15':15,'Sub 17':17,'Sub 19':19,'Sub 23':23,'Senior':35,'Master I':45,'Master II':55};
+  for(const insc of inscriptions){
+    const cat=insc.cat;
+    if(!cat||cat==='Principal')continue;
+    const limit=catLimits[cat];
+    if(!limit)continue;
+    if(cat.startsWith('Sub')){
+      // Sub: idade precisa ser MENOR que o limite
+      if(age>=limit)return true;
+    } else {
+      // Senior/Master: idade precisa ser MAIOR OU IGUAL ao limite
+      if(age<limit)return true;
+    }
+  }
+  return false;
+}
+
 // === NAVIGATION ===
 function setupNavigation() {
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -305,8 +326,11 @@ function renderPlayers() {
   players.forEach(p => {
     const autoCat = calculateCategory(p.dob);
     const inscriptions = (p.inscriptions||[]).length;
+    const hasConflict = checkCategoryConflict(p.dob, p.inscriptions);
+    const nameStyle = hasConflict ? 'color:#DC2626' : '';
+    const conflictIcon = hasConflict ? '<span title="Atleta inscrito em categoria incompativel com a idade" style="color:#DC2626;cursor:help;margin-left:4px">&#9888;</span>' : '';
     h += `<tr>
-      <td><strong>${esc(p.firstName)} ${esc(p.lastName)}</strong></td>
+      <td><strong style="${nameStyle}">${esc(p.firstName)} ${esc(p.lastName)}${conflictIcon}</strong></td>
       <td>${p.gender==='M'?'Masc':p.gender==='F'?'Fem':'-'}</td>
       <td>${fmtDate(p.dob)}</td>
       <td><span class="tag tag-blue">${esc(autoCat)}</span></td>
@@ -932,7 +956,9 @@ function renderDraws() {
   let lh = '';
   draws.forEach((d,i) => {
     const has = d.matches?.length > 0;
-    const st = d.awarded ? '<span class="tag" style="background:#D1FAE5;color:#065F46;border:1px solid #10B981">&#127942; Premiado</span>' : has ? '<span class="tag tag-green">Sorteado</span>' : '<span class="tag tag-yellow">Pendente</span>';
+    const realMatches=has?(d.matches||[]).filter(m=>!m.isBye&&m.player1&&m.player2&&m.player2!=='BYE'&&m.player1!=='BYE'):[];
+    const allFinished=realMatches.length>0&&realMatches.every(m=>m.winner!==undefined&&m.winner!==null);
+    const st = d.awarded ? '<span class="tag" style="background:#D1FAE5;color:#065F46;border:1px solid #10B981">&#127942; Premiado</span>' : allFinished ? '<span class="tag" style="background:#DBEAFE;color:#1E3A8A;border:1px solid #2563EB">JOGOS FINALIZADOS</span>' : has ? '<span class="tag tag-green">Sorteado</span>' : '<span class="tag tag-yellow">Pendente</span>';
     lh += `<div class="draws-list-item${i===selectedDrawIdx?' active':''}" onclick="selectDraw(${i})">
       <div class="draw-item-name">${esc(d.name)}</div>
       <div class="draw-item-info">${esc(d.type)} - ${d.players?.length||0} jogadores - ${has?(d.type==='Eliminatoria'?(d.players?.length||0)-1:((d.players?.length||0)*((d.players?.length||0)-1)/2)):0} jogos ${st}</div>
@@ -3176,9 +3202,15 @@ function reportWinners(){
   const draws=tournament.draws||[];
   if(!draws.length)return'<p>Nenhuma chave criada.</p>';
   let h='<h2 style="color:#1E3A8A;margin-bottom:12px">Premiacao</h2>';
+  let count=0;
   draws.forEach(d=>{
+    // So mostrar categorias com TODOS os jogos finalizados
+    const realMatches=(d.matches||[]).filter(m=>!m.isBye&&m.player1&&m.player2&&m.player2!=='BYE'&&m.player1!=='BYE');
+    const allFinished=realMatches.length>0&&realMatches.every(m=>m.winner!==undefined&&m.winner!==null);
+    if(!allFinished)return;
     const ranking=computeDrawRanking(d);
     if(!ranking||!ranking.length)return;
+    count++;
     h+=`<div class="cat-title">${esc(d.name)}</div>`;
     h+='<table><thead><tr><th>Pos.</th><th>Medalha</th><th>Jogador</th></tr></thead><tbody>';
     ranking.forEach(r=>{
@@ -3189,6 +3221,7 @@ function reportWinners(){
     });
     h+='</tbody></table>';
   });
+  if(!count)h+='<p>Nenhuma categoria finalizada.</p>';
   return h;
 }
 

@@ -1,23 +1,47 @@
 {
   "name": "fabd-tournament-planner",
-  "version": "1.0.0",
-  "description": "Planejador de Torneios - Federação Alagoana de Badminton",
+  "version": "3.0.0",
+  "description": "Planejador de Torneios - Federacao Alagoana de Badminton",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder"
+    "build": "electron-builder --win"
   },
-  "author": "FABD - Federação Alagoana de Badminton",
+  "author": "FABD - Federacao Alagoana de Badminton",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^26.8.1"
   },
   "build": {
     "appId": "com.fabd.tournament-planner",
     "productName": "FABD Tournament Planner",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
     "win": {
-      "target": "nsis",
-      "icon": "src/assets/logo-fabd.jpg"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "src/assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "src/assets/icon.ico",
+      "uninstallerIcon": "src/assets/icon.ico",
+      "installerHeaderIcon": "src/assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FABD Tournament Planner"
     }
   },
   "dependencies": {
