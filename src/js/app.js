@@ -13,6 +13,7 @@ let wizHasProfile = false;
 let wizSteps = [];
 let selectedDrawIdx = -1;
 let gameProfiles = [];
+let lastScoreUpdateTimestamp = {};
 
 // Categorias e modalidades
 const CATEGORIES = ['Sub 13','Sub 15','Sub 17','Sub 19','Sub 23','Principal','Senior','Master I','Master II'];
@@ -506,6 +507,17 @@ async function savePlayer() {
         const oldName = `${oldPlayer.firstName} ${oldPlayer.lastName}`.trim();
         const newName = `${p.firstName} ${p.lastName}`.trim();
         if (oldName !== newName && oldName) {
+          // Bloquear rename se jogador tem jogo Em Quadra
+          const inCourt = (tournament.matches||[]).some(m =>
+            m.status === 'Em Quadra' && (
+              (m.player1 && m.player1.includes(oldName)) ||
+              (m.player2 && m.player2.includes(oldName))
+            )
+          );
+          if (inCourt) {
+            showToast('Nao pode renomear jogador com jogo em quadra. Tire o jogo da quadra primeiro.');
+            return;
+          }
           // Atualizar em entries
           (tournament.entries||[]).forEach(e=>{
             if(e.playerName===oldName)e.playerName=newName;
@@ -2276,6 +2288,11 @@ async function handleRealtimeScoreUpdate(data){
     if(matchNum)m=tournament.matches.find(x=>x.num===matchNum);
   }
   if(!m)return;
+  // Deduplicacao: ignorar updates com timestamp igual ou anterior ao ultimo processado
+  const updateKey = data.match_id;
+  const updateTs = data.updated_at;
+  if (lastScoreUpdateTimestamp[updateKey] && lastScoreUpdateTimestamp[updateKey] >= updateTs) return;
+  lastScoreUpdateTimestamp[updateKey] = updateTs;
   // Se jogo ja foi finalizado localmente, ignorar
   if(m.status==='Finalizada'||m.status==='WO')return;
   // Se o jogo nao esta em quadra, ignorar

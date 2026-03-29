@@ -520,6 +520,9 @@
       const m=document.getElementById('modal-confirm');
       const winner=parseInt(m.dataset.winner),finalScore=m.dataset.score;
       try{
+        // Verificar se o jogo ainda esta Em Quadra antes de finalizar
+        const {data:matchCheck}=await sb.from('live_matches').select('status').eq('id',currentMatch.id).single();
+        if(!matchCheck||matchCheck.status!=='Em Quadra'){alert('Este jogo nao esta mais em quadra. Saindo do placar.');closeModal();exitScorer();return;}
         const r1=await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,current_set:state.set,score_p1:state.p1,score_p2:state.p2,sets_p1:state.setsP1,sets_p2:state.setsP2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,winner,final_score:finalScore,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'});
         const r2=await sb.from('live_matches').update({status:'Finalizada',umpire:currentUser?.name||''}).eq('id',currentMatch.id);
         if(r1.error||r2.error){alert('Erro ao finalizar: '+(r1.error?.message||r2.error?.message));return;}

@@ -119,7 +119,17 @@ ipcMain.handle('db:newTournament', (_, tournament) => {
   return tournament;
 });
 
-ipcMain.handle('db:closeTournament', () => {
+ipcMain.handle('db:closeTournament', async () => {
+  // Limpar dados do Supabase antes de fechar
+  if (db.tournament?.id) {
+    try {
+      const tid = db.tournament.id;
+      await supabase.from('live_scores').delete().eq('tournament_id', tid);
+      await supabase.from('live_matches').delete().eq('tournament_id', tid);
+      await supabase.from('tournaments').delete().eq('id', tid);
+      log('INFO', 'Supabase cleanup ao fechar torneio', tid);
+    } catch (e) { log('ERROR', 'Erro cleanup Supabase:', e.message); }
+  }
   db.tournament = null;
   saveDatabase(db);
   return true;
