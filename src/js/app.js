@@ -2823,6 +2823,8 @@ async function handleRealtimeScoreUpdate(data){
   // Sets anteriores para exibicao
   const setsP1=data.sets_p1||[],setsP2=data.sets_p2||[];
   m.liveSets=setsP1.map((v,i)=>v+'-'+(setsP2[i]||0));
+  // Atualizar arbitro em tempo real
+  if(data.umpire_name)m.umpire=data.umpire_name;
 
   // Se arbitro finalizou o jogo (winner definido)
   if(data.winner&&data.final_score){
@@ -2831,8 +2833,6 @@ async function handleRealtimeScoreUpdate(data){
     m.winner=data.winner;
     m.finishedAt=new Date().toISOString();
     m.liveScore='';
-    // Adicionar arbitro se veio do app
-    if(data.umpire_name)m.umpire=data.umpire_name;
     try{propagateResultToDraws(m);}catch(e){console.warn('Erro ao propagar resultado:',e);}
     await window.api.saveTournament(tournament);
     showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
