@@ -2778,6 +2778,7 @@ function renderCourtsPanel() {
           </div>
           <div style="flex:1;text-align:right;font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(emQuadra.player2)}</div>
         </div>
+        ${emQuadra.umpire?`<div style="text-align:center;font-size:11px;color:var(--fabd-gray-500);margin-top:4px">Árbitro - ${esc(emQuadra.umpire)}</div>`:''}
       </div>`;
     }
     h+='</div></div>';
