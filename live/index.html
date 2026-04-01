@@ -120,7 +120,8 @@
           const s1=s?.sets_p1||[],s2=s?.sets_p2||[],sw1=s?.sets_won_p1||0,sw2=s?.sets_won_p2||0,w=s?.winner;
 
           h+=`<div class="match-live${isActive?' active':''}">`;
-          h+=`<div class="top-row"><span class="badge badge-blue">${esc(m.court)}</span><span class="badge badge-gray">${esc(m.draw_name)} - ${esc(m.round_name||'')}</span></div>`;
+          const umpire=s?.umpire_name||'';
+          h+=`<div class="top-row"><span class="badge badge-blue">${esc(m.court)}</span><span class="badge badge-gray">${esc(m.draw_name)} - ${esc(m.round_name||'')}</span>${umpire?`<span style="font-size:11px;color:#94A3B8;margin-left:auto">Árbitro Principal - ${esc(umpire)}</span>`:''}</div>`;
           // Scoreboard com sets no centro
           h+=`<div class="scoreboard">`;
           h+=`<div class="player"><div class="name${w===1?' winner':''}">${esc(m.player1)}</div><div class="points">${p1S}</div>${(sw1||sw2)?`<div class="sets-won">${sw1} sets</div>`:''}</div>`;

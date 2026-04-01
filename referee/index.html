@@ -227,8 +227,10 @@
       </div>
     </div>
     <div class="scorer-bottom">
-      <button class="btn btn-danger" onclick="undoPoint()">&#8630; Desfazer</button>
+      <span style="font-size:10px;color:#94A3B8" id="scorer-umpire"></span>
+      <button class="btn btn-danger" id="btn-undo" onclick="undoPoint()">&#8630; Desfazer</button>
       <span style="font-size:11px;color:#64748B" id="scorer-draw-info"></span>
+      <span style="font-size:10px;color:#F59E0B;display:none" id="readonly-badge">&#128274; Somente visualização</span>
     </div>
   </div>
 
@@ -508,10 +510,26 @@
           if(isDoubles&&(state.p1>0||state.p2>0))canSwapInner=false;
         }
 
+        // Verificar se outro árbitro já está marcando este jogo
+        isReadOnly=false;
+        if(sc&&sc.umpire_name&&sc.umpire_name!==currentUser?.name){
+          // Outro árbitro está ativo — verificar se atualizou nos últimos 5 minutos
+          const lastUpdate=new Date(sc.updated_at||0).getTime();
+          const fiveMin=5*60*1000;
+          if(Date.now()-lastUpdate<fiveMin){
+            isReadOnly=true;
+          }
+        }
+        // Se não tem árbitro ainda, registrar este como árbitro do jogo
+        if(!isReadOnly&&(!sc?.umpire_name||sc.umpire_name===currentUser?.name)){
+          await sb.from('live_scores').upsert({match_id:matchId,tournament_id:match.tournament_id,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'});
+        }
+
         hideAll();document.getElementById('page-scorer').style.display='flex';
         if(pollInterval)clearInterval(pollInterval);
         lockLandscape();
         updateDisplay();
+        updateReadOnlyUI();
       }catch(e){console.error(e);alert('Erro');}
     }
 
@@ -551,6 +569,7 @@
     }
 
     function addPoint(side){
+      if(isReadOnly)return;
       const player=side==='left'?leftPlayer:rightPlayer;
       state.history.push({
         set:state.set,p1:state.p1,p2:state.p2,server:state.server,
@@ -610,7 +629,7 @@
     }
 
     function undoPoint(){
-      if(!state.history.length)return;
+      if(isReadOnly||!state.history.length)return;
       const prev=state.history.pop();
       state.set=prev.set;state.p1=prev.p1;state.p2=prev.p2;state.server=prev.server;
       state.setsP1=prev.setsP1;state.setsP2=prev.setsP2;
@@ -847,9 +866,11 @@
       }
     }
 
+    let isReadOnly=false; // true quando outro árbitro já está marcando
+
     async function syncScore(){
-      if(!currentMatch||!sb)return;
-      try{await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,current_set:state.set,score_p1:state.p1,score_p2:state.p2,sets_p1:state.setsP1,sets_p2:state.setsP2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,updated_at:new Date().toISOString()},{onConflict:'match_id'});document.getElementById('sync-status').style.background='#10B981';}catch(e){document.getElementById('sync-status').style.background='#EF4444';try{localStorage.setItem('fabd_score_backup_'+currentMatch.id,JSON.stringify(state));}catch(le){}}
+      if(!currentMatch||!sb||isReadOnly)return;
+      try{await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,current_set:state.set,score_p1:state.p1,score_p2:state.p2,sets_p1:state.setsP1,sets_p2:state.setsP2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'});document.getElementById('sync-status').style.background='#10B981';}catch(e){document.getElementById('sync-status').style.background='#EF4444';try{localStorage.setItem('fabd_score_backup_'+currentMatch.id,JSON.stringify(state));}catch(le){}}
     }
 
     function showConfirm(winner){
@@ -875,7 +896,23 @@
       }catch(e){alert('Erro: '+e.message);}
     }
 
-    function exitScorer(){hideAll();currentMatch=null;showMatches();try{screen.orientation?.unlock?.();}catch(e){}}
+    function updateReadOnlyUI(){
+      const umpName=currentUser?.name||'';
+      document.getElementById('scorer-umpire').textContent=umpName?'Árbitro: '+umpName.split(' ')[0]:'';
+      if(isReadOnly){
+        document.getElementById('readonly-badge').style.display='inline';
+        document.getElementById('btn-undo').style.display='none';
+        // Desabilitar cliques na quadra
+        document.querySelectorAll('.court-side').forEach(el=>{el.style.pointerEvents='none';el.style.opacity='0.85';});
+        document.querySelectorAll('.swap-btn,.swap-inner').forEach(el=>{el.style.display='none';});
+      }else{
+        document.getElementById('readonly-badge').style.display='none';
+        document.getElementById('btn-undo').style.display='inline-block';
+        document.querySelectorAll('.court-side').forEach(el=>{el.style.pointerEvents='auto';el.style.opacity='1';});
+      }
+    }
+
+    function exitScorer(){hideAll();currentMatch=null;isReadOnly=false;showMatches();try{screen.orientation?.unlock?.();}catch(e){}}
     function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
     checkAuth();
   </script>
