@@ -177,25 +177,53 @@
       <span id="scorer-court" style="color:#60A5FA"></span>
       <span id="sync-status" style="width:8px;height:8px;border-radius:50%;background:#10B981;display:inline-block"></span>
     </div>
-    <div class="court-container">
-      <div class="court-side court-left" id="court-left" onclick="addPoint('left')">
-        <div class="player-name" id="left-name">Jogador 1</div>
-        <div class="score-big" id="left-score">0</div>
-        <div class="sets-info" id="left-sets">Sets: 0</div>
-        <div class="shuttle" id="shuttle-left" style="display:none">&#127992;</div>
-        <div class="server-name" id="server-name-left" style="display:none"></div>
+    <!-- QUADRA SIMPLES -->
+    <div class="court-container" id="court-singles">
+      <div class="court-side court-left" onclick="addPoint('left')">
+        <div class="player-name" id="s-left-name">Jogador 1</div>
+        <div class="score-big" id="s-left-score">0</div>
+        <div class="sets-info" id="s-left-sets">Sets: 0</div>
+        <div class="shuttle" id="s-shuttle-left" style="display:none">&#127992;</div>
+        <div class="server-name" id="s-server-left" style="display:none"></div>
       </div>
       <div class="court-divider">
-        <div class="set-label" id="div-set">SET 1</div>
+        <div class="set-label" id="s-div-set">SET 1</div>
         <button class="swap-btn" onclick="swapSides()" title="Trocar lados">&#8646;</button>
-        <div class="set-history" id="div-history"></div>
+        <div class="set-history" id="s-div-history"></div>
       </div>
-      <div class="court-side court-right" id="court-right" onclick="addPoint('right')">
-        <div class="player-name" id="right-name">Jogador 2</div>
-        <div class="score-big" id="right-score">0</div>
-        <div class="sets-info" id="right-sets">Sets: 0</div>
-        <div class="shuttle" id="shuttle-right" style="display:none">&#127992;</div>
-        <div class="server-name" id="server-name-right" style="display:none"></div>
+      <div class="court-side court-right" onclick="addPoint('right')">
+        <div class="player-name" id="s-right-name">Jogador 2</div>
+        <div class="score-big" id="s-right-score">0</div>
+        <div class="sets-info" id="s-right-sets">Sets: 0</div>
+        <div class="shuttle" id="s-shuttle-right" style="display:none">&#127992;</div>
+        <div class="server-name" id="s-server-right" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- QUADRA DUPLAS -->
+    <div class="court-container" id="court-doubles" style="display:none">
+      <div class="court-side court-left" onclick="addPoint('left')">
+        <div class="player-name" id="d-left-name">Dupla 1</div>
+        <div class="score-big" id="d-left-score">0</div>
+        <div class="sets-info" id="d-left-sets">Sets: 0</div>
+        <div class="shuttle" id="d-shuttle-left" style="display:none">&#127992;</div>
+        <div class="server-name" id="d-server-left" style="display:none"></div>
+        <div class="player-name" id="d-left-top" style="top:8px;font-size:11px;left:12px;transform:none;text-align:left"></div>
+        <div class="player-name" id="d-left-bottom" style="top:auto;bottom:22px;font-size:11px;left:12px;transform:none;text-align:left"></div>
+      </div>
+      <div class="court-divider">
+        <div class="set-label" id="d-div-set">SET 1</div>
+        <button class="swap-btn" onclick="swapSides()" title="Trocar lados">&#8646;</button>
+        <div class="set-history" id="d-div-history"></div>
+      </div>
+      <div class="court-side court-right" onclick="addPoint('right')">
+        <div class="player-name" id="d-right-name">Dupla 2</div>
+        <div class="score-big" id="d-right-score">0</div>
+        <div class="sets-info" id="d-right-sets">Sets: 0</div>
+        <div class="shuttle" id="d-shuttle-right" style="display:none">&#127992;</div>
+        <div class="server-name" id="d-server-right" style="display:none"></div>
+        <div class="player-name" id="d-right-top" style="top:8px;font-size:11px;right:12px;left:auto;transform:none;text-align:right"></div>
+        <div class="player-name" id="d-right-bottom" style="top:auto;bottom:22px;font-size:11px;right:12px;left:auto;transform:none;text-align:right"></div>
       </div>
     </div>
     <div class="scorer-bottom">
@@ -483,10 +511,12 @@
     }
 
     function setupDoublesUI(){
-      document.querySelector('.court-container').classList.add('doubles-court');
+      document.getElementById('court-singles').style.display='none';
+      document.getElementById('court-doubles').style.display='flex';
     }
     function teardownDoublesUI(){
-      document.querySelector('.court-container').classList.remove('doubles-court');
+      document.getElementById('court-singles').style.display='flex';
+      document.getElementById('court-doubles').style.display='none';
     }
 
     function getDoublesName(key){
@@ -689,12 +719,8 @@
       const lSets=leftPlayer===1?state.setsWonP1:state.setsWonP2;
       const rSets=leftPlayer===1?state.setsWonP2:state.setsWonP1;
 
-      document.getElementById('left-score').textContent=lScore;
-      document.getElementById('right-score').textContent=rScore;
-      document.getElementById('left-sets').textContent='Sets: '+lSets;
-      document.getElementById('right-sets').textContent='Sets: '+rSets;
-      document.getElementById('div-set').textContent='SET '+state.set;
-      document.getElementById('scorer-info').textContent=currentMatch.draw_name+' - '+( currentMatch.round_name||'');
+      // Comum
+      document.getElementById('scorer-info').textContent=currentMatch.draw_name+' - '+(currentMatch.round_name||'');
       document.getElementById('scorer-court').textContent=currentMatch.court;
       document.getElementById('scorer-draw-info').textContent=`#${currentMatch.match_num} | ${currentMatch.draw_name}`;
 
@@ -704,28 +730,41 @@
         const s2=leftPlayer===1?state.setsP2[i]:s;
         hist+=s1+'-'+s2+'<br>';
       });
-      document.getElementById('div-history').innerHTML=hist;
 
-      // Remover setinhas internas anteriores
-      document.querySelectorAll('.swap-inner').forEach(el=>el.remove());
+      const px=isDoubles?'d':'s'; // prefixo dos IDs
+
+      document.getElementById(px+'-left-score').textContent=lScore;
+      document.getElementById(px+'-right-score').textContent=rScore;
+      document.getElementById(px+'-left-sets').textContent='Sets: '+lSets;
+      document.getElementById(px+'-right-sets').textContent='Sets: '+rSets;
+      document.getElementById(px+'-div-set').textContent='SET '+state.set;
+      document.getElementById(px+'-div-history').innerHTML=hist;
 
       if(isDoubles){
         // === DUPLAS ===
-        const ltName=getDoublesName(leftTopPlayer).split(' ')[0];
-        const lbName=getDoublesName(leftBottomPlayer).split(' ')[0];
-        const rtName=getDoublesName(rightTopPlayer).split(' ')[0];
-        const rbName=getDoublesName(rightBottomPlayer).split(' ')[0];
-        document.getElementById('left-name').innerHTML=`<span style="font-size:11px">${esc(ltName)}</span> <span style="color:rgba(255,255,255,0.4)">/</span> <span style="font-size:11px">${esc(lbName)}</span>`;
-        document.getElementById('right-name').innerHTML=`<span style="font-size:11px">${esc(rtName)}</span> <span style="color:rgba(255,255,255,0.4)">/</span> <span style="font-size:11px">${esc(rbName)}</span>`;
+        // Nomes nos cantos da quadra
+        const ltName=getDoublesName(leftTopPlayer);
+        const lbName=getDoublesName(leftBottomPlayer);
+        const rtName=getDoublesName(rightTopPlayer);
+        const rbName=getDoublesName(rightBottomPlayer);
+        document.getElementById('d-left-top').textContent=ltName.split(' ')[0];
+        document.getElementById('d-left-bottom').textContent=lbName.split(' ')[0];
+        document.getElementById('d-right-top').textContent=rtName.split(' ')[0];
+        document.getElementById('d-right-bottom').textContent=rbName.split(' ')[0];
+        document.getElementById('d-left-name').textContent=lName;
+        document.getElementById('d-right-name').textContent=rName;
+        // Esconder nome principal central (já tem nos cantos)
+        document.getElementById('d-left-name').style.display='none';
+        document.getElementById('d-right-name').style.display='none';
 
         // Peteca: sacador em duplas
         const serverTeam=doublesServer.startsWith('p1')?1:2;
         const serverSide=serverTeam===leftPlayer?'left':'right';
-        document.getElementById('shuttle-left').style.display=serverSide==='left'?'block':'none';
-        document.getElementById('shuttle-right').style.display=serverSide==='right'?'block':'none';
+        document.getElementById('d-shuttle-left').style.display=serverSide==='left'?'block':'none';
+        document.getElementById('d-shuttle-right').style.display=serverSide==='right'?'block':'none';
         const serverScore=serverTeam===1?state.p1:state.p2;
         const isEven=serverScore%2===0;
-        const shuttle=document.getElementById('shuttle-'+serverSide);
+        const shuttle=document.getElementById('d-shuttle-'+serverSide);
         if(shuttle){
           if(serverSide==='left'){shuttle.style.top=isEven?'65%':'35%';}
           else{shuttle.style.top=isEven?'35%':'65%';}
@@ -735,11 +774,9 @@
 
         // Nome do sacador ao lado da peteca
         const serverFullName=getDoublesName(doublesServer);
-        const sNameL=document.getElementById('server-name-left');
-        const sNameR=document.getElementById('server-name-right');
-        sNameL.style.display=serverSide==='left'?'block':'none';
-        sNameR.style.display=serverSide==='right'?'block':'none';
-        const sNameEl=serverSide==='left'?sNameL:sNameR;
+        document.getElementById('d-server-left').style.display=serverSide==='left'?'block':'none';
+        document.getElementById('d-server-right').style.display=serverSide==='right'?'block':'none';
+        const sNameEl=document.getElementById('d-server-'+serverSide);
         sNameEl.textContent=serverFullName.split(' ')[0]+' ▸';
         if(shuttle){
           sNameEl.style.top=shuttle.style.top;
@@ -748,29 +785,28 @@
         }
 
         // Setinhas internas — só no inicio de cada set
+        document.querySelectorAll('.swap-inner').forEach(el=>el.remove());
         if(canSwapInner){
-          const leftSide=document.getElementById('court-left');
-          const rightSide=document.getElementById('court-right');
-          const btnL=document.createElement('button');
-          btnL.className='swap-inner';btnL.innerHTML='&#8645;';
-          btnL.onclick=function(e){e.stopPropagation();swapInnerLeft();};
-          leftSide.appendChild(btnL);
-          const btnR=document.createElement('button');
-          btnR.className='swap-inner';btnR.innerHTML='&#8645;';
-          btnR.onclick=function(e){e.stopPropagation();swapInnerRight();};
-          rightSide.appendChild(btnR);
+          const courtDoubles=document.getElementById('court-doubles');
+          const sides=courtDoubles.querySelectorAll('.court-side');
+          sides.forEach((side,idx)=>{
+            const btn=document.createElement('button');
+            btn.className='swap-inner';btn.innerHTML='&#8645;';
+            btn.onclick=function(e){e.stopPropagation();idx===0?swapInnerLeft():swapInnerRight();};
+            side.appendChild(btn);
+          });
         }
       }else{
         // === SIMPLES ===
-        document.getElementById('left-name').textContent=lName;
-        document.getElementById('right-name').textContent=rName;
+        document.getElementById('s-left-name').textContent=lName;
+        document.getElementById('s-right-name').textContent=rName;
 
         const serverSide=state.server===leftPlayer?'left':'right';
-        document.getElementById('shuttle-left').style.display=serverSide==='left'?'block':'none';
-        document.getElementById('shuttle-right').style.display=serverSide==='right'?'block':'none';
+        document.getElementById('s-shuttle-left').style.display=serverSide==='left'?'block':'none';
+        document.getElementById('s-shuttle-right').style.display=serverSide==='right'?'block':'none';
         const serverScore=state.server===1?state.p1:state.p2;
         const isEven=serverScore%2===0;
-        const shuttle=document.getElementById('shuttle-'+serverSide);
+        const shuttle=document.getElementById('s-shuttle-'+serverSide);
         if(shuttle){
           if(serverSide==='left'){shuttle.style.top=isEven?'65%':'35%';}
           else{shuttle.style.top=isEven?'35%':'65%';}
@@ -780,11 +816,9 @@
 
         // Nome do servidor ao lado da peteca
         const serverName=state.server===1?p1Name:p2Name;
-        const sNameL=document.getElementById('server-name-left');
-        const sNameR=document.getElementById('server-name-right');
-        sNameL.style.display=serverSide==='left'?'block':'none';
-        sNameR.style.display=serverSide==='right'?'block':'none';
-        const sNameEl=serverSide==='left'?sNameL:sNameR;
+        document.getElementById('s-server-left').style.display=serverSide==='left'?'block':'none';
+        document.getElementById('s-server-right').style.display=serverSide==='right'?'block':'none';
+        const sNameEl=document.getElementById('s-server-'+serverSide);
         sNameEl.textContent=serverName.split(' ')[0]+' ▸';
         if(shuttle){
           sNameEl.style.top=shuttle.style.top;
