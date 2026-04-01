@@ -479,8 +479,8 @@
         state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
         interval11Asked=false;
 
-        // Detectar duplas (nomes separados por " / ")
-        isDoubles=match.player1.includes('/')&&match.player2.includes('/');
+        // Detectar duplas: nomes com "/" OU draw_name começa com DM/DF/DX
+        isDoubles=(match.player1.includes('/')&&match.player2.includes('/'))||/^D[MFX]/i.test(match.draw_name||'');
         if(isDoubles){
           const parts1=match.player1.split('/').map(n=>n.trim());
           const parts2=match.player2.split('/').map(n=>n.trim());
