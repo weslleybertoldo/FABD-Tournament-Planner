@@ -90,6 +90,26 @@
     .modal .actions{display:flex;gap:12px}
     .modal .actions .btn{flex:1;padding:12px}
 
+    /* Nome do servidor ao lado da peteca */
+    .server-name{position:absolute;font-size:10px;font-weight:600;color:rgba(255,255,255,0.85);z-index:3;white-space:nowrap;transition:all 0.3s ease}
+
+    /* Modal Intervalo */
+    .interval-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:150;align-items:center;justify-content:center}
+    .interval-overlay.active{display:flex}
+    .interval-box{text-align:center;color:#fff}
+    .interval-box h2{font-size:20px;margin-bottom:8px;color:#F59E0B}
+    .interval-box .timer{font-size:64px;font-weight:900;margin:16px 0;font-variant-numeric:tabular-nums}
+    .interval-box .timer.warning{color:#EF4444;animation:pulse 1s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+
+    /* Duplas: 2 jogadores por lado */
+    .doubles-court .court-side{display:flex;flex-direction:row;padding:0}
+    .doubles-court .court-half{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;min-height:100%}
+    .doubles-court .court-half-divider{width:0;border-left:1px dashed rgba(255,255,255,0.2);align-self:stretch;margin:8px 0}
+    .doubles-court .court-half .player-name-doubles{font-size:11px;font-weight:600;position:absolute;top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90%;z-index:2}
+    .doubles-court .swap-inner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,0.15);border:none;color:#fff;width:28px;height:28px;border-radius:50%;font-size:12px;cursor:pointer;z-index:4;display:flex;align-items:center;justify-content:center}
+    .doubles-court .swap-inner:active{background:rgba(255,255,255,0.3)}
+
     @media (orientation:portrait){
       .scorer-page .court-container{flex-direction:column}
       .court-divider{width:100%;height:44px;flex-direction:row}
@@ -163,6 +183,7 @@
         <div class="score-big" id="left-score">0</div>
         <div class="sets-info" id="left-sets">Sets: 0</div>
         <div class="shuttle" id="shuttle-left" style="display:none">&#127992;</div>
+        <div class="server-name" id="server-name-left" style="display:none"></div>
       </div>
       <div class="court-divider">
         <div class="set-label" id="div-set">SET 1</div>
@@ -174,6 +195,7 @@
         <div class="score-big" id="right-score">0</div>
         <div class="sets-info" id="right-sets">Sets: 0</div>
         <div class="shuttle" id="shuttle-right" style="display:none">&#127992;</div>
+        <div class="server-name" id="server-name-right" style="display:none"></div>
       </div>
     </div>
     <div class="scorer-bottom">
@@ -195,6 +217,28 @@
     </div>
   </div>
 
+  <!-- MODAL INTERVALO -->
+  <div class="interval-overlay" id="modal-interval">
+    <div class="interval-box">
+      <h2 id="interval-title">Intervalo</h2>
+      <div class="timer" id="interval-timer">1:00</div>
+      <p id="interval-msg" style="font-size:13px;color:#94A3B8;margin-bottom:16px"></p>
+      <button class="btn btn-primary" id="interval-skip-btn" onclick="skipInterval()">Pular</button>
+    </div>
+  </div>
+
+  <!-- MODAL PERGUNTAR INTERVALO (11 pontos) -->
+  <div class="modal-overlay" id="modal-ask-interval">
+    <div class="modal">
+      <h3>&#9200; Intervalo</h3>
+      <p style="color:#94A3B8;margin-bottom:20px">Primeiro jogador atingiu 11 pontos.<br>Deseja descansar?</p>
+      <div class="actions">
+        <button class="btn btn-danger" onclick="declineInterval()">Não</button>
+        <button class="btn btn-success" onclick="acceptInterval()">Sim (1 min)</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
   <script>
     const SUPABASE_URL='https://zwjgjtrmsqtyyjtuotuo.supabase.co';
@@ -207,6 +251,8 @@
     let leftPlayer=1,rightPlayer=2; // 1=player1, 2=player2
     let state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
     const PTS=21,MAX=30,BEST=3;
+    let intervalTimer=null,intervalSeconds=0;
+    let interval11Asked=false; // evita perguntar novamente no mesmo set
 
     // === PWA SERVICE WORKER ===
     if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
@@ -389,6 +435,7 @@
         currentMatch=match;
         leftPlayer=1;rightPlayer=2;
         state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
+        interval11Asked=false;
         // Carregar score existente
         const{data:sc}=await sb.from('live_scores').select('*').eq('match_id',matchId).single();
         if(sc){state.set=sc.current_set||1;state.p1=sc.score_p1||0;state.p2=sc.score_p2||0;state.setsP1=sc.sets_p1||[];state.setsP2=sc.sets_p2||[];state.setsWonP1=sc.sets_won_p1||0;state.setsWonP2=sc.sets_won_p2||0;}
@@ -444,12 +491,56 @@
         // Proximo set: trocar lados
         state.set++;state.p1=0;state.p2=0;
         const tmp=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp;
-        state.server=1; // servico volta ao player 1 do set
+        state.server=1;
+        interval11Asked=false; // reset para o proximo set
+        // Intervalo obrigatorio entre sets: 2 minutos
+        startInterval(120,'Intervalo entre Sets','Próximo set em:');
+        return;
       }
-      // Intervalo no 11 pontos: trocar lados
-      if((state.p1===11&&state.p2<11)||(state.p2===11&&state.p1<11)){
-        // Nao trocar automaticamente, so visual (regra BWF: troca de lado no intervalo do set 3)
+      // Intervalo no 11 pontos: perguntar se quer descansar
+      if(!interval11Asked&&((p1===11&&p2<11)||(p2===11&&p1<11))){
+        interval11Asked=true;
+        document.getElementById('modal-ask-interval').classList.add('active');
       }
+    }
+
+    // === INTERVALO / DESCANSO ===
+    function acceptInterval(){
+      document.getElementById('modal-ask-interval').classList.remove('active');
+      startInterval(60,'Intervalo - 11 pontos','');
+    }
+    function declineInterval(){
+      document.getElementById('modal-ask-interval').classList.remove('active');
+    }
+    function startInterval(seconds,title,msg){
+      intervalSeconds=seconds;
+      document.getElementById('interval-title').textContent=title;
+      document.getElementById('interval-msg').textContent=msg;
+      document.getElementById('interval-skip-btn').style.display='inline-block';
+      const timerEl=document.getElementById('interval-timer');
+      timerEl.classList.remove('warning');
+      updateIntervalDisplay();
+      document.getElementById('modal-interval').classList.add('active');
+      intervalTimer=setInterval(()=>{
+        intervalSeconds--;
+        if(intervalSeconds<=10)timerEl.classList.add('warning');
+        updateIntervalDisplay();
+        if(intervalSeconds<=0){
+          clearInterval(intervalTimer);intervalTimer=null;
+          // Vibrar/som se possivel
+          try{navigator.vibrate?.([200,100,200]);}catch(e){}
+          setTimeout(()=>{document.getElementById('modal-interval').classList.remove('active');},500);
+        }
+      },1000);
+    }
+    function updateIntervalDisplay(){
+      const m=Math.floor(intervalSeconds/60);
+      const s=intervalSeconds%60;
+      document.getElementById('interval-timer').textContent=m+':'+String(s).padStart(2,'0');
+    }
+    function skipInterval(){
+      if(intervalTimer){clearInterval(intervalTimer);intervalTimer=null;}
+      document.getElementById('modal-interval').classList.remove('active');
     }
 
     function updateDisplay(){
@@ -491,7 +582,6 @@
       const isEven=serverScore%2===0;
       const shuttle=document.getElementById('shuttle-'+serverSide);
       if(shuttle){
-        // Lado esquerdo: par=baixo, impar=cima / Lado direito: invertido (espelho)
         if(serverSide==='left'){
           shuttle.style.top=isEven?'65%':'35%';
         } else {
@@ -499,6 +589,24 @@
         }
         shuttle.style[serverSide==='left'?'right':'left']='15px';
         shuttle.style[serverSide==='left'?'left':'right']='auto';
+      }
+
+      // Nome do servidor ao lado da peteca
+      const serverName=state.server===1?p1Name:p2Name;
+      const sNameL=document.getElementById('server-name-left');
+      const sNameR=document.getElementById('server-name-right');
+      sNameL.style.display=serverSide==='left'?'block':'none';
+      sNameR.style.display=serverSide==='right'?'block':'none';
+      const sNameEl=serverSide==='left'?sNameL:sNameR;
+      // Pegar só o primeiro nome para caber
+      sNameEl.textContent=serverName.split(' ')[0]+' ▸';
+      if(shuttle){
+        sNameEl.style.top=shuttle.style.top;
+        if(serverSide==='left'){
+          sNameEl.style.right='48px';sNameEl.style.left='auto';
+        }else{
+          sNameEl.style.left='48px';sNameEl.style.right='auto';
+        }
       }
     }
 
