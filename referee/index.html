@@ -252,7 +252,21 @@
     let state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
     const PTS=21,MAX=30,BEST=3;
     let intervalTimer=null,intervalSeconds=0;
-    let interval11Asked=false; // evita perguntar novamente no mesmo set
+    let interval11Asked=false;
+
+    // === DUPLAS ===
+    let isDoubles=false;
+    // Nomes dos jogadores das duplas
+    let p1a='',p1b='',p2a='',p2b='';
+    // Posição na quadra: quem está no topo (esquerda quadra = direita da tela espelhada)
+    // left side: leftTopPlayer, leftBottomPlayer (indices: 'p1a','p1b' ou 'p2a','p2b')
+    // right side: rightTopPlayer, rightBottomPlayer
+    let leftTopPlayer='',leftBottomPlayer='',rightTopPlayer='',rightBottomPlayer='';
+    // Quem está sacando individualmente (em duplas)
+    let doublesServer=''; // 'p1a','p1b','p2a','p2b'
+    let doublesReceiver=''; // quem recebe
+    // Controle de setinhas (só aparecem no inicio de cada set)
+    let canSwapInner=true;
 
     // === PWA SERVICE WORKER ===
     if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
@@ -436,9 +450,30 @@
         leftPlayer=1;rightPlayer=2;
         state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
         interval11Asked=false;
+
+        // Detectar duplas (nomes separados por " / ")
+        isDoubles=match.player1.includes('/')&&match.player2.includes('/');
+        if(isDoubles){
+          const parts1=match.player1.split('/').map(n=>n.trim());
+          const parts2=match.player2.split('/').map(n=>n.trim());
+          p1a=parts1[0]||'';p1b=parts1[1]||'';
+          p2a=parts2[0]||'';p2b=parts2[1]||'';
+          // Posição inicial: p1a=direita(baixo), p1b=esquerda(cima) no lado azul
+          leftTopPlayer='p1b';leftBottomPlayer='p1a';
+          rightTopPlayer='p2a';rightBottomPlayer='p2b';
+          doublesServer='p1a'; // primeiro sacador
+          doublesReceiver='p2a'; // primeiro recebedor
+          canSwapInner=true;
+          setupDoublesUI();
+        }else{
+          teardownDoublesUI();
+        }
+
         // Carregar score existente
         const{data:sc}=await sb.from('live_scores').select('*').eq('match_id',matchId).single();
-        if(sc){state.set=sc.current_set||1;state.p1=sc.score_p1||0;state.p2=sc.score_p2||0;state.setsP1=sc.sets_p1||[];state.setsP2=sc.sets_p2||[];state.setsWonP1=sc.sets_won_p1||0;state.setsWonP2=sc.sets_won_p2||0;}
+        if(sc){state.set=sc.current_set||1;state.p1=sc.score_p1||0;state.p2=sc.score_p2||0;state.setsP1=sc.sets_p1||[];state.setsP2=sc.sets_p2||[];state.setsWonP1=sc.sets_won_p1||0;state.setsWonP2=sc.sets_won_p2||0;
+          if(isDoubles&&(state.p1>0||state.p2>0))canSwapInner=false;
+        }
 
         hideAll();document.getElementById('page-scorer').style.display='flex';
         if(pollInterval)clearInterval(pollInterval);
@@ -447,17 +482,81 @@
       }catch(e){console.error(e);alert('Erro');}
     }
 
+    function setupDoublesUI(){
+      document.querySelector('.court-container').classList.add('doubles-court');
+    }
+    function teardownDoublesUI(){
+      document.querySelector('.court-container').classList.remove('doubles-court');
+    }
+
+    function getDoublesName(key){
+      const map={p1a,p1b,p2a,p2b};
+      return map[key]||key;
+    }
+
+    function swapInnerLeft(){
+      if(!canSwapInner)return;
+      const tmp=leftTopPlayer;leftTopPlayer=leftBottomPlayer;leftBottomPlayer=tmp;
+      updateDisplay();
+    }
+    function swapInnerRight(){
+      if(!canSwapInner)return;
+      const tmp=rightTopPlayer;rightTopPlayer=rightBottomPlayer;rightBottomPlayer=tmp;
+      updateDisplay();
+    }
+
     function addPoint(side){
       const player=side==='left'?leftPlayer:rightPlayer;
       state.history.push({
         set:state.set,p1:state.p1,p2:state.p2,server:state.server,
         setsP1:[...state.setsP1],setsP2:[...state.setsP2],
         setsWonP1:state.setsWonP1,setsWonP2:state.setsWonP2,
-        leftPlayer,rightPlayer,interval11Asked
+        leftPlayer,rightPlayer,interval11Asked,
+        // Salvar estado de duplas para undo
+        doublesServer,doublesReceiver,
+        leftTopPlayer,leftBottomPlayer,rightTopPlayer,rightBottomPlayer,
+        canSwapInner
       });
       if(player===1)state.p1++;else state.p2++;
-      // Servico: quem marcou ponto serve (badminton)
       state.server=player;
+
+      // Duplas: lógica de posicionamento BWF
+      if(isDoubles){
+        canSwapInner=false; // setinhas somem após primeiro ponto
+        const scoringTeam=player; // 1=team1, 2=team2
+        const serverTeam=doublesServer.startsWith('p1')?1:2;
+        if(scoringTeam===serverTeam){
+          // Time sacador marcou ponto → sacador troca de lado na sua quadra
+          if(serverTeam===1){
+            if(leftPlayer===1){const tmp=leftTopPlayer;leftTopPlayer=leftBottomPlayer;leftBottomPlayer=tmp;}
+            else{const tmp=rightTopPlayer;rightTopPlayer=rightBottomPlayer;rightBottomPlayer=tmp;}
+          }else{
+            if(leftPlayer===2){const tmp=leftTopPlayer;leftTopPlayer=leftBottomPlayer;leftBottomPlayer=tmp;}
+            else{const tmp=rightTopPlayer;rightTopPlayer=rightBottomPlayer;rightBottomPlayer=tmp;}
+          }
+          // Mesmo sacador continua
+        }else{
+          // Time recebedor marcou ponto → ganha o saque
+          // Ninguém troca de lado, mas o sacador muda para quem está no lado correto
+          const recTeamScore=scoringTeam===1?state.p1:state.p2;
+          const isEven=recTeamScore%2===0;
+          // Quem está no lado correto (par=direita/baixo, impar=esquerda/cima) do time recebedor saca
+          if(scoringTeam===1){
+            if(leftPlayer===1){
+              doublesServer=isEven?leftBottomPlayer:leftTopPlayer;
+            }else{
+              doublesServer=isEven?rightBottomPlayer:rightTopPlayer;
+            }
+          }else{
+            if(leftPlayer===2){
+              doublesServer=isEven?leftBottomPlayer:leftTopPlayer;
+            }else{
+              doublesServer=isEven?rightBottomPlayer:rightTopPlayer;
+            }
+          }
+        }
+      }
+
       checkSetEnd();
       updateDisplay();
       syncScore();
@@ -471,11 +570,25 @@
       state.setsWonP1=prev.setsWonP1;state.setsWonP2=prev.setsWonP2;
       leftPlayer=prev.leftPlayer;rightPlayer=prev.rightPlayer;
       interval11Asked=prev.interval11Asked||false;
+      if(isDoubles){
+        doublesServer=prev.doublesServer||doublesServer;
+        doublesReceiver=prev.doublesReceiver||doublesReceiver;
+        leftTopPlayer=prev.leftTopPlayer||leftTopPlayer;
+        leftBottomPlayer=prev.leftBottomPlayer||leftBottomPlayer;
+        rightTopPlayer=prev.rightTopPlayer||rightTopPlayer;
+        rightBottomPlayer=prev.rightBottomPlayer||rightBottomPlayer;
+        canSwapInner=prev.canSwapInner!==undefined?prev.canSwapInner:canSwapInner;
+      }
       updateDisplay();syncScore();
     }
 
     function swapSides(){
       const tmp=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp;
+      if(isDoubles){
+        const tmpLT=leftTopPlayer,tmpLB=leftBottomPlayer;
+        leftTopPlayer=rightTopPlayer;leftBottomPlayer=rightBottomPlayer;
+        rightTopPlayer=tmpLT;rightBottomPlayer=tmpLB;
+      }
       updateDisplay();
     }
 
@@ -493,8 +606,14 @@
         state.set++;state.p1=0;state.p2=0;
         const tmp=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp;
         state.server=1;
-        interval11Asked=false; // reset para o proximo set
-        // Intervalo obrigatorio entre sets: 2 minutos
+        interval11Asked=false;
+        if(isDoubles){
+          // Trocar posições das duplas junto com os lados
+          const tmpLT=leftTopPlayer,tmpLB=leftBottomPlayer;
+          leftTopPlayer=rightTopPlayer;leftBottomPlayer=rightBottomPlayer;
+          rightTopPlayer=tmpLT;rightBottomPlayer=tmpLB;
+          canSwapInner=true; // setinhas reaparecem no inicio do set
+        }
         startInterval(120,'Intervalo entre Sets','Próximo set em:');
         return;
       }
@@ -503,7 +622,12 @@
         interval11Asked=true;
         // No 3o set nos 11: trocar de lado (regra BWF)
         if(state.set===3){
-          const tmp=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp;
+          const tmp2=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp2;
+          if(isDoubles){
+            const tmpLT=leftTopPlayer,tmpLB=leftBottomPlayer;
+            leftTopPlayer=rightTopPlayer;leftBottomPlayer=rightBottomPlayer;
+            rightTopPlayer=tmpLT;rightBottomPlayer=tmpLB;
+          }
         }
         document.getElementById('modal-ask-interval').classList.add('active');
       }
@@ -559,14 +683,12 @@
       if(!currentMatch)return;
       const p1Name=currentMatch.player1,p2Name=currentMatch.player2;
       const lName=leftPlayer===1?p1Name:p2Name;
-      const rName=rightPlayer===1?p1Name:p2Name;
+      const rName=leftPlayer===1?p2Name:p1Name;
       const lScore=leftPlayer===1?state.p1:state.p2;
-      const rScore=rightPlayer===1?state.p1:state.p2;
+      const rScore=leftPlayer===1?state.p2:state.p1;
       const lSets=leftPlayer===1?state.setsWonP1:state.setsWonP2;
-      const rSets=rightPlayer===1?state.setsWonP1:state.setsWonP2;
+      const rSets=leftPlayer===1?state.setsWonP2:state.setsWonP1;
 
-      document.getElementById('left-name').textContent=lName;
-      document.getElementById('right-name').textContent=rName;
       document.getElementById('left-score').textContent=lScore;
       document.getElementById('right-score').textContent=rScore;
       document.getElementById('left-sets').textContent='Sets: '+lSets;
@@ -584,40 +706,90 @@
       });
       document.getElementById('div-history').innerHTML=hist;
 
-      // Peteca (servico) - quadra espelhada como na realidade
-      // Lado azul (esquerdo): par=baixo(65%), impar=cima(35%)
-      // Lado vermelho (direito): ESPELHADO - par=cima(35%), impar=baixo(65%)
-      const serverSide=state.server===leftPlayer?'left':'right';
-      document.getElementById('shuttle-left').style.display=serverSide==='left'?'block':'none';
-      document.getElementById('shuttle-right').style.display=serverSide==='right'?'block':'none';
-      const serverScore=state.server===1?state.p1:state.p2;
-      const isEven=serverScore%2===0;
-      const shuttle=document.getElementById('shuttle-'+serverSide);
-      if(shuttle){
-        if(serverSide==='left'){
-          shuttle.style.top=isEven?'65%':'35%';
-        } else {
-          shuttle.style.top=isEven?'35%':'65%';
-        }
-        shuttle.style[serverSide==='left'?'right':'left']='15px';
-        shuttle.style[serverSide==='left'?'left':'right']='auto';
-      }
+      // Remover setinhas internas anteriores
+      document.querySelectorAll('.swap-inner').forEach(el=>el.remove());
 
-      // Nome do servidor ao lado da peteca
-      const serverName=state.server===1?p1Name:p2Name;
-      const sNameL=document.getElementById('server-name-left');
-      const sNameR=document.getElementById('server-name-right');
-      sNameL.style.display=serverSide==='left'?'block':'none';
-      sNameR.style.display=serverSide==='right'?'block':'none';
-      const sNameEl=serverSide==='left'?sNameL:sNameR;
-      // Pegar só o primeiro nome para caber
-      sNameEl.textContent=serverName.split(' ')[0]+' ▸';
-      if(shuttle){
-        sNameEl.style.top=shuttle.style.top;
-        if(serverSide==='left'){
-          sNameEl.style.right='48px';sNameEl.style.left='auto';
-        }else{
-          sNameEl.style.left='48px';sNameEl.style.right='auto';
+      if(isDoubles){
+        // === DUPLAS ===
+        const ltName=getDoublesName(leftTopPlayer).split(' ')[0];
+        const lbName=getDoublesName(leftBottomPlayer).split(' ')[0];
+        const rtName=getDoublesName(rightTopPlayer).split(' ')[0];
+        const rbName=getDoublesName(rightBottomPlayer).split(' ')[0];
+        document.getElementById('left-name').innerHTML=`<span style="font-size:11px">${esc(ltName)}</span> <span style="color:rgba(255,255,255,0.4)">/</span> <span style="font-size:11px">${esc(lbName)}</span>`;
+        document.getElementById('right-name').innerHTML=`<span style="font-size:11px">${esc(rtName)}</span> <span style="color:rgba(255,255,255,0.4)">/</span> <span style="font-size:11px">${esc(rbName)}</span>`;
+
+        // Peteca: sacador em duplas
+        const serverTeam=doublesServer.startsWith('p1')?1:2;
+        const serverSide=serverTeam===leftPlayer?'left':'right';
+        document.getElementById('shuttle-left').style.display=serverSide==='left'?'block':'none';
+        document.getElementById('shuttle-right').style.display=serverSide==='right'?'block':'none';
+        const serverScore=serverTeam===1?state.p1:state.p2;
+        const isEven=serverScore%2===0;
+        const shuttle=document.getElementById('shuttle-'+serverSide);
+        if(shuttle){
+          if(serverSide==='left'){shuttle.style.top=isEven?'65%':'35%';}
+          else{shuttle.style.top=isEven?'35%':'65%';}
+          shuttle.style[serverSide==='left'?'right':'left']='15px';
+          shuttle.style[serverSide==='left'?'left':'right']='auto';
+        }
+
+        // Nome do sacador ao lado da peteca
+        const serverFullName=getDoublesName(doublesServer);
+        const sNameL=document.getElementById('server-name-left');
+        const sNameR=document.getElementById('server-name-right');
+        sNameL.style.display=serverSide==='left'?'block':'none';
+        sNameR.style.display=serverSide==='right'?'block':'none';
+        const sNameEl=serverSide==='left'?sNameL:sNameR;
+        sNameEl.textContent=serverFullName.split(' ')[0]+' ▸';
+        if(shuttle){
+          sNameEl.style.top=shuttle.style.top;
+          if(serverSide==='left'){sNameEl.style.right='48px';sNameEl.style.left='auto';}
+          else{sNameEl.style.left='48px';sNameEl.style.right='auto';}
+        }
+
+        // Setinhas internas — só no inicio de cada set
+        if(canSwapInner){
+          const leftSide=document.getElementById('court-left');
+          const rightSide=document.getElementById('court-right');
+          const btnL=document.createElement('button');
+          btnL.className='swap-inner';btnL.innerHTML='&#8645;';
+          btnL.onclick=function(e){e.stopPropagation();swapInnerLeft();};
+          leftSide.appendChild(btnL);
+          const btnR=document.createElement('button');
+          btnR.className='swap-inner';btnR.innerHTML='&#8645;';
+          btnR.onclick=function(e){e.stopPropagation();swapInnerRight();};
+          rightSide.appendChild(btnR);
+        }
+      }else{
+        // === SIMPLES ===
+        document.getElementById('left-name').textContent=lName;
+        document.getElementById('right-name').textContent=rName;
+
+        const serverSide=state.server===leftPlayer?'left':'right';
+        document.getElementById('shuttle-left').style.display=serverSide==='left'?'block':'none';
+        document.getElementById('shuttle-right').style.display=serverSide==='right'?'block':'none';
+        const serverScore=state.server===1?state.p1:state.p2;
+        const isEven=serverScore%2===0;
+        const shuttle=document.getElementById('shuttle-'+serverSide);
+        if(shuttle){
+          if(serverSide==='left'){shuttle.style.top=isEven?'65%':'35%';}
+          else{shuttle.style.top=isEven?'35%':'65%';}
+          shuttle.style[serverSide==='left'?'right':'left']='15px';
+          shuttle.style[serverSide==='left'?'left':'right']='auto';
+        }
+
+        // Nome do servidor ao lado da peteca
+        const serverName=state.server===1?p1Name:p2Name;
+        const sNameL=document.getElementById('server-name-left');
+        const sNameR=document.getElementById('server-name-right');
+        sNameL.style.display=serverSide==='left'?'block':'none';
+        sNameR.style.display=serverSide==='right'?'block':'none';
+        const sNameEl=serverSide==='left'?sNameL:sNameR;
+        sNameEl.textContent=serverName.split(' ')[0]+' ▸';
+        if(shuttle){
+          sNameEl.style.top=shuttle.style.top;
+          if(serverSide==='left'){sNameEl.style.right='48px';sNameEl.style.left='auto';}
+          else{sNameEl.style.left='48px';sNameEl.style.right='auto';}
         }
       }
     }
