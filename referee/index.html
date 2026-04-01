@@ -575,18 +575,20 @@
           // Ninguém troca de lado, mas o sacador muda para quem está no lado correto
           const recTeamScore=scoringTeam===1?state.p1:state.p2;
           const isEven=recTeamScore%2===0;
-          // Quem está no lado correto (par=direita/baixo, impar=esquerda/cima) do time recebedor saca
+          // Quem está no lado correto do time recebedor saca
+          // Lado esquerdo: par=baixo, impar=cima
+          // Lado direito: ESPELHADO — par=cima, impar=baixo
           if(scoringTeam===1){
             if(leftPlayer===1){
               doublesServer=isEven?leftBottomPlayer:leftTopPlayer;
             }else{
-              doublesServer=isEven?rightBottomPlayer:rightTopPlayer;
+              doublesServer=isEven?rightTopPlayer:rightBottomPlayer;
             }
           }else{
             if(leftPlayer===2){
               doublesServer=isEven?leftBottomPlayer:leftTopPlayer;
             }else{
-              doublesServer=isEven?rightBottomPlayer:rightTopPlayer;
+              doublesServer=isEven?rightTopPlayer:rightBottomPlayer;
             }
           }
         }
