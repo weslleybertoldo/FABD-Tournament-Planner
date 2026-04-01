@@ -91,7 +91,7 @@
     .modal .actions .btn{flex:1;padding:12px}
 
     /* Nome do servidor ao lado da peteca */
-    .server-name{position:absolute;font-size:10px;font-weight:600;color:rgba(255,255,255,0.85);z-index:3;white-space:nowrap;transition:all 0.3s ease}
+    .server-name{position:absolute;font-size:14px;font-weight:700;color:rgba(255,255,255,0.9);z-index:3;white-space:nowrap;transition:all 0.3s ease;text-shadow:1px 1px 3px rgba(0,0,0,0.5)}
 
     /* Modal Intervalo */
     .interval-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:150;align-items:center;justify-content:center}
@@ -453,7 +453,7 @@
         set:state.set,p1:state.p1,p2:state.p2,server:state.server,
         setsP1:[...state.setsP1],setsP2:[...state.setsP2],
         setsWonP1:state.setsWonP1,setsWonP2:state.setsWonP2,
-        leftPlayer,rightPlayer
+        leftPlayer,rightPlayer,interval11Asked
       });
       if(player===1)state.p1++;else state.p2++;
       // Servico: quem marcou ponto serve (badminton)
@@ -470,6 +470,7 @@
       state.setsP1=prev.setsP1;state.setsP2=prev.setsP2;
       state.setsWonP1=prev.setsWonP1;state.setsWonP2=prev.setsWonP2;
       leftPlayer=prev.leftPlayer;rightPlayer=prev.rightPlayer;
+      interval11Asked=prev.interval11Asked||false;
       updateDisplay();syncScore();
     }
 
@@ -500,6 +501,10 @@
       // Intervalo no 11 pontos: perguntar se quer descansar
       if(!interval11Asked&&((p1===11&&p2<11)||(p2===11&&p1<11))){
         interval11Asked=true;
+        // No 3o set nos 11: trocar de lado (regra BWF)
+        if(state.set===3){
+          const tmp=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp;
+        }
         document.getElementById('modal-ask-interval').classList.add('active');
       }
     }
@@ -527,8 +532,15 @@
         updateIntervalDisplay();
         if(intervalSeconds<=0){
           clearInterval(intervalTimer);intervalTimer=null;
-          // Vibrar/som se possivel
-          try{navigator.vibrate?.([200,100,200]);}catch(e){}
+          // Som + vibrar ao finalizar
+          try{
+            navigator.vibrate?.([300,100,300,100,300]);
+            const ctx=new(window.AudioContext||window.webkitAudioContext)();
+            const osc=ctx.createOscillator();osc.type='square';osc.frequency.value=880;
+            const gain=ctx.createGain();gain.gain.value=0.3;
+            osc.connect(gain);gain.connect(ctx.destination);
+            osc.start();setTimeout(()=>{osc.stop();ctx.close();},500);
+          }catch(e){}
           setTimeout(()=>{document.getElementById('modal-interval').classList.remove('active');},500);
         }
       },1000);
