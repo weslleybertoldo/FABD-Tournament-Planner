@@ -75,6 +75,7 @@
     .court-divider .set-history{font-size:10px;color:#94A3B8;text-align:center}
     .swap-btn{background:#334155;border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
     .swap-btn:active{background:#475569}
+    .swap-serve{font-size:20px;background:#1E3A8A;border:1px solid #F59E0B}
 
     /* Barra inferior */
     .scorer-bottom{background:#0F172A;padding:8px 12px;display:flex;gap:8px;align-items:center;justify-content:center;z-index:5;flex-shrink:0}
@@ -189,6 +190,7 @@
       <div class="court-divider">
         <div class="set-label" id="s-div-set">SET 1</div>
         <button class="swap-btn" onclick="swapSides()" title="Trocar lados">&#8646;</button>
+        <button class="swap-btn swap-serve" id="s-swap-serve" onclick="swapServer()" title="Trocar saque">&#127992;</button>
         <div class="set-history" id="s-div-history"></div>
       </div>
       <div class="court-side court-right" onclick="addPoint('right')">
@@ -214,6 +216,7 @@
       <div class="court-divider">
         <div class="set-label" id="d-div-set">SET 1</div>
         <button class="swap-btn" onclick="swapSides()" title="Trocar lados">&#8646;</button>
+        <button class="swap-btn swap-serve" id="d-swap-serve" onclick="swapServer()" title="Trocar saque">&#127992;</button>
         <div class="set-history" id="d-div-history"></div>
       </div>
       <div class="court-side court-right" onclick="addPoint('right')">
@@ -664,6 +667,27 @@
       updateDisplay();
     }
 
+    function swapServer(){
+      if(!canSwapInner)return; // só funciona antes do primeiro ponto de cada set
+      if(isDoubles){
+        // Trocar time que saca: se p1 saca, passa pra p2 e vice-versa
+        const serverTeam=doublesServer.startsWith('p1')?1:2;
+        if(serverTeam===1){
+          // Passar saque pro time 2 — quem está na posição correta (par=0, lado correto)
+          if(leftPlayer===2){doublesServer=leftBottomPlayer;}
+          else{doublesServer=rightTopPlayer;}
+        }else{
+          // Passar saque pro time 1
+          if(leftPlayer===1){doublesServer=leftBottomPlayer;}
+          else{doublesServer=rightTopPlayer;}
+        }
+      }else{
+        // Simples: trocar quem saca
+        state.server=state.server===1?2:1;
+      }
+      updateDisplay();
+    }
+
     function checkSetEnd(){
       const{p1,p2}=state;
       const won=(hi,lo)=>(hi>=PTS&&hi-lo>=2)||(hi>=MAX&&hi>lo);
@@ -781,6 +805,10 @@
       document.getElementById(px+'-right-sets').textContent='Sets: '+rSets;
       document.getElementById(px+'-div-set').textContent='SET '+state.set;
       document.getElementById(px+'-div-history').innerHTML=hist;
+
+      // Botão de trocar saque — só aparece antes do primeiro ponto de cada set
+      const swapServeBtn=document.getElementById(px+'-swap-serve');
+      if(swapServeBtn)swapServeBtn.style.display=canSwapInner?'flex':'none';
 
       if(isDoubles){
         // === DUPLAS ===
