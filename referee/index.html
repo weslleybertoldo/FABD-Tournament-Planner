@@ -107,8 +107,8 @@
     .doubles-court .court-half{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;min-height:100%}
     .doubles-court .court-half-divider{width:0;border-left:1px dashed rgba(255,255,255,0.2);align-self:stretch;margin:8px 0}
     .doubles-court .court-half .player-name-doubles{font-size:11px;font-weight:600;position:absolute;top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90%;z-index:2}
-    .doubles-court .swap-inner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,0.15);border:none;color:#fff;width:28px;height:28px;border-radius:50%;font-size:12px;cursor:pointer;z-index:4;display:flex;align-items:center;justify-content:center}
-    .doubles-court .swap-inner:active{background:rgba(255,255,255,0.3)}
+    .swap-inner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,0.25);border:2px solid rgba(255,255,255,0.4);color:#fff;width:44px;height:44px;border-radius:50%;font-size:20px;cursor:pointer;z-index:10;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+    .swap-inner:active{background:rgba(255,255,255,0.5)}
 
     @media (orientation:portrait){
       .scorer-page .court-container{flex-direction:column}
@@ -799,7 +799,9 @@
           sides.forEach((side,idx)=>{
             const btn=document.createElement('button');
             btn.className='swap-inner';btn.innerHTML='&#8645;';
-            btn.onclick=function(e){e.stopPropagation();idx===0?swapInnerLeft():swapInnerRight();};
+            btn.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();idx===0?swapInnerLeft():swapInnerRight();});
+            btn.addEventListener('touchend',function(e){e.stopPropagation();e.preventDefault();idx===0?swapInnerLeft():swapInnerRight();},{passive:false});
+            btn.addEventListener('touchstart',function(e){e.stopPropagation();},{passive:false});
             side.appendChild(btn);
           });
         }
