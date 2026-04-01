@@ -532,11 +532,21 @@
     function swapInnerLeft(){
       if(!canSwapInner)return;
       const tmp=leftTopPlayer;leftTopPlayer=leftBottomPlayer;leftBottomPlayer=tmp;
+      // Atualizar sacador se é do time esquerdo
+      const serverTeam=doublesServer.startsWith('p1')?1:2;
+      if(serverTeam===leftPlayer){
+        doublesServer=leftBottomPlayer; // sacador = quem está na posição de saque (baixo = par)
+      }
       updateDisplay();
     }
     function swapInnerRight(){
       if(!canSwapInner)return;
       const tmp=rightTopPlayer;rightTopPlayer=rightBottomPlayer;rightBottomPlayer=tmp;
+      // Atualizar sacador se é do time direito
+      const serverTeam=doublesServer.startsWith('p1')?1:2;
+      if(serverTeam!==leftPlayer){
+        doublesServer=rightTopPlayer; // lado direito espelhado: saque par = topo
+      }
       updateDisplay();
     }
 
