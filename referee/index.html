@@ -513,10 +513,10 @@
           if(isDoubles&&(state.p1>0||state.p2>0))canSwapInner=false;
         }
 
-        // Verificar se este árbitro já está em outro jogo ativo
+        // Verificar se este árbitro já está em outro jogo ativo (não finalizado)
         isReadOnly=false;
-        if(!isReadOnly){
-          const{data:activeGames}=await sb.from('live_scores').select('match_id,umpire_name,updated_at').eq('umpire_name',currentUser?.name||'');
+        {
+          const{data:activeGames}=await sb.from('live_scores').select('match_id,umpire_name,updated_at,winner').eq('umpire_name',currentUser?.name||'').is('winner',null);
           const fiveMin=5*60*1000;
           const otherActive=activeGames?.find(g=>g.match_id!==matchId&&(Date.now()-new Date(g.updated_at||0).getTime())<fiveMin);
           if(otherActive){
