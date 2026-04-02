@@ -698,10 +698,11 @@
         if(state.setsWonP1>=need||state.setsWonP2>=need){
           showConfirm(state.setsWonP1>=need?1:2);return;
         }
-        // Proximo set: trocar lados
+        // Proximo set: trocar lados, quem ganhou saca (BWF Lei 7.6)
+        const setWinner=p1>p2?1:2;
         state.set++;state.p1=0;state.p2=0;
         const tmp=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp;
-        state.server=1;
+        state.server=setWinner;
         interval11Asked=false;
         if(isDoubles){
           // Trocar posições das duplas junto com os lados
@@ -709,6 +710,14 @@
           leftTopPlayer=rightTopPlayer;leftBottomPlayer=rightBottomPlayer;
           rightTopPlayer=tmpLT;rightBottomPlayer=tmpLB;
           canSwapInner=true; // setinhas reaparecem no inicio do set
+          // Sacador do time vencedor — quem está na posição de saque (par=0)
+          if(setWinner===1){
+            if(leftPlayer===1){doublesServer=leftBottomPlayer;}
+            else{doublesServer=rightTopPlayer;} // espelhado
+          }else{
+            if(leftPlayer===2){doublesServer=leftBottomPlayer;}
+            else{doublesServer=rightTopPlayer;}
+          }
         }
         startInterval(120,'Intervalo entre Sets','Próximo set em:');
         return;
