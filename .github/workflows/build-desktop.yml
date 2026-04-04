@@ -1,0 +1,94 @@
+name: Build Desktop
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Get current version
+        id: version
+        shell: bash
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+          echo "Building version: $CURRENT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Electron app
+        run: npm run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Find setup exe
+        id: find_exe
+        shell: bash
+        run: |
+          EXE=$(find dist -name "*.exe" -type f | head -1)
+          echo "exe_path=$EXE" >> $GITHUB_OUTPUT
+          echo "Found: $EXE"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FABD-Tournament-Planner
+          path: dist/*.exe
+          retention-days: 30
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.current }}
+          name: FABD Tournament Planner v${{ steps.version.outputs.current }}
+          body: |
+            ## FABD Tournament Planner v${{ steps.version.outputs.current }}
+
+            Instalador gerado automaticamente.
+
+            **Download:** Baixe o `.exe` abaixo e execute para instalar/atualizar.
+          files: dist/*.exe
+          generate_release_notes: true
+          make_latest: true
+
+      - name: Bump version for next build
+        shell: bash
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          NEW_MINOR=$((MINOR + 1))
+          NEXT="$MAJOR.$NEW_MINOR.0"
+          echo "Version bump: $CURRENT -> $NEXT"
+
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '$NEXT';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+          # Atualiza APP_VERSION no app.js
+          sed -i "s/const APP_VERSION='$CURRENT'/const APP_VERSION='$NEXT'/" src/js/app.js
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json src/js/app.js
+          git diff --staged --quiet || git commit -m "chore: bump version to v$NEXT [skip ci]"
+          git push
