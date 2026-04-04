@@ -527,11 +527,14 @@
 
         // Verificar se outro árbitro já está marcando este jogo
         if(sc&&sc.umpire_name&&sc.umpire_name!==currentUser?.name){
-          const lastUpdate=new Date(sc.updated_at||0).getTime();
-          const fiveMin=5*60*1000;
-          if(Date.now()-lastUpdate<fiveMin){
-            isReadOnly=true;
-          }
+          // Se outro árbitro tem o nome registrado → somente visualização
+          // Não importa o tempo — enquanto o umpire_name estiver lá, é dele
+          isReadOnly=true;
+        }
+
+        // Se NÃO é readOnly, registra este árbitro imediatamente no jogo
+        if(!isReadOnly&&currentUser?.name){
+          await sb.from('live_scores').update({umpire_name:currentUser.name,updated_at:new Date().toISOString()}).eq('match_id',matchId);
         }
 
         hideAll();document.getElementById('page-scorer').style.display='flex';
