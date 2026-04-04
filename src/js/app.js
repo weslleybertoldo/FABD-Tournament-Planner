@@ -97,6 +97,9 @@ async function loadData(autoLoad=false) {
       } catch(e) { console.warn('Supabase connect:', e); }
     }
   } catch(e) { console.error('Erro:', e); }
+  // Versão no rodapé (dinâmica)
+  const vFooter=document.getElementById('app-version-footer');
+  if(vFooter)vFooter.textContent='FABD Tournament Planner v'+APP_VERSION;
   // Verificação automática de atualização
   checkAutoUpdate();
 }
