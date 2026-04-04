@@ -74,7 +74,7 @@ jobs:
           CURRENT=$(node -p "require('./package.json').version")
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
           NEW_MINOR=$((MINOR + 1))
-          NEXT="$MAJOR.$NEW_MINOR.0"
+          NEXT="$MAJOR.$NEW_MINOR"
           echo "Version bump: $CURRENT -> $NEXT"
 
           node -e "
