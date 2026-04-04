@@ -937,6 +937,15 @@
     async function syncScore(){
       if(!currentMatch||!sb||isReadOnly)return;
       try{
+        // Verificar se outro árbitro assumiu o jogo (ex: após timeout de 5 min)
+        const{data:check}=await sb.from('live_scores').select('umpire_name').eq('match_id',currentMatch.id).single();
+        if(check&&check.umpire_name&&check.umpire_name!==currentUser?.name){
+          // Outro árbitro assumiu → bloqueia este
+          isReadOnly=true;
+          updateReadOnlyUI();
+          alert('Outro árbitro assumiu este jogo ('+(check.umpire_name.split(' ')[0])+').\nSeu placar está em modo visualização.');
+          return;
+        }
         const {error}=await sb.from('live_scores').upsert({
           match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,
           current_set:state.set,score_p1:state.p1,score_p2:state.p2,
