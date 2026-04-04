@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <!-- Barra de atualização automática -->
-  <div id="update-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#1E3A8A;color:#fff;padding:8px 16px;font-size:13px;font-family:'Inter',sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;gap:12px">
+  <!-- Barra de atualização automática (hidden por padrão, JS mostra quando há update) -->
+  <div id="update-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#1E3A8A;color:#fff;padding:8px 16px;font-size:13px;font-family:'Inter',sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.2);align-items:center;justify-content:center;gap:12px">
     <span id="update-bar-text"></span>
     <button id="update-bar-btn" style="background:#fff;color:#1E3A8A;border:none;padding:4px 14px;border-radius:6px;font-weight:600;font-size:12px;cursor:pointer">Baixar</button>
     <button onclick="document.getElementById('update-bar').style.display='none'" style="background:none;border:none;color:#fff;cursor:pointer;font-size:16px;padding:4px">&times;</button>

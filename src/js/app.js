@@ -101,12 +101,24 @@ async function loadData(autoLoad=false) {
   checkAutoUpdate();
 }
 
+function isNewerVersion(remote, local){
+  const r=remote.split('.').map(Number);
+  const l=local.split('.').map(Number);
+  for(let i=0;i<Math.max(r.length,l.length);i++){
+    const rv=r[i]||0, lv=l[i]||0;
+    if(rv>lv)return true;
+    if(rv<lv)return false;
+  }
+  return false;
+}
+
 async function checkAutoUpdate(){
   try{
     const data=await window.api.checkUpdate();
     if(data.error)return;
     const latestVersion=(data.tag_name||'').replace('v','');
-    if(latestVersion&&latestVersion!==APP_VERSION){
+    if(!latestVersion)return;
+    if(isNewerVersion(latestVersion,APP_VERSION)){
       const exeAsset=(data.assets||[]).find(a=>a.name.endsWith('.exe'));
       const bar=document.getElementById('update-bar');
       const txt=document.getElementById('update-bar-text');
@@ -3361,7 +3373,7 @@ async function checkForUpdates(){
     const data=await window.api.checkUpdate();
     if(data.error)throw new Error(data.error);
     const latestVersion=(data.tag_name||'').replace('v','');
-    if(latestVersion&&latestVersion!==APP_VERSION){
+    if(latestVersion&&isNewerVersion(latestVersion,APP_VERSION)){
       const exeAsset=(data.assets||[]).find(a=>a.name.endsWith('.exe'));
       statusEl.innerHTML=`<span style="color:#F59E0B;font-weight:600">Nova versao disponivel: v${esc(latestVersion)}</span>`;
       if(exeAsset){
