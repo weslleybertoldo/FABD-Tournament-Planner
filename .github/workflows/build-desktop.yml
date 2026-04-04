@@ -26,9 +26,12 @@ jobs:
         id: version
         shell: bash
         run: |
-          CURRENT=$(node -p "require('./package.json').version")
-          echo "current=$CURRENT" >> $GITHUB_OUTPUT
-          echo "Building version: $CURRENT"
+          FULL=$(node -p "require('./package.json').version")
+          # Display version: remove .0 do final (3.1.0 → 3.1)
+          DISPLAY=$(echo "$FULL" | sed 's/\.0$//')
+          echo "current=$DISPLAY" >> $GITHUB_OUTPUT
+          echo "full=$FULL" >> $GITHUB_OUTPUT
+          echo "Building version: $DISPLAY (semver: $FULL)"
 
       - name: Install dependencies
         run: npm ci
@@ -71,21 +74,24 @@ jobs:
       - name: Bump version for next build
         shell: bash
         run: |
-          CURRENT=$(node -p "require('./package.json').version")
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          FULL=$(node -p "require('./package.json').version")
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$FULL"
           NEW_MINOR=$((MINOR + 1))
-          NEXT="$MAJOR.$NEW_MINOR"
-          echo "Version bump: $CURRENT -> $NEXT"
+          NEXT_SEMVER="$MAJOR.$NEW_MINOR.0"
+          NEXT_DISPLAY="$MAJOR.$NEW_MINOR"
+          CURRENT_DISPLAY=$(echo "$FULL" | sed 's/\.0$//')
+          echo "Version bump: $CURRENT_DISPLAY -> $NEXT_DISPLAY (semver: $NEXT_SEMVER)"
 
+          # package.json precisa de semver X.Y.Z (electron-builder exige)
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = '$NEXT';
+            pkg.version = '$NEXT_SEMVER';
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
-          # Atualiza APP_VERSION no app.js
-          sed -i "s/const APP_VERSION='$CURRENT'/const APP_VERSION='$NEXT'/" src/js/app.js
+          # APP_VERSION usa formato curto X.Y
+          sed -i "s/const APP_VERSION='$CURRENT_DISPLAY'/const APP_VERSION='$NEXT_DISPLAY'/" src/js/app.js
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
