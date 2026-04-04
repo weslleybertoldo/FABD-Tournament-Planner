@@ -527,9 +527,13 @@
 
         // Verificar se outro árbitro já está marcando este jogo
         if(sc&&sc.umpire_name&&sc.umpire_name!==currentUser?.name){
-          // Se outro árbitro tem o nome registrado → somente visualização
-          // Não importa o tempo — enquanto o umpire_name estiver lá, é dele
-          isReadOnly=true;
+          const lastUpdate=new Date(sc.updated_at||0).getTime();
+          const fiveMin=5*60*1000;
+          if(Date.now()-lastUpdate<fiveMin){
+            // Outro árbitro ativo (atualizou nos últimos 5 min) → somente visualização
+            isReadOnly=true;
+          }
+          // Se passou 5 min sem atualização, assume que saiu sem clicar Voltar → libera
         }
 
         // Se NÃO é readOnly, registra este árbitro imediatamente no jogo
