@@ -1327,7 +1327,9 @@ async function syncDrawsWithPlayers() {
 }
 
 // Sortear TODAS as chaves de uma vez
+let _generatingDraws = false;
 async function generateAllDraws() {
+  if (_generatingDraws) { showToast('Sorteio em andamento, aguarde...', 'warning'); return; }
   if (!tournament?.draws?.length) { showToast('Nenhuma chave para sortear', 'warning'); return; }
   const pending = tournament.draws.filter(d => !d.matches?.length);
   if (!pending.length) {
@@ -1336,33 +1338,41 @@ async function generateAllDraws() {
     tournament.draws.forEach(d => { d.matches = []; });
   }
 
-  let count = 0;
-  tournament.draws.forEach((d, idx) => {
-    if (d.matches?.length && pending.length > 0) return;
-    const seeds=(d.seeds_list||[]).filter(s=>s);
-    const nonSeeds=[...d.players].filter(p=>!seeds.includes(p)).sort(()=>Math.random()-0.5);
-    if (d.type === 'Eliminatoria') {
-      d.matches = generateEliminationBracket(nonSeeds,seeds);
-    } else if (d.type === 'Grupos + Eliminatoria') {
-      const numG = d.numGroups || 2;
-      const qual = d.groupQualifiers || 2;
-      const allP = [...seeds, ...nonSeeds];
-      d.groupsData = generateGroupsPhase(allP, numG, seeds);
-      d.groupQualifiers = qual;
-      d.numGroups = numG;
-      d.matches = [];
-      d.groupsData.groups.forEach(g => { g.matches.forEach(m => d.matches.push(m)); });
-    } else {
-      const sh=[...seeds,...nonSeeds];
-      d.matches = generateRoundRobinSchedule(sh);
-    }
-    count++;
-  });
+  _generatingDraws = true;
+  try {
+    let count = 0;
+    tournament.draws.forEach((d, idx) => {
+      if (d.matches?.length && pending.length > 0) return;
+      const seeds=(d.seeds_list||[]).filter(s=>s);
+      const nonSeeds=[...d.players].filter(p=>!seeds.includes(p)).sort(()=>Math.random()-0.5);
+      if (d.type === 'Eliminatoria') {
+        d.matches = generateEliminationBracket(nonSeeds,seeds);
+      } else if (d.type === 'Grupos + Eliminatoria') {
+        const numG = d.numGroups || 2;
+        const qual = d.groupQualifiers || 2;
+        const allP = [...seeds, ...nonSeeds];
+        d.groupsData = generateGroupsPhase(allP, numG, seeds);
+        d.groupQualifiers = qual;
+        d.numGroups = numG;
+        d.matches = [];
+        d.groupsData.groups.forEach(g => { g.matches.forEach(m => d.matches.push(m)); });
+      } else {
+        const sh=[...seeds,...nonSeeds];
+        d.matches = generateRoundRobinSchedule(sh);
+      }
+      count++;
+    });
 
-  rebuildMatchList();
-  await window.api.saveTournament(tournament);
-  renderDraws();
-  showToast(`${count} chave(s) sorteada(s)!`);
+    rebuildMatchList();
+    await window.api.saveTournament(tournament);
+    renderDraws();
+    showToast(`${count} chave(s) sorteada(s)!`);
+  } catch(e) {
+    console.error('Erro ao gerar chaves:', e);
+    showToast('Erro ao gerar chaves: ' + e.message, 'error');
+  } finally {
+    _generatingDraws = false;
+  }
 }
 
 async function updateSeed(drawIdx,seedIdx,playerName){

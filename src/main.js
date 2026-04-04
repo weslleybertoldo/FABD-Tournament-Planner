@@ -68,16 +68,32 @@ function loadDatabase() {
 }
 
 let saveTimeout = null;
+let lastBackupTime = 0;
+
 function saveDatabase(data) {
   if (saveTimeout) clearTimeout(saveTimeout);
-  createBackup();
+  // Backup no máximo 1x a cada 30s (evita backup a cada keystroke)
+  const now = Date.now();
+  if (now - lastBackupTime > 30000) {
+    createBackup();
+    lastBackupTime = now;
+  }
   saveTimeout = setTimeout(() => {
-    try { fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8'); } catch(e) { log('ERROR', 'Erro salvar:', e.message); }
+    try {
+      // Escrita atômica: temp → rename (evita corrupção se crash)
+      const tmpPath = DB_PATH + '.tmp';
+      fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
+      fs.renameSync(tmpPath, DB_PATH);
+    } catch(e) { log('ERROR', 'Erro salvar:', e.message); }
   }, 300);
 }
 
 function saveDatabaseSync(data) {
-  try { fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8'); } catch(e) {}
+  try {
+    const tmpPath = DB_PATH + '.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
+    fs.renameSync(tmpPath, DB_PATH);
+  } catch(e) { log('ERROR', 'Erro salvar sync:', e.message); }
 }
 
 let mainWindow;
@@ -114,12 +130,12 @@ function createWindow() {
           log('INFO', 'Backup exportado ao fechar:', backupPath);
         } catch(err) { log('ERROR', 'Erro backup ao fechar:', err.message); }
       }
-      // Limpar Supabase ao fechar
+      // Limpar Supabase ao fechar (fire-and-forget com log de erro)
       try {
         const tid = db.tournament.id;
-        supabase.from('live_scores').delete().eq('tournament_id', tid).then(()=>{});
-        supabase.from('live_matches').delete().eq('tournament_id', tid).then(()=>{});
-        supabase.from('tournaments').delete().eq('id', tid).then(()=>{});
+        supabase.from('live_scores').delete().eq('tournament_id', tid).catch(e => log('ERROR', 'Cleanup scores:', e.message));
+        supabase.from('live_matches').delete().eq('tournament_id', tid).catch(e => log('ERROR', 'Cleanup matches:', e.message));
+        supabase.from('tournaments').delete().eq('id', tid).catch(e => log('ERROR', 'Cleanup tournament:', e.message));
         log('INFO', 'Supabase cleanup ao fechar app');
       } catch(err) { log('ERROR', 'Erro cleanup Supabase:', err.message); }
       // Limpar torneio local
@@ -132,7 +148,14 @@ function createWindow() {
 }
 
 app.whenReady().then(createWindow);
-app.on('window-all-closed', () => { if(saveTimeout)clearTimeout(saveTimeout); saveDatabaseSync(db); if(process.platform!=='darwin')app.quit(); });
+app.on('window-all-closed', () => {
+  if(saveTimeout)clearTimeout(saveTimeout);
+  if(realtimeChannel){supabase.removeChannel(realtimeChannel);realtimeChannel=null;}
+  if(pollingInterval){clearInterval(pollingInterval);pollingInterval=null;}
+  if(realtimeRetryInterval){clearInterval(realtimeRetryInterval);realtimeRetryInterval=null;}
+  saveDatabaseSync(db);
+  if(process.platform!=='darwin')app.quit();
+});
 app.on('activate', () => { if(!BrowserWindow.getAllWindows().length) createWindow(); });
 process.on('uncaughtException', (e) => { log('ERROR', 'Uncaught:', e.message); });
 process.on('unhandledRejection', (e) => { log('ERROR', 'Unhandled:', String(e)); });
@@ -201,8 +224,35 @@ ipcMain.handle('db:savePlayer', (_, player) => {
 
 ipcMain.handle('db:deletePlayer', (_, id) => {
   if (!db.tournament) return;
+  const player = (db.tournament.players||[]).find(p => p.id === id);
+  if (!player) return true;
+  const playerName = `${player.firstName || ''} ${player.lastName || ''}`.trim();
+
+  // Remove o jogador
   db.tournament.players = (db.tournament.players||[]).filter(p => p.id !== id);
+
+  // Cascade: remove entries do jogador
+  if (db.tournament.entries) {
+    db.tournament.entries = db.tournament.entries.filter(e => e.playerId !== id);
+  }
+
+  // Cascade: limpa referências em matches (não deleta matches finalizadas)
+  if (db.tournament.matches && playerName) {
+    db.tournament.matches.forEach(m => {
+      if (m.player1 === playerName) m.player1 = '';
+      if (m.player2 === playerName) m.player2 = '';
+    });
+  }
+
+  // Cascade: remove de draws.players
+  if (db.tournament.draws && playerName) {
+    db.tournament.draws.forEach(d => {
+      if (d.players) d.players = d.players.filter(p => p !== playerName);
+    });
+  }
+
   saveDatabase(db);
+  log('INFO', 'Player deletado com cascade:', playerName);
   return true;
 });
 
@@ -219,13 +269,22 @@ ipcMain.handle('dialog:selectFile', async (_, filters) => {
 
 ipcMain.handle('file:read', async (_, filePath) => {
   const allowed = ['.csv', '.txt', '.json', '.fabd'];
-  if (!allowed.includes(path.extname(filePath).toLowerCase())) throw new Error('Tipo nao permitido');
-  const stat = fs.statSync(filePath);
+  const resolvedPath = path.resolve(filePath);
+  if (!allowed.includes(path.extname(resolvedPath).toLowerCase())) throw new Error('Tipo nao permitido');
+  // Bloqueia path traversal — só permite ler de diretórios seguros
+  const userHome = app.getPath('home');
+  const userDesktop = app.getPath('desktop');
+  const userDocs = app.getPath('documents');
+  const userDownloads = app.getPath('downloads');
+  const safeDirs = [userHome, userDesktop, userDocs, userDownloads, app.getPath('userData')];
+  if (!safeDirs.some(d => resolvedPath.startsWith(d))) throw new Error('Caminho nao permitido');
+  const stat = fs.statSync(resolvedPath);
   if (stat.size > 10 * 1024 * 1024) throw new Error('Arquivo muito grande');
-  return fs.readFileSync(filePath, 'utf-8');
+  return fs.readFileSync(resolvedPath, 'utf-8');
 });
 
 ipcMain.handle('dialog:saveFile', async (_, filters, content) => {
+  if (typeof content !== 'string' || content.length > 50 * 1024 * 1024) throw new Error('Conteudo invalido ou muito grande');
   const result = await dialog.showSaveDialog(mainWindow, { title: 'Salvar', filters: filters || [{ name: 'CSV', extensions: ['csv'] }] });
   if (result.canceled || !result.filePath) return false;
   fs.writeFileSync(result.filePath, content, 'utf-8');
@@ -256,11 +315,19 @@ ipcMain.handle('db:importTournament', async () => {
   });
   if (result.canceled || !result.filePaths.length) return null;
   try {
-    const data = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf-8'));
+    const raw = fs.readFileSync(result.filePaths[0], 'utf-8');
+    if (raw.length > 50 * 1024 * 1024) throw new Error('Arquivo muito grande (max 50MB)');
+    const data = JSON.parse(raw);
     if (!data.tournament && !data._type) throw new Error('Arquivo invalido');
     createBackup();
     const tournament = data.tournament || data;
-    if (!tournament.players) tournament.players = [];
+    // Validação de campos obrigatórios
+    if (typeof tournament !== 'object' || !tournament) throw new Error('Dados de torneio invalidos');
+    if (!tournament.name || typeof tournament.name !== 'string') throw new Error('Torneio sem nome');
+    if (!Array.isArray(tournament.players)) tournament.players = [];
+    if (!Array.isArray(tournament.entries)) tournament.entries = [];
+    if (!Array.isArray(tournament.draws)) tournament.draws = [];
+    if (!Array.isArray(tournament.matches)) tournament.matches = [];
     db.tournament = tournament;
     saveDatabaseSync(db);
     log('INFO', 'Backup importado:', tournament.name);

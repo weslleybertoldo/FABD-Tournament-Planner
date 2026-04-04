@@ -913,7 +913,21 @@
 
     async function syncScore(){
       if(!currentMatch||!sb||isReadOnly)return;
-      try{await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,current_set:state.set,score_p1:state.p1,score_p2:state.p2,sets_p1:state.setsP1,sets_p2:state.setsP2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'});document.getElementById('sync-status').style.background='#10B981';}catch(e){document.getElementById('sync-status').style.background='#EF4444';try{localStorage.setItem('fabd_score_backup_'+currentMatch.id,JSON.stringify(state));}catch(le){}}
+      try{
+        const {error}=await sb.from('live_scores').upsert({
+          match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,
+          current_set:state.set,score_p1:state.p1,score_p2:state.p2,
+          sets_p1:state.setsP1,sets_p2:state.setsP2,
+          sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,
+          umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()
+        },{onConflict:'match_id'});
+        if(error){throw error;}
+        document.getElementById('sync-status').style.background='#10B981';
+      }catch(e){
+        console.error('[Referee] Sync error:',e?.message||e);
+        document.getElementById('sync-status').style.background='#EF4444';
+        try{localStorage.setItem('fabd_score_backup_'+currentMatch.id,JSON.stringify(state));}catch(le){}
+      }
     }
 
     function showConfirm(winner){
