@@ -537,8 +537,9 @@
         }
 
         // Se NÃO é readOnly, registra este árbitro imediatamente no jogo
+        // Usa UPSERT para funcionar mesmo se o row ainda não existe (jogo recém colocado em quadra)
         if(!isReadOnly&&currentUser?.name){
-          await sb.from('live_scores').update({umpire_name:currentUser.name,updated_at:new Date().toISOString()}).eq('match_id',matchId);
+          await sb.from('live_scores').upsert({match_id:matchId,tournament_id:currentMatch.tournament_id,umpire_name:currentUser.name,updated_at:new Date().toISOString()},{onConflict:'match_id'});
         }
 
         hideAll();document.getElementById('page-scorer').style.display='flex';
@@ -933,18 +934,22 @@
     }
 
     let isReadOnly=false; // true quando outro árbitro já está marcando
+    let lastUmpireCheck=0; // timestamp da última verificação de umpire
 
     async function syncScore(){
       if(!currentMatch||!sb||isReadOnly)return;
       try{
-        // Verificar se outro árbitro assumiu o jogo (ex: após timeout de 5 min)
-        const{data:check}=await sb.from('live_scores').select('umpire_name').eq('match_id',currentMatch.id).single();
-        if(check&&check.umpire_name&&check.umpire_name!==currentUser?.name){
-          // Outro árbitro assumiu → bloqueia este
-          isReadOnly=true;
-          updateReadOnlyUI();
-          alert('Outro árbitro assumiu este jogo ('+(check.umpire_name.split(' ')[0])+').\nSeu placar está em modo visualização.');
-          return;
+        // Verificar se outro árbitro assumiu — mas só a cada 10s (evita latência em cada ponto)
+        const now=Date.now();
+        if(now-lastUmpireCheck>10000){
+          lastUmpireCheck=now;
+          const{data:check}=await sb.from('live_scores').select('umpire_name').eq('match_id',currentMatch.id).single();
+          if(check&&check.umpire_name&&check.umpire_name!==currentUser?.name){
+            isReadOnly=true;
+            updateReadOnlyUI();
+            alert('Outro árbitro assumiu este jogo ('+(check.umpire_name.split(' ')[0])+').\nSeu placar está em modo visualização.');
+            return;
+          }
         }
         const {error}=await sb.from('live_scores').upsert({
           match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,
