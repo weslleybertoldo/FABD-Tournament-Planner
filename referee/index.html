@@ -661,9 +661,12 @@
     function swapSides(){
       const tmp=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp;
       if(isDoubles){
+        // Swap diagonal — quadra espelhada (vista de cima)
         const tmpLT=leftTopPlayer,tmpLB=leftBottomPlayer;
-        leftTopPlayer=rightTopPlayer;leftBottomPlayer=rightBottomPlayer;
-        rightTopPlayer=tmpLT;rightBottomPlayer=tmpLB;
+        leftTopPlayer=rightBottomPlayer;
+        leftBottomPlayer=rightTopPlayer;
+        rightTopPlayer=tmpLB;
+        rightBottomPlayer=tmpLT;
       }
       updateDisplay();
     }
@@ -706,10 +709,12 @@
         state.server=setWinner;
         interval11Asked=false;
         if(isDoubles){
-          // Trocar posições das duplas junto com os lados
+          // Swap diagonal — quadra espelhada (vista de cima)
           const tmpLT=leftTopPlayer,tmpLB=leftBottomPlayer;
-          leftTopPlayer=rightTopPlayer;leftBottomPlayer=rightBottomPlayer;
-          rightTopPlayer=tmpLT;rightBottomPlayer=tmpLB;
+          leftTopPlayer=rightBottomPlayer;
+          leftBottomPlayer=rightTopPlayer;
+          rightTopPlayer=tmpLB;
+          rightBottomPlayer=tmpLT;
           canSwapInner=true; // setinhas reaparecem no inicio do set
           // Sacador do time vencedor — quem está na posição de saque (par=0)
           if(setWinner===1){
@@ -727,21 +732,21 @@
       if(!interval11Asked&&((p1===11&&p2<11)||(p2===11&&p1<11))){
         interval11Asked=true;
         // No 3o set nos 11: trocar de lado (regra BWF)
-        // - Quem sacava continua sacando
-        // - Posições relativas mantidas (esquerda→esquerda, direita→direita)
-        // - 11 é ímpar → sacador vai pro lado esquerdo da quadra dele
+        // - Quem sacava continua sacando (doublesServer não muda)
+        // - Quadra espelhada: ao caminhar pro outro lado, posições invertem diagonalmente
+        //   Left-Top ↔ Right-Bottom, Left-Bottom ↔ Right-Top
         if(state.set===3){
           // Troca times de lado (1↔2)
           const tmp2=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp2;
           if(isDoubles){
-            // Preserva posições: quem estava top fica top, bottom fica bottom
-            // Só troca os lados (esquerda↔direita), não as posições internas
+            // Swap DIAGONAL — quadra é espelhada (vista de cima)
+            // Quem estava no top-esquerda vai pro bottom-direita e vice-versa
             const tmpLT=leftTopPlayer,tmpLB=leftBottomPlayer;
-            leftTopPlayer=rightTopPlayer;leftBottomPlayer=rightBottomPlayer;
-            rightTopPlayer=tmpLT;rightBottomPlayer=tmpLB;
-            // Sacador continua o mesmo (não muda) — BWF: saque continua com quem estava sacando
-            // O doublesServer já aponta pro jogador correto, que agora está do outro lado
-            // Não precisa mudar doublesServer, só o posicionamento na quadra já mudou
+            leftTopPlayer=rightBottomPlayer;   // right-bottom → left-top
+            leftBottomPlayer=rightTopPlayer;    // right-top → left-bottom
+            rightTopPlayer=tmpLB;               // left-bottom → right-top
+            rightBottomPlayer=tmpLT;            // left-top → right-bottom
+            // doublesServer NÃO muda — sacador continua o mesmo jogador
           }
           // state.server NÃO muda — quem sacava continua sacando
         }
