@@ -44,7 +44,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "FABD Tournament Planner"
-    }
+    },
+    "publish": null
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.1"
