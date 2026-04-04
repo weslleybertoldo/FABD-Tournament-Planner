@@ -51,7 +51,7 @@ async function loadData(autoLoad=false) {
         const s=await window.api.getSettings();
         if(s?.umpires?.length){saveUmpires(s.umpires);}
       }
-    }catch(e){}
+    }catch(e){console.warn('Erro ao carregar umpires:', e);}
     updateOverview();
     if (tournament) {
       document.getElementById('breadcrumb').textContent = tournament.name;
@@ -97,6 +97,30 @@ async function loadData(autoLoad=false) {
       } catch(e) { console.warn('Supabase connect:', e); }
     }
   } catch(e) { console.error('Erro:', e); }
+  // Verificação automática de atualização
+  checkAutoUpdate();
+}
+
+async function checkAutoUpdate(){
+  try{
+    const data=await window.api.checkUpdate();
+    if(data.error)return;
+    const latestVersion=(data.tag_name||'').replace('v','');
+    if(latestVersion&&latestVersion!==APP_VERSION){
+      const exeAsset=(data.assets||[]).find(a=>a.name.endsWith('.exe'));
+      const bar=document.getElementById('update-bar');
+      const txt=document.getElementById('update-bar-text');
+      const btn=document.getElementById('update-bar-btn');
+      if(bar&&txt){
+        txt.textContent='Nova versao disponivel: v'+latestVersion;
+        if(exeAsset&&btn){
+          btn.onclick=()=>window.api.openExternal(exeAsset.browser_download_url);
+          btn.style.display='inline-block';
+        } else if(btn){ btn.style.display='none'; }
+        bar.style.display='flex';
+      }
+    }
+  }catch(e){/* silencioso — nao bloqueia o app */}
 }
 
 // Mostrar/esconder abas dependentes de torneio
@@ -547,8 +571,12 @@ async function savePlayer() {
     const hasCheckboxes = document.querySelectorAll('.p-cat-check').length > 0;
     const inscriptions = hasCheckboxes ? collectInscriptions() : (editingPlayerId ? (players.find(x=>x.id===editingPlayerId)?.inscriptions || []) : []);
 
+    const trimmedFirst = gv('p-firstname').trim();
+    const trimmedLast = gv('p-lastname').trim();
+    if (!trimmedFirst && !trimmedLast) { showToast('Nome e sobrenome nao podem estar ambos vazios', 'warning'); return; }
+
     const p = {
-      firstName: gv('p-firstname'), lastName: gv('p-lastname'), gender: gv('p-gender'),
+      firstName: trimmedFirst, lastName: trimmedLast, gender: gv('p-gender'),
       dob: gv('p-dob'), club: gv('p-club'), state: gv('p-state'),
       category: calculateCategory(gv('p-dob')),
       ranking: gv('p-ranking'), phone: gv('p-phone'), email: gv('p-email'),
@@ -676,6 +704,7 @@ async function deletePlayer(id) {
   players = tournament?.players || [];
   renderPlayers();
   syncEntriesFromPlayers();
+  renderDraws();
 }
 
 async function deleteAllPlayers() {
@@ -2843,7 +2872,7 @@ async function handleRealtimeScoreUpdate(data){
     m.winner=data.winner;
     m.finishedAt=new Date().toISOString();
     m.liveScore='';
-    try{propagateResultToDraws(m);}catch(e){console.warn('Erro ao propagar resultado:',e);}
+    try{propagateResultToDraws(m);}catch(e){console.warn('Erro ao propagar resultado:',e);showToast('Aviso: resultado recebido mas propagacao na chave falhou','warning');}
     await window.api.saveTournament(tournament);
     showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
   }
@@ -2899,7 +2928,7 @@ async function assignCourt(idx, value) {
     if(value&&m.status==='Em Quadra'){
       await window.api.supabaseUpsertTournament(tournament.id,tournament.name);
       const ok=await window.api.supabaseUpsertMatch(tournament.id,m);
-      if(!ok)showToast('Aviso: sincronizacao online falhou','warning');
+      if(!ok)showToast('Aviso: sincronizacao online falhou. O jogo pode nao aparecer no painel publico.','warning');
     }
     else if(!value){await window.api.supabaseRemoveFromCourt(tournament.id,m);}
   }catch(e){console.warn('Supabase sync:',e);showToast('Aviso: sincronizacao online falhou','warning');}
@@ -3522,7 +3551,7 @@ async function loadGameProfiles(){
 }
 async function saveGameProfiles(){
   localStorage.setItem('fabd-game-profiles',JSON.stringify(gameProfiles));
-  try{const s=await window.api.getSettings()||{};s.gameProfiles=gameProfiles;await window.api.saveSettings(s);}catch(e){}
+  try{const s=await window.api.getSettings()||{};s.gameProfiles=gameProfiles;await window.api.saveSettings(s);}catch(e){console.warn('Erro ao sincronizar perfis:', e);}
 }
 function renderGameProfiles(){const c=document.getElementById('game-profiles-list');if(!gameProfiles.length){c.innerHTML='<p style="text-align:center;color:var(--fabd-gray-500)">Sem perfis</p>';return;}let h='<table><thead><tr><th>Nome</th><th>Modo</th><th>Detalhes</th><th>Acoes</th></tr></thead><tbody>';gameProfiles.forEach(p=>{h+=`<tr><td><strong>${esc(p.name)}</strong></td><td>${p.mode==='fixed'?'Fixo':'Personalizado'}</td><td style="font-size:12px">${p.mode==='fixed'?esc(p.fixedType):(p.ranges||[]).map(r=>`${r.min}-${r.max}: ${r.type}`).join(' | ')}</td><td><button class="btn btn-sm btn-secondary" onclick="editGameProfile('${p.id}')">Editar</button> <button class="btn btn-sm btn-danger" onclick="deleteGameProfile('${p.id}')">Excluir</button></td></tr>`;});c.innerHTML=h+'</tbody></table>';}
 function addGameProfile(){document.getElementById('profile-editor-title').textContent='Novo Perfil';document.getElementById('gp-name').value='';document.getElementById('gp-mode').value='custom';onGameModeChange();setRanges([{min:2,max:4,type:'Todos contra Todos'},{min:5,max:7,type:'Grupos + Eliminatoria'},{min:8,max:99,type:'Eliminatoria'}]);document.getElementById('game-profile-editor').style.display='';}

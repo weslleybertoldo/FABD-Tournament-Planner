@@ -539,7 +539,7 @@
         lockLandscape();
         updateDisplay();
         updateReadOnlyUI();
-      }catch(e){console.error(e);alert('Erro');}
+      }catch(e){console.error(e);if(pollInterval){clearInterval(pollInterval);pollInterval=null;}alert('Erro');}
     }
 
     function setupDoublesUI(){
@@ -590,6 +590,7 @@
         leftTopPlayer,leftBottomPlayer,rightTopPlayer,rightBottomPlayer,
         canSwapInner
       });
+      if(state.history.length>500)state.history.shift();
       if(player===1)state.p1++;else state.p2++;
       state.server=player;
 
@@ -795,9 +796,9 @@
       const rSets=leftPlayer===1?state.setsWonP2:state.setsWonP1;
 
       // Comum
-      document.getElementById('scorer-info').textContent=currentMatch.draw_name+' - '+(currentMatch.round_name||'');
-      document.getElementById('scorer-court').textContent=currentMatch.court;
-      document.getElementById('scorer-draw-info').textContent=`#${currentMatch.match_num} | ${currentMatch.draw_name}`;
+      const elInfo=document.getElementById('scorer-info');if(elInfo)elInfo.textContent=currentMatch.draw_name+' - '+(currentMatch.round_name||'');
+      const elCourt=document.getElementById('scorer-court');if(elCourt)elCourt.textContent=currentMatch.court;
+      const elDrawInfo=document.getElementById('scorer-draw-info');if(elDrawInfo)elDrawInfo.textContent=`#${currentMatch.match_num} | ${currentMatch.draw_name}`;
 
       // Historico de sets
       let hist='';state.setsP1.forEach((s,i)=>{

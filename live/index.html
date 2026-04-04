@@ -93,9 +93,17 @@
     }
 
     async function getTournament(){
-      const{data}=await sb.from('tournaments').select('id,name').order('updated_at',{ascending:false}).limit(1);
-      if(data?.length){tournamentId=data[0].id;document.getElementById('tournament-name').textContent=data[0].name;return data[0];}
-      document.getElementById('tournament-name').textContent='';return null;
+      try{
+        const{data,error}=await sb.from('tournaments').select('id,name').order('updated_at',{ascending:false}).limit(1);
+        if(error)throw error;
+        if(data?.length){tournamentId=data[0].id;document.getElementById('tournament-name').textContent=data[0].name;return data[0];}
+        document.getElementById('tournament-name').textContent='';return null;
+      }catch(e){
+        console.error('[Live] getTournament error:',e);
+        document.getElementById('tournament-name').textContent='Erro ao carregar torneio';
+        document.getElementById('tab-live').innerHTML='<div class="empty"><div class="icon">&#9888;</div><h3>Erro ao carregar torneio</h3><p style="color:#64748B">Verifique sua conexão e aguarde a próxima tentativa.</p></div>';
+        return null;
+      }
     }
 
     // === AO VIVO ===
@@ -141,7 +149,7 @@
           h+=`</div>`;
         });
         document.getElementById('tab-live').innerHTML=h;
-      }catch(e){console.error(e);document.getElementById('tab-live').innerHTML='<div class="empty"><div class="icon">&#9888;</div><h3>Erro de conexao</h3><p style="color:#64748B">Tentando reconectar...</p></div>';}
+      }catch(e){console.error('[Live] loadLive error:',e);const now=new Date().toLocaleTimeString('pt-BR');document.getElementById('tab-live').innerHTML='<div class="empty"><div class="icon">&#9888;</div><h3 style="color:#EF4444">Erro de conexão</h3><p style="color:#94A3B8;margin-top:8px">Não foi possível carregar os dados.<br>Tentando reconectar automaticamente...</p><p style="color:#64748B;font-size:11px;margin-top:12px">Último erro: '+now+'</p></div>';}
     }
 
     // === HISTORICO ===
