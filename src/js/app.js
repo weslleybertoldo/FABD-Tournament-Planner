@@ -91,7 +91,7 @@ async function loadData(autoLoad=false) {
 
       // Conectar Supabase Realtime
       try {
-        await window.api.supabaseUpsertTournament(tournament.id, tournament.name);
+        await window.api.supabaseUpsertTournament(tournament.id, tournament.name, tournament);
         await window.api.supabaseSubscribe(tournament.id);
         window.api.onScoreUpdate(handleRealtimeScoreUpdate);
       } catch(e) { console.warn('Supabase connect:', e); }
@@ -2941,7 +2941,7 @@ async function assignCourt(idx, value) {
   // Sincronizar com Supabase
   try{
     if(value&&m.status==='Em Quadra'){
-      await window.api.supabaseUpsertTournament(tournament.id,tournament.name);
+      await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
       const ok=await window.api.supabaseUpsertMatch(tournament.id,m);
       if(!ok)showToast('Aviso: sincronizacao online falhou. O jogo pode nao aparecer no painel publico.','warning');
     }

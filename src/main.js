@@ -385,9 +385,23 @@ ipcMain.handle('db:saveSettings', (_, settings) => { db.settings = settings; sav
 ipcMain.on('log', (_, level, msg) => { log(level, '[renderer]', msg); });
 
 // === IPC: SUPABASE REALTIME ===
-ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name) => {
+ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tournamentData) => {
   try {
-    const { error } = await supabase.from('tournaments').upsert({ id: tournamentId, name, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    const row = { id: tournamentId, name, updated_at: new Date().toISOString() };
+    if (tournamentData) {
+      // Enviar apenas matches e draws (dados necessarios pro site publico)
+      row.data = {
+        matches: tournamentData.matches || [],
+        draws: tournamentData.draws || [],
+        courts: tournamentData.courts,
+        courtNames: tournamentData.courtNames || [],
+        startDate: tournamentData.startDate,
+        endDate: tournamentData.endDate,
+        location: tournamentData.location,
+        city: tournamentData.city
+      };
+    }
+    const { error } = await supabase.from('tournaments').upsert(row, { onConflict: 'id' });
     if (error) throw error;
     return true;
   } catch(e) { log('ERROR', 'Supabase upsertTournament:', e.message); return false; }
