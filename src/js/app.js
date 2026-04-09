@@ -940,10 +940,21 @@ function filterRoster() { filterTable('search-roster','roster-table-body'); }
 
 function exportPlayersCSV() {
   if (!players.length) { showToast('Nenhum jogador','warning'); return; }
-  let csv = 'Nome,Sobrenome,Genero,DataNasc,Clube,Estado,Categoria,Ranking,Telefone,Email,Inscricoes\n';
-  players.forEach(p => { csv += `"${p.firstName}","${p.lastName}","${p.gender}","${p.dob||''}","${p.club||''}","${p.state||''}","${p.category||''}","${p.ranking||''}","${p.phone||''}","${p.email||''}","${(p.inscriptions||[]).map(i=>i.key).join(';')}"\n`; });
+  // Mesmo formato do template de importacao (separador ;)
+  let csv = 'Nome;Sobrenome;Genero;DataNascimento;Clube;Estado;Ranking;Telefone;Email;Inscricoes;Dupla_DM;Dupla_DF;Dupla_DX\n';
+  players.forEach(p => {
+    const inscs = (p.inscriptions||[]).map(i=>i.key).join('|');
+    // Buscar parceiros de dupla pelo nome
+    const findPartner = (mod) => {
+      const insc = (p.inscriptions||[]).find(i=>i.mod===mod);
+      if (!insc?.partner) return '';
+      const partner = players.find(x=>x.id===insc.partner);
+      return partner ? (partner.firstName+' '+partner.lastName).trim() : '';
+    };
+    csv += `${p.firstName||''};${p.lastName||''};${p.gender||''};${p.dob||''};${p.club||''};${p.state||''};${p.ranking||''};${p.phone||''};${p.email||''};${inscs};${findPartner('DM')};${findPartner('DF')};${findPartner('DX')}\n`;
+  });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
   a.download = 'jogadores-fabd.csv'; a.click();
 }
 
