@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS live_scores (
   sets_won_p2 INTEGER DEFAULT 0,
   winner INTEGER, -- 1 ou 2 quando jogo terminar
   final_score TEXT, -- ex: "21-15 / 21-18"
+  umpire_name TEXT, -- nome do arbitro que apitou
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 

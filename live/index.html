@@ -230,7 +230,7 @@
     let scheduleFilter='all';
     let selectedDraw=0;
 
-    function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''}
+    function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;'):''}
 
     // === NAVEGACAO ===
     function switchSection(sec){
@@ -244,13 +244,15 @@
     }
 
     // === BUSCAR TORNEIO ===
-    async function getTournament(){
+    let isLoading=false;
+    async function getTournament(includeData){
       try{
-        const{data,error}=await sb.from('tournaments').select('id,name,data').order('updated_at',{ascending:false}).limit(1);
+        const cols=includeData?'id,name,data':'id,name';
+        const{data,error}=await sb.from('tournaments').select(cols).order('updated_at',{ascending:false}).limit(1);
         if(error)throw error;
         if(data?.length){
           tournamentId=data[0].id;
-          tournamentData=data[0].data||null;
+          if(includeData)tournamentData=data[0].data||null;
           document.getElementById('tournament-name').textContent=data[0].name;
           return data[0];
         }
@@ -502,7 +504,12 @@
           const w=m.winner;
           const score1=m.score1||'';
           const score2=m.score2||'';
-          const scoreStr=(score1||score2)?`${score1} x ${score2}`:'';
+          // Formatar "21 18" + "15 21" -> "21-15 / 18-21"
+          let scoreStr='';
+          if(score1||score2){
+            const s1=score1.split(' '),s2=score2.split(' ');
+            scoreStr=s1.map((v,i)=>`${v}-${s2[i]||0}`).join(' / ');
+          }
           h+=`<div class="group-match-item">`;
           h+=`<div class="gm-p left${w===1?' win':''}">${esc(m.player1||'')}</div>`;
           h+=`<div class="gm-score">${w?esc(scoreStr):'-'}</div>`;
@@ -669,14 +676,16 @@
     // === INIT ===
     loadLive();
     setInterval(()=>{
-      if(currentSection==='live')loadLive();
+      if(isLoading)return;
+      isLoading=true;
+      const done=()=>{isLoading=false;};
+      if(currentSection==='live'){loadLive().finally(done);}
       else if(currentSection==='schedule'||currentSection==='brackets'){
-        // Atualizar dados do torneio periodicamente
-        getTournament().then(()=>{
+        getTournament(true).then(()=>{
           if(currentSection==='schedule')renderSchedule();
           if(currentSection==='brackets')renderBrackets();
-        });
-      }
+        }).finally(done);
+      } else {done();}
     },3000);
   </script>
 </body>

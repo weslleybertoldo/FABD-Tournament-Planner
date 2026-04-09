@@ -1410,6 +1410,7 @@ async function generateAllDraws() {
 
     rebuildMatchList();
     await window.api.saveTournament(tournament);
+    try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}
     renderDraws();
     showToast(`${count} chave(s) sorteada(s)!`);
   } catch(e) {
@@ -1456,6 +1457,7 @@ async function generateSingleDraw(idx) {
 
   rebuildMatchList();
   await window.api.saveTournament(tournament);
+  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}
   renderDraws();
   showToast(`Chave "${d.name}" sorteada!`);
 }
@@ -1973,6 +1975,7 @@ async function deleteDraw(i) {
   if(!tournament.draws.length)tournament.matches=[];
   cleanOrphanMatches(); selectedDrawIdx=-1;
   await window.api.saveTournament(tournament);
+  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}
   renderDraws(); showToast('Chave excluida');
 }
 
@@ -2890,6 +2893,7 @@ async function handleRealtimeScoreUpdate(data){
     m.liveScore='';
     try{propagateResultToDraws(m);}catch(e){console.warn('Erro ao propagar resultado:',e);showToast('Aviso: resultado recebido mas propagacao na chave falhou','warning');}
     await window.api.saveTournament(tournament);
+    try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}
     showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
   }
 
@@ -2979,7 +2983,7 @@ async function saveScore() {
   try{
     const m=tournament.matches[scoringMatchIdx];if(!m)return;
     const status=document.getElementById('score-status').value,winner=document.getElementById('score-winner').value;
-    if(status==='WO'||status==='Desqualificacao'){if(!winner){alert('Selecione vencedor');return;}m.score=status==='WO'?'W.O.':'DSQ';m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();propagateResultToDraws(m);await window.api.saveTournament(tournament);closeModal('modal-score');renderMatches();showToast('Resultado registrado');return;}
+    if(status==='WO'||status==='Desqualificacao'){if(!winner){alert('Selecione vencedor');return;}m.score=status==='WO'?'W.O.':'DSQ';m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();propagateResultToDraws(m);await window.api.saveTournament(tournament);try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}closeModal('modal-score');renderMatches();showToast('Resultado registrado');return;}
     if(!winner){alert('Selecione vencedor');return;}
     const numSets=tournament?.scoring?.sets||3,pts=tournament?.scoring?.points||21,maxP=tournament?.scoring?.maxPoints||30;
     let scores=[];
@@ -2987,7 +2991,7 @@ async function saveScore() {
     if(!scores.length&&status!=='Desistencia'){alert('Insira placar');return;}
     m.score=scores.join(' / ')||(status==='Desistencia'?'RET':'');m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();
     propagateResultToDraws(m);
-    await window.api.saveTournament(tournament);closeModal('modal-score');renderMatches();showToast('Placar salvo!');
+    await window.api.saveTournament(tournament);try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}closeModal('modal-score');renderMatches();showToast('Placar salvo!');
   }catch(e){console.error(e);showToast('Erro: '+e.message,'error');}
 }
 
@@ -3068,6 +3072,7 @@ async function resetMatch(idx){
   try{await window.api.supabaseRemoveFromCourt(tournament.id,m);}catch(e){console.warn('Supabase cleanup:',e);}
   m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;m.liveScore='';m.liveSets=[];
   await window.api.saveTournament(tournament);
+  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}
   renderMatches();renderFinishedMatches();showToast('Jogo resetado');
 }
 
