@@ -215,8 +215,8 @@ function navigateTo(page) {
     case 'players': renderPlayers(); break;
     case 'roster': showTournamentPages(); renderRoster(); break;
     case 'draws': showTournamentPages(); renderDraws(); break;
-    case 'matches': showTournamentPages(); if(tournament){ cleanOrphanMatches(); autoFillTimes(); } renderMatches(); break;
-    case 'schedule': showTournamentPages(); if(tournament) autoFillTimes(); renderSchedule(); break;
+    case 'matches': showTournamentPages(); if(tournament){ cleanOrphanMatches(); } renderMatches(); break;
+    case 'schedule': showTournamentPages(); renderSchedule(); break;
   }
 }
 
@@ -2160,7 +2160,7 @@ function assignAutoTimes(matches) {
   const start = timeToMin(tournament.startTime || '08:00'), end = timeToMin(tournament.endTime || '18:00');
   const dur = tournament.matchDuration || 30, rest = tournament.restMinBetweenGames || 20;
   const bS = timeToMin(tournament.breakStart || '12:00'), bE = timeToMin(tournament.breakEnd || '13:30');
-  const slot = dur + rest, courts = tournament.courts || 4, cNames = tournament.courtNames || [];
+  const slot = dur + rest, courts = tournament.courts || 4;
 
   // Gerar slots de horario
   const slots = [];
@@ -2172,47 +2172,73 @@ function assignAutoTimes(matches) {
     cur += slot;
   }
 
-  // Verificar descanso minimo entre jogos do mesmo jogador
-  const playerLastSlot = {}; // jogador -> indice do ultimo slot
+  // Controle de ocupacao: quantos jogos em cada slot
+  const slotCount = new Array(slots.length).fill(0);
+  const playerLastSlot = {};
 
-  let si = 0, ci = 0;
+  // Registrar jogos ja finalizados/em quadra
   matches.forEach(m => {
-    // Preservar horario de jogos ja finalizados ou em quadra
     if (m.time && (m.status === 'Finalizada' || m.status === 'WO' || m.status === 'Em Quadra' || m.status === 'Desistencia' || m.status === 'Desqualificacao')) {
-      // Registrar no playerLastSlot para respeitar descanso
       const slotIdx = slots.indexOf(timeToMin(m.time));
       if (slotIdx >= 0) {
+        slotCount[slotIdx]++;
         if (m.player1) playerLastSlot[m.player1] = slotIdx;
         if (m.player2) playerLastSlot[m.player2] = slotIdx;
       }
-      return;
     }
+  });
 
-    if (si >= slots.length) return;
+  // Registrar jogos que ja tem horario valido (mesmo que pendentes)
+  matches.forEach(m => {
+    if (m.time && (m.status === 'Finalizada' || m.status === 'WO' || m.status === 'Em Quadra' || m.status === 'Desistencia' || m.status === 'Desqualificacao')) return;
+    if (m.time) {
+      const slotIdx = slots.indexOf(timeToMin(m.time));
+      if (slotIdx >= 0 && slotCount[slotIdx] < courts) {
+        // Slot tem vaga — manter horario existente
+        slotCount[slotIdx]++;
+        if (m.player1) playerLastSlot[m.player1] = slotIdx;
+        if (m.player2) playerLastSlot[m.player2] = slotIdx;
+        return;
+      }
+      // Slot cheio — precisa reatribuir, limpar horario
+      m.time = '';
+    }
+  });
 
-    // Encontrar proximo slot onde ambos jogadores descansaram o suficiente
-    let targetSi = si;
-    while (targetSi < slots.length) {
+  // Atribuir horarios aos jogos sem horario
+  let startSearch = 0;
+  matches.forEach(m => {
+    if (m.time) return; // ja tem horario
+
+    // Encontrar proximo slot com vaga E onde ambos jogadores descansaram
+    for (let si = startSearch; si < slots.length; si++) {
+      if (slotCount[si] >= courts) continue; // slot cheio
+
       const p1Last = playerLastSlot[m.player1];
       const p2Last = playerLastSlot[m.player2];
-      const p1Ok = p1Last == null || targetSi > p1Last;
-      const p2Ok = p2Last == null || targetSi > p2Last;
+      const p1Ok = p1Last == null || si > p1Last;
+      const p2Ok = p2Last == null || si > p2Last;
 
-      if (p1Ok && p2Ok) break;
-      ci++;
-      if (ci >= courts) { ci = 0; targetSi++; }
+      if (p1Ok && p2Ok) {
+        m.time = minToTime(slots[si]);
+        if (!m.court) m.court = '';
+        slotCount[si]++;
+        if (m.player1) playerLastSlot[m.player1] = si;
+        if (m.player2) playerLastSlot[m.player2] = si;
+        return;
+      }
     }
-
-    if (targetSi >= slots.length) return;
-
-    m.time = minToTime(slots[targetSi]);
-    if (!m.court) m.court = '';
-
-    playerLastSlot[m.player1] = targetSi;
-    playerLastSlot[m.player2] = targetSi;
-
-    ci++;
-    if (ci >= courts) { ci = 0; si = targetSi + 1; } else { si = targetSi; }
+    // Sem slot ideal — relaxar regra de descanso e tentar qualquer slot com vaga
+    for (let si = 0; si < slots.length; si++) {
+      if (slotCount[si] < courts) {
+        m.time = minToTime(slots[si]);
+        if (!m.court) m.court = '';
+        slotCount[si]++;
+        if (m.player1) playerLastSlot[m.player1] = si;
+        if (m.player2) playerLastSlot[m.player2] = si;
+        return;
+      }
+    }
   });
 }
 
@@ -2335,10 +2361,46 @@ async function syncMatchesWithDraws() {
 
 async function regenerateSchedule() {
   if(!tournament?.matches?.length){showToast('Sem partidas','warning');return;}
-  const defs=tournament.matches.filter(m=>m.isDefinida!==false&&m.status!=='A definir');
-  assignAutoTimes(defs);
+  if(!confirm('Regenerar todos os horarios e renumerar jogos? Jogos finalizados e em quadra serao preservados.'))return;
+  // Limpar horarios dos jogos pendentes
+  tournament.matches.forEach(m=>{
+    if(m.status!=='Finalizada'&&m.status!=='WO'&&m.status!=='Em Quadra'&&m.status!=='Desistencia'&&m.status!=='Desqualificacao'){
+      m.time='';
+    }
+  });
+  // Redistribuir com max 4 por slot
+  assignAutoTimes(tournament.matches);
+  // Renumerar por ordem: dia -> horario -> numero atual
+  const hasDays=tournament.daySchedule?.length>0;
+  if(hasDays){
+    const dayDraws=[];
+    tournament.daySchedule.forEach(day=>{dayDraws.push(new Set(day.draws||[]));});
+    tournament.matches.sort((a,b)=>{
+      // Dia do jogo
+      let dayA=dayDraws.length,dayB=dayDraws.length;
+      dayDraws.forEach((s,i)=>{if(s.has(a.drawName))dayA=i;if(s.has(b.drawName))dayB=i;});
+      if(dayA!==dayB)return dayA-dayB;
+      // Horario
+      const ta=a.time?timeToMin(a.time):9999;
+      const tb=b.time?timeToMin(b.time):9999;
+      if(ta!==tb)return ta-tb;
+      return(a.num||0)-(b.num||0);
+    });
+  } else {
+    tournament.matches.sort((a,b)=>{
+      const ta=a.time?timeToMin(a.time):9999;
+      const tb=b.time?timeToMin(b.time):9999;
+      if(ta!==tb)return ta-tb;
+      return(a.num||0)-(b.num||0);
+    });
+  }
+  // Atribuir numeros sequenciais
+  tournament.matches.forEach((m,i)=>{m.id=(i+1).toString();m.num=i+1;});
   await window.api.saveTournament(tournament);
-  renderMatches(); showToast(`Horarios gerados para ${defs.length} partidas`);
+  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}
+  renderSchedule();
+  const total=tournament.matches.filter(m=>m.time).length;
+  showToast(`Horarios regenerados e renumerados! ${total} jogos.`);
 }
 
 // Re-sincronizar estado das draws com tournament.matches
