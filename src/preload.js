@@ -33,6 +33,10 @@ contextBridge.exposeInMainWorld('api', {
   checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
   log: (l, m) => ipcRenderer.send('log', l, m),
 
+  // Excel (XLSX)
+  xlsxExport: (data) => ipcRenderer.invoke('xlsx:export', data),
+  xlsxImport: () => ipcRenderer.invoke('xlsx:import'),
+
   // Supabase Realtime
   supabaseUpsertTournament: (tid, name, tournamentData) => ipcRenderer.invoke('supabase:upsertTournament', tid, name, tournamentData),
   supabaseUpsertMatch: (tid, m) => ipcRenderer.invoke('supabase:upsertMatch', tid, m),

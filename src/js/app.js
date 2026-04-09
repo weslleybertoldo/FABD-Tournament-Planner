@@ -156,20 +156,51 @@ function showTournamentPages() {
 // === CATEGORY BY AGE ===
 function calculateCategory(dob) {
   if (!dob) return 'Principal';
-  const birth = new Date(dob + 'T00:00:00');
-  const now = new Date();
-  const year = now.getFullYear();
-  const age = year - birth.getFullYear();
+  // Aceitar formatos DD/MM/YYYY e YYYY-MM-DD
+  let birthYear;
+  const brMatch = dob.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (brMatch) { birthYear = parseInt(brMatch[3]); }
+  else {
+    const isoMatch = dob.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) { birthYear = parseInt(isoMatch[1]); }
+    else { return 'Principal'; }
+  }
+  const age = new Date().getFullYear() - birthYear;
 
-  if (age < 13) return 'Sub 13';
-  if (age < 15) return 'Sub 15';
-  if (age < 17) return 'Sub 17';
-  if (age < 19) return 'Sub 19';
-  if (age < 23) return 'Sub 23';
+  // Regra: "ate X anos ESTE ANO" = ano_atual - ano_nascimento
+  if (age <= 10) return 'Sub 11';
+  if (age <= 12) return 'Sub 13';
+  if (age <= 14) return 'Sub 15';
+  if (age <= 16) return 'Sub 17';
+  if (age <= 18) return 'Sub 19';
+  if (age <= 22) return 'Sub 23';
   if (age >= 55) return 'Master II';
   if (age >= 45) return 'Master I';
   if (age >= 35) return 'Senior';
   return 'Principal';
+}
+
+function checkAloneInCategory(playerInscriptions) {
+  if (!tournament?.entries?.length || !playerInscriptions?.length) return [];
+  const alone = [];
+  playerInscriptions.forEach(insc => {
+    const key = insc.key;
+    const mod = insc.mod;
+    const isDupla = ['DM','DF','DX'].includes(mod);
+    // Contar quantos inscritos nesta chave (excluindo ausentes)
+    const count = (tournament.entries||[]).filter(e => e.key === key && e.status !== 'ausente').length;
+    if (isDupla) {
+      // Duplas: precisa de 2 duplas (4 inscricoes com parceiro)
+      const pairs = new Set();
+      (tournament.entries||[]).filter(e => e.key === key && e.status !== 'ausente' && e.partner).forEach(e => {
+        pairs.add([e.playerId, e.partner].sort().join('-'));
+      });
+      if (pairs.size < 2) alone.push(key);
+    } else {
+      if (count < 2) alone.push(key);
+    }
+  });
+  return alone;
 }
 
 function checkCategoryConflict(dob, inscriptions){
@@ -390,10 +421,13 @@ function renderPlayers() {
     const autoCat = calculateCategory(p.dob);
     const inscriptions = (p.inscriptions||[]).length;
     const hasConflict = checkCategoryConflict(p.dob, p.inscriptions);
-    const nameStyle = hasConflict ? 'color:#DC2626' : '';
+    const aloneKeys = checkAloneInCategory(p.inscriptions);
+    const hasAlone = aloneKeys.length > 0;
+    const nameStyle = hasConflict ? 'color:#DC2626' : hasAlone ? 'color:#D97706' : '';
     const conflictIcon = hasConflict ? '<span title="Atleta inscrito em categoria incompativel com a idade" style="color:#DC2626;cursor:help;margin-left:4px">&#9888;</span>' : '';
+    const aloneIcon = hasAlone ? '<span title="Sozinho em: '+aloneKeys.join(', ')+' (precisa de mais inscritos)" style="color:#D97706;cursor:help;margin-left:4px">&#9888;</span>' : '';
     h += `<tr>
-      <td><strong style="${nameStyle}">${esc(p.firstName)} ${esc(p.lastName)}${conflictIcon}</strong></td>
+      <td><strong style="${nameStyle}">${esc(p.firstName)} ${esc(p.lastName)}${conflictIcon}${aloneIcon}</strong>${hasAlone?'<div style="font-size:10px;color:#D97706;margin-top:2px">Sozinho em: '+aloneKeys.map(k=>'<strong>'+esc(k)+'</strong>').join(', ')+'</div>':''}</td>
       <td>${p.gender==='M'?'Masc':p.gender==='F'?'Fem':'-'}</td>
       <td>${fmtDate(p.dob)}</td>
       <td><span class="tag tag-blue">${esc(autoCat)}</span></td>
@@ -938,24 +972,49 @@ function filterPlayers() { filterTable('search-players','players-table-body'); }
 function filterTournaments() { filterTable('search-tournaments','tournaments-table-body'); }
 function filterRoster() { filterTable('search-roster','roster-table-body'); }
 
-function exportPlayersCSV() {
+async function exportPlayersCSV() {
   if (!players.length) { showToast('Nenhum jogador','warning'); return; }
-  // Mesmo formato do template de importacao (separador ;)
-  let csv = 'Nome;Sobrenome;Genero;DataNascimento;Clube;Estado;Ranking;Telefone;Email;Inscricoes;Dupla_DM;Dupla_DF;Dupla_DX\n';
+
+  // Gerar uma linha POR INSCRICAO (atleta pode ter varias linhas, uma por categoria)
+  const data = [];
+  const findPartnerName = (p, mod, cat) => {
+    const insc = (p.inscriptions||[]).find(i=>i.mod===mod&&i.cat===cat);
+    if (!insc?.partner) return '';
+    const partner = players.find(x=>x.id===insc.partner);
+    return partner ? (partner.firstName+' '+partner.lastName).trim() : '';
+  };
+
   players.forEach(p => {
-    const inscs = (p.inscriptions||[]).map(i=>i.key).join('|');
-    // Buscar parceiros de dupla pelo nome
-    const findPartner = (mod) => {
-      const insc = (p.inscriptions||[]).find(i=>i.mod===mod);
-      if (!insc?.partner) return '';
-      const partner = players.find(x=>x.id===insc.partner);
-      return partner ? (partner.firstName+' '+partner.lastName).trim() : '';
-    };
-    csv += `${p.firstName||''};${p.lastName||''};${p.gender||''};${p.dob||''};${p.club||''};${p.state||''};${p.ranking||''};${p.phone||''};${p.email||''};${inscs};${findPartner('DM')};${findPartner('DF')};${findPartner('DX')}\n`;
+    const name = (p.firstName+' '+p.lastName).trim();
+    const inscs = p.inscriptions||[];
+    if (!inscs.length) return;
+
+    // Agrupar inscricoes por categoria
+    const catMap = {};
+    inscs.forEach(i => {
+      const cat = i.cat || 'Principal';
+      if (!catMap[cat]) catMap[cat] = { simples: false, dupla: false, mista: false, parceiroDupla: '', parceiroMista: '' };
+      if (i.mod === 'SM' || i.mod === 'SF') catMap[cat].simples = true;
+      if (i.mod === 'DM' || i.mod === 'DF') { catMap[cat].dupla = true; catMap[cat].parceiroDupla = findPartnerName(p, i.mod, cat); }
+      if (i.mod === 'DX') { catMap[cat].mista = true; catMap[cat].parceiroMista = findPartnerName(p, 'DX', cat); }
+    });
+
+    // Uma linha por categoria
+    let first = true;
+    Object.entries(catMap).forEach(([cat, m]) => {
+      data.push({
+        name, gender: p.gender||'', dob: p.dob||'', club: p.club||'',
+        categoria: cat, phone: first ? (p.phone||'') : '',
+        simples: m.simples ? 'X' : '', dupla: m.dupla ? 'X' : '',
+        parceiroDupla: m.parceiroDupla, mista: m.mista ? 'X' : '',
+        parceiroMista: m.parceiroMista,
+      });
+      first = false;
+    });
   });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
-  a.download = 'jogadores-fabd.csv'; a.click();
+
+  const ok = await window.api.xlsxExport(data);
+  if (ok) showToast(`Planilha exportada! ${data.length} inscricoes de ${players.length} atletas.`);
 }
 
 // === ROSTER (sincronizado com jogadores) ===
@@ -3774,7 +3833,120 @@ const IMPORT_TEMPLATE_EXAMPLE=[
 function downloadImportTemplate(){const c=IMPORT_TEMPLATE_HEADER+'\n'+IMPORT_TEMPLATE_EXAMPLE.join('\n')+'\n';if(window.api?.saveFile)window.api.saveFile([{name:'CSV',extensions:['csv']}],'\uFEFF'+c).then(s=>{if(s)showToast('Modelo salvo!');});else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+c],{type:'text/csv'}));a.download='modelo-importacao-FABD.csv';a.click();}}
 function showImportModal(){importedRows=[];document.getElementById('import-step-1').style.display='';document.getElementById('import-step-2').style.display='none';document.getElementById('import-btn-confirm').style.display='none';openModal('modal-import');}
 function importBackToStep1(){document.getElementById('import-step-1').style.display='';document.getElementById('import-step-2').style.display='none';document.getElementById('import-btn-confirm').style.display='none';}
-async function selectImportFile(){try{const fp=await window.api.selectFile([{name:'CSV',extensions:['csv','txt']}]);if(!fp)return;const c=await window.api.readFile(fp);if(!c?.trim()){showToast('Arquivo vazio','warning');return;}parseCSV(c,fp);}catch(e){showToast('Erro: '+e.message,'error');}}
+async function selectImportFile(){
+  try{
+    // Tentar xlsx primeiro
+    const xlsxResult = await window.api.xlsxImport();
+    if(!xlsxResult) return;
+
+    if(xlsxResult.type==='csv'){
+      // Fallback CSV
+      parseCSV(xlsxResult.content, xlsxResult.fileName);
+      return;
+    }
+
+    // Processar dados do xlsx
+    const xlsxRows = xlsxResult.rows||[];
+    if(!xlsxRows.length){showToast('Planilha vazia','warning');return;}
+
+    // Fase 1: Agrupar linhas por atleta (mesmo nome = mesmo atleta, varias categorias)
+    const atletaMap = {}; // chave: nome normalizado -> { dados basicos, inscricoes[] }
+    xlsxRows.forEach(r => {
+      const nomeNorm = (r.nome||'').trim().toLowerCase();
+      if (!nomeNorm) return;
+
+      const parts = (r.nome||'').trim().split(/\s+/);
+      const firstName = parts[0]||'';
+      const lastName = parts.slice(1).join(' ')||'';
+      const gender = normalizeGender(r.sexo||'');
+      const dob = normalizeDate(r.dob||'');
+      const cat = (r.categoria||'').trim() || calculateCategory(dob) || 'Principal';
+
+      // Criar ou atualizar atleta
+      if (!atletaMap[nomeNorm]) {
+        atletaMap[nomeNorm] = {
+          firstName, lastName, gender, dob,
+          club: r.clube||'', phone: r.telefone||'', email: r.email||'',
+          inscricoes: new Set(), // "MOD Categoria" ex: "SM Principal"
+          duplas: {}, // "MOD Categoria" -> parceiro nome
+        };
+      }
+      const atleta = atletaMap[nomeNorm];
+      // Atualizar dados basicos se estavam vazios
+      if (!atleta.phone && r.telefone) atleta.phone = r.telefone;
+      if (!atleta.email && r.email) atleta.email = r.email;
+      if (!atleta.club && r.clube) atleta.club = r.clube;
+
+      // Adicionar inscricoes (descarta duplicatas automaticamente via Set)
+      if (r.simples) {
+        const mod = gender === 'M' ? 'SM' : 'SF';
+        atleta.inscricoes.add(mod + ' ' + cat);
+      }
+      if (r.dupla) {
+        const mod = gender === 'M' ? 'DM' : 'DF';
+        const key = mod + ' ' + cat;
+        atleta.inscricoes.add(key);
+        if (r.parceiroDupla) atleta.duplas[key] = r.parceiroDupla.trim();
+      }
+      if (r.mista) {
+        const key = 'DX ' + cat;
+        atleta.inscricoes.add(key);
+        if (r.parceiroMista) atleta.duplas[key] = r.parceiroMista.trim();
+      }
+    });
+
+    // Fase 2: Converter pra formato que o confirmImport espera
+    importedRows = [];
+    Object.values(atletaMap).forEach(a => {
+      const inscricoesRaw = [...a.inscricoes].join('|');
+
+      // Extrair parceiros por modalidade (primeiro encontrado como fallback + mapa completo por chave)
+      let duplaDM = '', duplaDF = '', duplaDX = '';
+      const duplaMap = {}; // "DM Sub 19" -> "Mateus Oliveira"
+      Object.entries(a.duplas).forEach(([key, parceiro]) => {
+        duplaMap[key] = parceiro;
+        if (key.startsWith('DM')) duplaDM = duplaDM || parceiro;
+        if (key.startsWith('DF')) duplaDF = duplaDF || parceiro;
+        if (key.startsWith('DX')) duplaDX = duplaDX || parceiro;
+      });
+
+      const row = {
+        firstName: a.firstName, lastName: a.lastName, gender: a.gender, dob: a.dob,
+        club: a.club, state: 'AL', ranking: '', phone: a.phone, email: a.email,
+        inscricoesRaw, duplaDM, duplaDF, duplaDX, _duplaMap: duplaMap,
+        valid: true, error: ''
+      };
+
+      // Validacoes
+      if (!row.firstName && !row.lastName) { row.valid = false; row.error = 'Nome vazio'; }
+      if (row.gender !== 'M' && row.gender !== 'F') { row.valid = false; row.error = 'Genero invalido'; }
+      if (!a.inscricoes.size) { row.valid = false; row.error = 'Sem modalidade (marque X)'; }
+      row.category = calculateCategory(row.dob);
+      importedRows.push(row);
+    });
+
+    // Fase 3: Mostrar preview com resumo
+    const totalLinhas = xlsxRows.length;
+    const totalAtletas = importedRows.length;
+    const totalInscs = importedRows.reduce((s, r) => s + (r.inscricoesRaw||'').split('|').filter(x=>x).length, 0);
+    const duplicatasRemovidas = totalLinhas - totalAtletas;
+
+    document.getElementById('import-file-name').textContent = xlsxResult.fileName;
+    document.getElementById('import-count').textContent = totalAtletas + ' atleta(s) de ' + totalLinhas + ' linha(s)' + (duplicatasRemovidas > 0 ? ' (' + duplicatasRemovidas + ' linhas extras agrupadas)' : '');
+    const vc = importedRows.filter(r => r.valid).length, ic = importedRows.filter(r => !r.valid).length;
+    document.getElementById('import-preview-head').innerHTML = '<tr><th>#</th><th>Nome</th><th>Sobrenome</th><th>Gen.</th><th>Nasc.</th><th>Cat. Base</th><th>Clube</th><th>Inscricoes</th><th>Status</th></tr>';
+    let tb = '';
+    importedRows.forEach((r, i) => {
+      const inscs = (r.inscricoesRaw||'').split(/[;|]/).filter(x => x.trim()).map(x => '<span class="tag tag-blue" style="margin:1px;font-size:9px">' + esc(x.trim()) + '</span>').join(' ') || '-';
+      tb += '<tr style="' + (r.valid ? '' : 'background:#FEE2E2') + '"><td>' + (i+1) + '</td><td>' + esc(r.firstName) + '</td><td>' + esc(r.lastName) + '</td><td>' + esc(r.gender) + '</td><td>' + esc(r.dob) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.club) + '</td><td>' + inscs + '</td><td>' + (r.valid ? '<span class="tag tag-green">OK</span>' : '<span class="tag tag-red">' + esc(r.error) + '</span>') + '</td></tr>';
+    });
+    document.getElementById('import-preview-body').innerHTML = tb;
+    document.getElementById('import-summary').innerHTML = '<strong>' + vc + '</strong> atleta(s) valido(s) | <strong>' + totalInscs + '</strong> inscricao(oes)' + (ic ? '<br><span style="color:var(--fabd-red)">' + ic + ' com erro</span>' : '');
+    document.getElementById('import-step-1').style.display='none';
+    document.getElementById('import-step-2').style.display='';
+    document.getElementById('import-btn-confirm').style.display=vc?'':'none';
+  }catch(e){showToast('Erro: '+e.message,'error');}
+}
 function parseCSV(content,filePath){const fl=content.split('\n')[0];const sep=(fl.match(/;/g)||[]).length>(fl.match(/,/g)||[]).length?';':',';document.getElementById('import-separator').textContent=sep===';'?'Ponto e virgula':'Virgula';const lines=content.split('\n').map(l=>l.trim()).filter(l=>l);if(lines.length<2){showToast('Arquivo precisa de cabecalho + dados','warning');return;}const headers=parseCSVLine(lines[0],sep);const colMap=mapColumns(headers);importedRows=[];for(let i=1;i<lines.length;i++){const cols=parseCSVLine(lines[i],sep);if(cols.length<2)continue;const row={firstName:getCol(cols,colMap.firstName),lastName:getCol(cols,colMap.lastName),gender:normalizeGender(getCol(cols,colMap.gender)),dob:normalizeDate(getCol(cols,colMap.dob)),club:getCol(cols,colMap.club),state:getCol(cols,colMap.state)||'AL',ranking:getCol(cols,colMap.ranking),phone:getCol(cols,colMap.phone),email:getCol(cols,colMap.email),inscricoesRaw:getCol(cols,colMap.inscricoes),duplaDM:getCol(cols,colMap.duplaDM),duplaDF:getCol(cols,colMap.duplaDF),duplaDX:getCol(cols,colMap.duplaDX),valid:true,error:''};if(!row.firstName&&!row.lastName){row.valid=false;row.error='Nome vazio';}if(row.gender!=='M'&&row.gender!=='F'){row.valid=false;row.error='Genero invalido';}row.category=calculateCategory(row.dob);importedRows.push(row);}document.getElementById('import-file-name').textContent=filePath.split(/[/\\]/).pop();document.getElementById('import-count').textContent=`${importedRows.length} linha(s)`;const vc=importedRows.filter(r=>r.valid).length,ic=importedRows.filter(r=>!r.valid).length;document.getElementById('import-preview-head').innerHTML='<tr><th>#</th><th>Nome</th><th>Sobrenome</th><th>Gen.</th><th>Nasc.</th><th>Cat.</th><th>Clube</th><th>Inscricoes</th><th>Status</th></tr>';let tb='';importedRows.forEach((r,i)=>{const inscs=(r.inscricoesRaw||'').split(/[;|]/).filter(x=>x.trim()).map(x=>`<span class="tag tag-blue" style="margin:1px;font-size:9px">${esc(x.trim())}</span>`).join(' ')||'-';tb+=`<tr style="${r.valid?'':'background:#FEE2E2'}"><td>${i+1}</td><td>${esc(r.firstName)}</td><td>${esc(r.lastName)}</td><td>${esc(r.gender)}</td><td>${esc(r.dob)}</td><td>${esc(r.category)}</td><td>${esc(r.club)}</td><td>${inscs}</td><td>${r.valid?'<span class="tag tag-green">OK</span>':`<span class="tag tag-red">${esc(r.error)}</span>`}</td></tr>`;});document.getElementById('import-preview-body').innerHTML=tb;document.getElementById('import-summary').innerHTML=`<strong>${vc}</strong> valido(s)${ic?`<br><span style="color:var(--fabd-red)">${ic} com erro</span>`:''}`;document.getElementById('import-step-1').style.display='none';document.getElementById('import-step-2').style.display='';document.getElementById('import-btn-confirm').style.display=vc?'':'none';}
 function parseCSVLine(line,sep){const r=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(q&&line[i+1]==='"'){c+='"';i++;}else q=!q;}else if(ch===sep&&!q){r.push(c.trim());c='';}else c+=ch;}r.push(c.trim());return r;}
 function mapColumns(h){const m={firstName:-1,lastName:-1,gender:-1,dob:-1,club:-1,state:-1,ranking:-1,phone:-1,email:-1,inscricoes:-1,duplaDM:-1,duplaDF:-1,duplaDX:-1};const a={firstName:['nome','firstname','first name'],lastName:['sobrenome','lastname','last name'],gender:['genero','gender','sexo'],dob:['data nascimento','datanascimento','dob','date of birth','data nasc','dt nascimento'],club:['clube','club'],state:['estado','state','uf'],ranking:['ranking','classificacao','rank'],phone:['telefone','phone','tel','celular','mobile'],email:['email','e-mail','mail'],inscricoes:['inscricoes','inscricao','categories','categorias'],duplaDM:['dupla_dm','dupladm','parceiro_dm'],duplaDF:['dupla_df','dupladf','parceira_df'],duplaDX:['dupla_dx','duladx','parceiro_dx','parceira_dx']};h.forEach((x,i)=>{const l=x.toLowerCase().replace(/[^a-z0-9_ ]/g,'').trim();Object.keys(a).forEach(k=>{if(a[k].some(al=>l===al||l.includes(al))&&m[k]===-1)m[k]=i;});});if(m.firstName===-1)m.firstName=0;if(m.lastName===-1)m.lastName=1;if(m.gender===-1)m.gender=2;if(m.dob===-1)m.dob=3;if(m.club===-1)m.club=4;if(m.state===-1)m.state=5;if(m.ranking===-1)m.ranking=6;if(m.phone===-1)m.phone=7;if(m.email===-1)m.email=8;if(m.inscricoes===-1)m.inscricoes=9;if(m.duplaDM===-1)m.duplaDM=10;if(m.duplaDF===-1)m.duplaDF=11;if(m.duplaDX===-1)m.duplaDX=12;return m;}
@@ -3814,7 +3986,8 @@ async function confirmImport(){
         dob:row.dob,club:row.club,state:row.state,category:row.category,
         ranking:row.ranking,phone:row.phone,email:row.email,
         inscriptions,
-        _duplaDM:row.duplaDM||'',_duplaDF:row.duplaDF||'',_duplaDX:row.duplaDX||''
+        _duplaDM:row.duplaDM||'',_duplaDF:row.duplaDF||'',_duplaDX:row.duplaDX||'',
+        _duplaMap:row._duplaMap||{}
       };
       if(ex){p.id=ex.id;updated++;}else added++;
       const saved=await window.api.savePlayer(p);
@@ -3823,32 +3996,33 @@ async function confirmImport(){
       players=tournament?.players||[];
     }
 
-    // Segunda passada: vincular duplas
+    // Segunda passada: vincular duplas (por chave especifica: "DM Sub 19" -> parceiro)
     for(const p of players){
       let changed=false;
-      const linkDupla=(modCode,duplaName)=>{
-        if(!duplaName)return;
-        const dn=duplaName.trim().toLowerCase();
-        // Buscar parceiro por nome completo (firstName + lastName)
-        const partner=players.find(x=>{
-          if(x.id===p.id)return false;
-          const fullName=`${x.firstName} ${x.lastName}`.toLowerCase().trim();
-          return fullName===dn;
-        });
-        if(!partner)return;
-        // Encontrar inscricao de dupla deste mod
-        (p.inscriptions||[]).forEach(insc=>{
-          if(insc.mod===modCode&&!insc.partner){
-            insc.partner=partner.id;
-            changed=true;
-          }
-        });
-      };
-      linkDupla('DM',p._duplaDM);
-      linkDupla('DF',p._duplaDF);
-      linkDupla('DX',p._duplaDX);
+      const duplaMap=p._duplaMap||{};
+
+      // Vincular por chave especifica primeiro (ex: "DM Sub 19" -> "Mateus Oliveira")
+      (p.inscriptions||[]).forEach(insc=>{
+        if(insc.partner) return; // ja tem parceiro
+        if(!['DM','DF','DX'].includes(insc.mod)) return;
+        const key=insc.mod+' '+insc.cat;
+        const parcName=duplaMap[key]||'';
+        if(!parcName){
+          // Fallback: usar _duplaDM/_duplaDF/_duplaDX generico
+          const fallback=insc.mod==='DM'?p._duplaDM:insc.mod==='DF'?p._duplaDF:insc.mod==='DX'?p._duplaDX:'';
+          if(!fallback) return;
+          const dn=fallback.trim().toLowerCase();
+          const partner=players.find(x=>x.id!==p.id&&(x.firstName+' '+x.lastName).toLowerCase().trim()===dn);
+          if(partner){insc.partner=partner.id;changed=true;}
+          return;
+        }
+        const dn=parcName.trim().toLowerCase();
+        const partner=players.find(x=>x.id!==p.id&&(x.firstName+' '+x.lastName).toLowerCase().trim()===dn);
+        if(partner){insc.partner=partner.id;changed=true;}
+      });
+
       // Limpar campos temporarios
-      delete p._duplaDM;delete p._duplaDF;delete p._duplaDX;
+      delete p._duplaDM;delete p._duplaDF;delete p._duplaDX;delete p._duplaMap;
       if(changed) await window.api.savePlayer(p);
     }
 

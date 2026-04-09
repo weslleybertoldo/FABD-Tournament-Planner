@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
+const XLSX = require('xlsx');
 
 // === SUPABASE ===
 const SUPABASE_URL = 'https://zwjgjtrmsqtyyjtuotuo.supabase.co';
@@ -289,6 +290,100 @@ ipcMain.handle('dialog:saveFile', async (_, filters, content) => {
   if (result.canceled || !result.filePath) return false;
   fs.writeFileSync(result.filePath, content, 'utf-8');
   return true;
+});
+
+// === IPC: EXCEL (XLSX) ===
+ipcMain.handle('xlsx:export', async (_, playersData) => {
+  try {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Exportar Planilha de Atletas',
+      defaultPath: 'jogadores-fabd.xlsx',
+      filters: [{ name: 'Excel', extensions: ['xlsx'] }]
+    });
+    if (result.canceled || !result.filePath) return false;
+
+    const wb = XLSX.utils.book_new();
+    const header = ['Nome Completo','Sexo\n(M ou F)','Data de\nNascimento','Clube','Categoria','Telefone','Simples\n(marque X)','Dupla\n(marque X)','Parceiro(a)\nDupla','Mista\n(marque X)','Parceiro(a)\nMista'];
+    const rows = [header];
+    (playersData || []).forEach(p => { rows.push([p.name, p.gender, p.dob, p.club, p.categoria, p.phone, p.simples, p.dupla, p.parceiroDupla, p.mista, p.parceiroMista]); });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch:28},{wch:8},{wch:14},{wch:20},{wch:14},{wch:16},{wch:10},{wch:10},{wch:22},{wch:10},{wch:22}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Inscricoes');
+    XLSX.writeFile(wb, result.filePath);
+    return true;
+  } catch(e) { log('ERROR', 'xlsx:export:', e.message); return false; }
+});
+
+ipcMain.handle('xlsx:import', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Importar Planilha de Atletas',
+      filters: [{ name: 'Excel/CSV', extensions: ['xlsx', 'xls', 'csv'] }],
+      properties: ['openFile']
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    const filePath = result.filePaths[0];
+    const ext = path.extname(filePath).toLowerCase();
+
+    if (ext === '.csv') {
+      return { type: 'csv', content: fs.readFileSync(filePath, 'utf-8'), fileName: path.basename(filePath) };
+    }
+
+    const wb = XLSX.readFile(filePath);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (rows.length < 2) return { type: 'xlsx', rows: [], fileName: path.basename(filePath) };
+
+    // Encontrar linha do cabecalho (pode nao ser a primeira se tiver titulo/merge)
+    let headerIdx = 0;
+    const findHeader = (row) => row.some(h => {
+      const hl = String(h).toLowerCase().replace(/\n/g,' ');
+      return hl.includes('nome') && (hl.includes('completo') || hl.includes('sobrenome'));
+    }) || row.some(h => String(h).toLowerCase().includes('sexo') || String(h).toLowerCase().includes('genero'));
+    for (let hi = 0; hi < Math.min(rows.length, 5); hi++) {
+      if (findHeader(rows[hi])) { headerIdx = hi; break; }
+    }
+    const headerRow = rows[headerIdx].map(h => String(h).toLowerCase().trim().replace(/\n/g,' '));
+    const findCol = (keywords) => headerRow.findIndex(h => keywords.some(k => h.includes(k)));
+    const colMap = {
+      nome: findCol(['nome completo','nome']),
+      sexo: findCol(['sexo','genero']),
+      dob: findCol(['nascimento','data de','datanascimento']),
+      clube: findCol(['clube']),
+      categoria: findCol(['categoria']),
+      telefone: findCol(['telefone','fone','celular']),
+      email: findCol(['email','e-mail']),
+      simples: findCol(['simples']),
+      parceiroDupla: findCol(['parceiro(a) dupla','parceiro dupla','parceirodupla','dupla_dm','dupla_df']),
+      dupla: findCol(['dupla (','dupla (marque','dupla']),
+      mista: findCol(['mista']),
+      parceiroMista: findCol(['parceiro(a) mista','parceiro mista','parceiromista','dupla_dx']),
+    };
+
+    const players = [];
+    for (let i = headerIdx + 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || !r.length) continue;
+      const get = (col) => col >= 0 && r[col] != null ? String(r[col]).trim() : '';
+      const nome = get(colMap.nome);
+      if (!nome || nome.toLowerCase().includes('exemplo') || nome.toLowerCase().includes('preencha') || nome.toLowerCase().includes('ficha de')) continue;
+      players.push({
+        nome: nome,
+        sexo: get(colMap.sexo).toUpperCase(),
+        dob: get(colMap.dob),
+        clube: get(colMap.clube),
+        categoria: get(colMap.categoria),
+        telefone: get(colMap.telefone),
+        email: get(colMap.email),
+        simples: get(colMap.simples).toUpperCase() === 'X',
+        dupla: get(colMap.dupla).toUpperCase() === 'X',
+        parceiroDupla: get(colMap.parceiroDupla),
+        mista: get(colMap.mista).toUpperCase() === 'X',
+        parceiroMista: get(colMap.parceiroMista),
+      });
+    }
+    return { type: 'xlsx', rows: players, fileName: path.basename(filePath) };
+  } catch(e) { log('ERROR', 'xlsx:import:', e.message); return null; }
 });
 
 // === IPC: BACKUP DO TORNEIO ===
