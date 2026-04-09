@@ -281,8 +281,8 @@
           <div class="card" id="settings-game" style="display:none">
             <div class="card-header"><h3>Configuracao de Jogo</h3></div>
             <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
-              Defina como o sistema de disputa sera determinado automaticamente com base no numero de atletas inscritos em cada evento.
-              Voce pode criar varios perfis e atribuir a cada torneio.
+              Configure como o sistema de disputa e escolhido automaticamente.<br>
+              <strong>Ex:</strong> Se tiver 2 a 4 atletas &rarr; Todos contra Todos. Se tiver 8+ &rarr; Eliminatoria.
             </p>
 
             <!-- Lista de perfis salvos -->
@@ -292,24 +292,26 @@
             <div id="game-profiles-list"></div>
 
             <!-- Editor de perfil -->
-            <div id="game-profile-editor" style="display:none;margin-top:16px;border:2px solid var(--fabd-blue);border-radius:8px;padding:20px">
-              <h3 style="color:var(--fabd-blue);margin-bottom:16px" id="profile-editor-title">Novo Perfil</h3>
+            <div id="game-profile-editor" style="display:none;margin-top:16px;border:2px solid var(--fabd-blue);border-radius:8px;padding:20px;background:#f8fafc">
+              <h3 style="color:var(--fabd-blue);margin-bottom:4px" id="profile-editor-title">Novo Perfil</h3>
+              <p style="font-size:12px;color:var(--fabd-gray-500);margin-bottom:16px">Crie um perfil que define qual sistema de disputa usar baseado na quantidade de atletas.</p>
+
               <div class="form-group">
                 <label>Nome do Perfil *</label>
                 <input type="text" class="form-control" id="gp-name" placeholder="Ex: Padrao FABD">
               </div>
               <div class="form-group">
-                <label>Modo</label>
+                <label>Como definir o sistema?</label>
                 <select class="form-control" id="gp-mode" onchange="onGameModeChange()">
-                  <option value="fixed">Fixo (mesmo sistema para qualquer quantidade)</option>
-                  <option value="custom">Personalizado (por faixa de atletas)</option>
+                  <option value="fixed">Fixo &mdash; Mesmo sistema para qualquer quantidade de atletas</option>
+                  <option value="custom">Automatico &mdash; Sistema muda conforme quantidade de atletas</option>
                 </select>
               </div>
 
               <!-- Modo Fixo -->
               <div id="gp-fixed-config">
                 <div class="form-group">
-                  <label>Sistema de Disputa</label>
+                  <label>Sistema de Disputa (para todos os eventos)</label>
                   <select class="form-control" id="gp-fixed-type">
                     <option value="Eliminatoria">Eliminatoria (mata-mata)</option>
                     <option value="Todos contra Todos">Todos contra Todos (round robin)</option>
@@ -320,9 +322,16 @@
 
               <!-- Modo Personalizado -->
               <div id="gp-custom-config" style="display:none">
-                <div style="margin-bottom:12px;font-size:13px;color:var(--fabd-gray-600)">
-                  Defina as faixas de quantidade de atletas e o sistema para cada faixa:
+                <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+                  <div style="font-size:13px;font-weight:700;color:#1E3A8A;margin-bottom:6px">Como funciona?</div>
+                  <div style="font-size:12px;color:#1E40AF;line-height:1.6">
+                    Defina regras por <strong>quantidade de atletas inscritos</strong>:<br>
+                    &bull; Se tiver <strong>2 a 4</strong> atletas &rarr; usar <em>Todos contra Todos</em><br>
+                    &bull; Se tiver <strong>5 a 7</strong> atletas &rarr; usar <em>Grupos + Eliminatoria</em><br>
+                    &bull; Se tiver <strong>8 ou mais</strong> &rarr; usar <em>Eliminatoria (mata-mata)</em>
+                  </div>
                 </div>
+                <div style="font-size:13px;font-weight:600;color:var(--fabd-gray-700);margin-bottom:8px">Regras por faixa de atletas:</div>
                 <div id="gp-ranges-container"></div>
                 <button class="btn btn-sm btn-secondary" onclick="addRange()" style="margin-top:8px">&#10133; Adicionar Faixa</button>
               </div>

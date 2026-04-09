@@ -3645,13 +3645,28 @@ function cancelProfileEditor(){document.getElementById('game-profile-editor').st
 function onGameModeChange(){const m=document.getElementById('gp-mode').value;document.getElementById('gp-fixed-config').style.display=m==='fixed'?'':'none';document.getElementById('gp-custom-config').style.display=m==='custom'?'':'none';}
 function setRanges(ranges){const c=document.getElementById('gp-ranges-container');let h='';ranges.forEach((r,i)=>{
   const isGrupos=r.type==='Grupos + Eliminatoria';
-  h+=`<div class="form-row" style="margin-bottom:8px;align-items:end">
-    <div class="form-group" style="margin-bottom:0">${i===0?'<label style="font-size:12px">De</label>':''}<input type="number" class="form-control range-min" value="${r.min}" min="1" max="99"></div>
-    <div class="form-group" style="margin-bottom:0">${i===0?'<label style="font-size:12px">Ate</label>':''}<input type="number" class="form-control range-max" value="${r.max}" min="1" max="99"></div>
-    <div class="form-group" style="margin-bottom:0">${i===0?'<label style="font-size:12px">Sistema</label>':''}<select class="form-control range-type" onchange="onRangeTypeChange()"><option value="Todos contra Todos"${r.type==='Todos contra Todos'?' selected':''}>Todos contra Todos</option><option value="Grupos + Eliminatoria"${isGrupos?' selected':''}>Grupos + Elim.</option><option value="Eliminatoria"${r.type==='Eliminatoria'?' selected':''}>Eliminatoria</option></select></div>
-    <div class="form-group" style="margin-bottom:0;${isGrupos?'':'display:none'}" data-grupos-config><label style="font-size:11px;color:var(--fabd-gray-500)">Qtd Grupos</label><input type="number" class="form-control range-groups" value="${r.numGroups||2}" min="2" max="8" style="width:55px" title="Quantidade de grupos"></div>
-    <div class="form-group" style="margin-bottom:0;${isGrupos?'':'display:none'}" data-qualif-config><label style="font-size:11px;color:var(--fabd-gray-500)">Classif/Grupo</label><input type="number" class="form-control range-qualifiers" value="${r.groupQualifiers||2}" min="1" max="4" style="width:55px" title="Quantos classificam por grupo para a eliminatoria"></div>
-    <div><button class="btn btn-sm btn-danger" onclick="removeRange(${i})">&times;</button></div></div>`;
+  h+=`<div class="form-row" style="margin-bottom:12px;align-items:stretch;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;gap:12px">
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <span style="font-size:12px;font-weight:600;color:#64748B">Se tiver de</span>
+      <input type="number" class="form-control range-min" value="${r.min}" min="1" max="999" style="width:72px;text-align:center;font-weight:700">
+      <span style="font-size:12px;font-weight:600;color:#64748B">a</span>
+      <input type="number" class="form-control range-max" value="${r.max}" min="1" max="999" style="width:72px;text-align:center;font-weight:700">
+      <span style="font-size:12px;font-weight:600;color:#64748B">atletas</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex:1">
+      <span style="font-size:12px;font-weight:600;color:#64748B">&rarr;</span>
+      <select class="form-control range-type" onchange="onRangeTypeChange()" style="font-weight:600">
+        <option value="Todos contra Todos"${r.type==='Todos contra Todos'?' selected':''}>Todos contra Todos</option>
+        <option value="Grupos + Eliminatoria"${isGrupos?' selected':''}>Grupos + Eliminatoria</option>
+        <option value="Eliminatoria"${r.type==='Eliminatoria'?' selected':''}>Eliminatoria (mata-mata)</option>
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;${isGrupos?'':'display:none'}" data-grupos-config>
+      <div style="font-size:11px;color:#64748B;text-align:center"><div>Grupos</div><input type="number" class="form-control range-groups" value="${r.numGroups||2}" min="2" max="8" style="width:50px;text-align:center;margin-top:2px" title="Quantidade de grupos"></div>
+      <div style="font-size:11px;color:#64748B;text-align:center"><div>Classif.</div><input type="number" class="form-control range-qualifiers" value="${r.groupQualifiers||2}" min="1" max="4" style="width:50px;text-align:center;margin-top:2px" title="Quantos classificam por grupo"></div>
+    </div>
+    <div style="display:flex;align-items:center"><button class="btn btn-sm btn-danger" onclick="removeRange(${i})" title="Remover faixa">&times;</button></div>
+  </div>`;
 });c.innerHTML=h;}
 function onRangeTypeChange(){
   document.querySelectorAll('#gp-ranges-container .form-row').forEach(row=>{
