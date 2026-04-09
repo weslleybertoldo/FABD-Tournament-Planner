@@ -643,6 +643,7 @@
           <div class="tab" onclick="setTcTab(this,'tc-tab-scoring')">Pontuacao</div>
           <div class="tab" onclick="setTcTab(this,'tc-tab-courts')">Quadras</div>
           <div class="tab" onclick="setTcTab(this,'tc-tab-schedule')">Programacao</div>
+          <div class="tab" onclick="setTcTab(this,'tc-tab-pricing')">Valor das Inscricoes</div>
         </div>
 
         <!-- Aba: Sistema de Disputa -->
@@ -762,6 +763,21 @@
             Configure horarios e categorias para cada dia do torneio.
           </p>
           <div id="tc-day-schedule-container"></div>
+        </div>
+
+        <!-- Aba: Valor das Inscricoes -->
+        <div id="tc-tab-pricing" style="display:none">
+          <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
+            Defina o valor por inscricao. Ao alterar, todos os jogadores serao atualizados automaticamente.
+          </p>
+          <div style="background:var(--fabd-gray-100);border-radius:8px;padding:20px;margin-bottom:16px">
+            <div class="form-group" style="margin-bottom:12px">
+              <label style="font-weight:700">Valor padrao por inscricao (R$)</label>
+              <input type="number" class="form-control" id="tc-valor-padrao" value="30" min="0" step="5" style="width:150px;font-size:18px;font-weight:700;text-align:center">
+            </div>
+            <button class="btn btn-primary" onclick="applyPricingToAll()">&#128176; Aplicar valor a todos os jogadores</button>
+          </div>
+          <div id="tc-pricing-summary" style="font-size:13px;color:var(--fabd-gray-600)"></div>
         </div>
 
       </div>

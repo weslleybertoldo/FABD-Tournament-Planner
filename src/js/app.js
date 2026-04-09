@@ -276,9 +276,10 @@ function updateOverview() {
   document.getElementById('stat-matches').textContent = tm;
   // Calcular total de inscricoes arrecadadas
   let totalArrecadado=0;
+  const valorPadrao=tournament?.valorInscricao||30;
   players.forEach(p=>{
     const catCount=(p.inscriptions||[]).length;
-    const valor=p.valorCategoria||30;
+    const valor=p.valorCategoria||valorPadrao;
     const pStatus=p.pagamentoStatus||'pago';
     if(pStatus==='pago')totalArrecadado+=catCount*valor;
   });
@@ -3563,7 +3564,34 @@ function showTournamentConfig(){
   openModal('modal-tournament-config');
 }
 
-function setTcTab(el,id){document.querySelectorAll('#tc-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['tc-tab-system','tc-tab-scoring','tc-tab-courts','tc-tab-schedule'].forEach(i=>document.getElementById(i).style.display=i===id?'':'none');if(id==='tc-tab-courts')renderCourtNames();if(id==='tc-tab-schedule')renderDaySchedule();}
+function setTcTab(el,id){document.querySelectorAll('#tc-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['tc-tab-system','tc-tab-scoring','tc-tab-courts','tc-tab-schedule','tc-tab-pricing'].forEach(i=>document.getElementById(i).style.display=i===id?'':'none');if(id==='tc-tab-courts')renderCourtNames();if(id==='tc-tab-schedule')renderDaySchedule();if(id==='tc-tab-pricing')renderPricingSummary();}
+
+function renderPricingSummary(){
+  const valor=tournament?.valorInscricao||30;
+  document.getElementById('tc-valor-padrao').value=valor;
+  const totalInscritos=players.filter(p=>(p.inscriptions||[]).length>0).length;
+  const totalInscs=players.reduce((s,p)=>s+(p.inscriptions||[]).length,0);
+  const totalPago=players.filter(p=>(p.pagamentoStatus||'pago')==='pago').reduce((s,p)=>s+(p.inscriptions||[]).length,0);
+  const totalArrecadado=totalPago*valor;
+  let h=`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">`;
+  h+=`<div style="background:white;border-radius:8px;padding:12px;border:1px solid #E2E8F0"><div style="font-size:11px;color:var(--fabd-gray-500)">Jogadores inscritos</div><div style="font-size:24px;font-weight:800">${totalInscritos}</div></div>`;
+  h+=`<div style="background:white;border-radius:8px;padding:12px;border:1px solid #E2E8F0"><div style="font-size:11px;color:var(--fabd-gray-500)">Total de inscricoes</div><div style="font-size:24px;font-weight:800">${totalInscs}</div></div>`;
+  h+=`<div style="background:white;border-radius:8px;padding:12px;border:1px solid #E2E8F0"><div style="font-size:11px;color:var(--fabd-gray-500)">Valor por inscricao</div><div style="font-size:24px;font-weight:800;color:#1E3A8A">R$ ${valor.toFixed(2)}</div></div>`;
+  h+=`<div style="background:white;border-radius:8px;padding:12px;border:1px solid #E2E8F0"><div style="font-size:11px;color:var(--fabd-gray-500)">Total arrecadado (pagos)</div><div style="font-size:24px;font-weight:800;color:#10B981">R$ ${totalArrecadado.toFixed(2)}</div></div>`;
+  h+=`</div>`;
+  document.getElementById('tc-pricing-summary').innerHTML=h;
+}
+
+async function applyPricingToAll(){
+  const valor=parseInt(document.getElementById('tc-valor-padrao').value)||30;
+  if(!confirm('Aplicar R$ '+valor.toFixed(2)+' por inscricao para todos os '+players.length+' jogadores?'))return;
+  tournament.valorInscricao=valor;
+  players.forEach(p=>{p.valorCategoria=valor;});
+  await window.api.saveTournament(tournament);
+  renderPricingSummary();
+  updateOverview();
+  showToast('Valor atualizado para R$ '+valor.toFixed(2)+' por inscricao!');
+}
 function renderCourtNames(){const c=parseInt(document.getElementById('tc-courts').value)||4;const n=tournament?.courtNames||[];let h='';for(let i=0;i<c;i++)h+=`<div style="margin-bottom:4px"><input type="text" class="form-control tc-court-name" value="${esc(n[i]||'Quadra '+(i+1))}" style="padding:4px 8px;font-size:13px"></div>`;document.getElementById('tc-court-names').innerHTML=h;}
 
 function getDaysBetween(startDate,endDate){
