@@ -385,7 +385,7 @@
         const isWinner2=m.winner===2;
 
         h+=`<tr class="${statusClass}">`;
-        h+=`<td class="sched-num">${m.num||'-'}</td>`;
+        h+=`<td class="sched-num">${m.num||'-'}${m.time?`<div style="font-size:10px;color:#F59E0B;font-weight:600">${esc(m.time)}</div>`:''}</td>`;
         h+=`<td><span class="badge badge-gray">${esc(m.drawName||'')}</span></td>`;
         h+=`<td style="color:#94A3B8;font-size:12px">${esc(m.roundName||'')}</td>`;
         h+=`<td class="sched-players"><span class="${isWinner1?'sched-winner':''}">${esc(p1)}</span><span class="sched-vs"> vs </span><span class="${isWinner2?'sched-winner':''}">${esc(p2)}</span></td>`;
