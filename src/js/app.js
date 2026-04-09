@@ -3882,29 +3882,33 @@ async function selectImportFile(){
     const xlsxRows = xlsxResult.rows||[];
     if(!xlsxRows.length){showToast('Planilha vazia','warning');return;}
 
-    // Fase 1: Agrupar linhas por atleta (mesmo nome = mesmo atleta, varias categorias)
-    const atletaMap = {}; // chave: nome normalizado -> { dados basicos, inscricoes[] }
+    // Fase 1: Agrupar linhas por atleta (nome sem acento + data nascimento = mesma pessoa)
+    const atletaMap = {}; // chave: nome_normalizado|dob -> { dados basicos, inscricoes[] }
     xlsxRows.forEach(r => {
-      const nomeNorm = (r.nome||'').trim().toLowerCase();
+      const nomeOriginal = (r.nome||'').trim();
+      const nomeNorm = normalizeName(nomeOriginal);
       if (!nomeNorm) return;
 
-      const parts = (r.nome||'').trim().split(/\s+/);
+      const parts = nomeOriginal.split(/\s+/);
       const firstName = parts[0]||'';
       const lastName = parts.slice(1).join(' ')||'';
       const gender = normalizeGender(r.sexo||'');
       const dob = normalizeDate(r.dob||'');
       const cat = (r.categoria||'').trim() || calculateCategory(dob) || 'Principal';
 
+      // Chave unica: nome sem acento + data nascimento (diferencia homonimos)
+      const atletaKey = nomeNorm + '|' + dob;
+
       // Criar ou atualizar atleta
-      if (!atletaMap[nomeNorm]) {
-        atletaMap[nomeNorm] = {
+      if (!atletaMap[atletaKey]) {
+        atletaMap[atletaKey] = {
           firstName, lastName, gender, dob,
           club: r.clube||'', phone: r.telefone||'', email: r.email||'',
           inscricoes: new Set(), // "MOD Categoria" ex: "SM Principal"
           duplas: {}, // "MOD Categoria" -> parceiro nome
         };
       }
-      const atleta = atletaMap[nomeNorm];
+      const atleta = atletaMap[atletaKey];
       // Atualizar dados basicos se estavam vazios
       if (!atleta.phone && r.telefone) atleta.phone = r.telefone;
       if (!atleta.email && r.email) atleta.email = r.email;
@@ -3984,6 +3988,7 @@ function parseCSV(content,filePath){const fl=content.split('\n')[0];const sep=(f
 function parseCSVLine(line,sep){const r=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(q&&line[i+1]==='"'){c+='"';i++;}else q=!q;}else if(ch===sep&&!q){r.push(c.trim());c='';}else c+=ch;}r.push(c.trim());return r;}
 function mapColumns(h){const m={firstName:-1,lastName:-1,gender:-1,dob:-1,club:-1,state:-1,ranking:-1,phone:-1,email:-1,inscricoes:-1,duplaDM:-1,duplaDF:-1,duplaDX:-1};const a={firstName:['nome','firstname','first name'],lastName:['sobrenome','lastname','last name'],gender:['genero','gender','sexo'],dob:['data nascimento','datanascimento','dob','date of birth','data nasc','dt nascimento'],club:['clube','club'],state:['estado','state','uf'],ranking:['ranking','classificacao','rank'],phone:['telefone','phone','tel','celular','mobile'],email:['email','e-mail','mail'],inscricoes:['inscricoes','inscricao','categories','categorias'],duplaDM:['dupla_dm','dupladm','parceiro_dm'],duplaDF:['dupla_df','dupladf','parceira_df'],duplaDX:['dupla_dx','duladx','parceiro_dx','parceira_dx']};h.forEach((x,i)=>{const l=x.toLowerCase().replace(/[^a-z0-9_ ]/g,'').trim();Object.keys(a).forEach(k=>{if(a[k].some(al=>l===al||l.includes(al))&&m[k]===-1)m[k]=i;});});if(m.firstName===-1)m.firstName=0;if(m.lastName===-1)m.lastName=1;if(m.gender===-1)m.gender=2;if(m.dob===-1)m.dob=3;if(m.club===-1)m.club=4;if(m.state===-1)m.state=5;if(m.ranking===-1)m.ranking=6;if(m.phone===-1)m.phone=7;if(m.email===-1)m.email=8;if(m.inscricoes===-1)m.inscricoes=9;if(m.duplaDM===-1)m.duplaDM=10;if(m.duplaDF===-1)m.duplaDF=11;if(m.duplaDX===-1)m.duplaDX=12;return m;}
 function getCol(c,i){return i>=0&&i<c.length?c[i].replace(/^["']|["']$/g,'').trim():'';}
+function normalizeName(s){return(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
 function normalizeGender(g){if(!g)return'';const v=g.toUpperCase().trim();if('M MASCULINO MASC MALE'.includes(v))return'M';if('F FEMININO FEM FEMALE'.includes(v))return'F';return v;}
 function normalizeDate(d){if(!d)return'';const m=d.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);if(m)return`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;return d;}
 async function confirmImport(){
@@ -4002,7 +4007,8 @@ async function confirmImport(){
     for(let ri=0;ri<vr.length;ri++){
       const row=vr[ri];
       if(importStatus)importStatus.innerHTML=`<strong>Importando ${ri+1}/${totalVr}...</strong>`;
-      const ex=players.find(p=>p.firstName.toLowerCase()===row.firstName.toLowerCase()&&p.lastName.toLowerCase()===row.lastName.toLowerCase());
+      const rowNameNorm=normalizeName(row.firstName+' '+row.lastName);
+      const ex=players.find(p=>normalizeName(p.firstName+' '+p.lastName)===rowNameNorm&&normalizeDate(p.dob||'')===normalizeDate(row.dob||''));
 
       // Processar inscricoes do CSV
       const inscriptions=[];
@@ -4048,13 +4054,13 @@ async function confirmImport(){
           // Fallback: usar _duplaDM/_duplaDF/_duplaDX generico
           const fallback=insc.mod==='DM'?p._duplaDM:insc.mod==='DF'?p._duplaDF:insc.mod==='DX'?p._duplaDX:'';
           if(!fallback) return;
-          const dn=fallback.trim().toLowerCase();
-          const partner=players.find(x=>x.id!==p.id&&(x.firstName+' '+x.lastName).toLowerCase().trim()===dn);
+          const dn=normalizeName(fallback);
+          const partner=players.find(x=>x.id!==p.id&&normalizeName(x.firstName+' '+x.lastName)===dn);
           if(partner){insc.partner=partner.id;changed=true;}
           return;
         }
-        const dn=parcName.trim().toLowerCase();
-        const partner=players.find(x=>x.id!==p.id&&(x.firstName+' '+x.lastName).toLowerCase().trim()===dn);
+        const dn=normalizeName(parcName);
+        const partner=players.find(x=>x.id!==p.id&&normalizeName(x.firstName+' '+x.lastName)===dn);
         if(partner){insc.partner=partner.id;changed=true;}
       });
 
