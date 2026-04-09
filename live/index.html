@@ -115,6 +115,22 @@
     .group-match-item .gm-p.win{color:#10B981}
     .group-match-item .gm-score{color:#F59E0B;font-weight:700;min-width:60px;text-align:center}
 
+    /* Classificacao */
+    .ranking-section{margin-top:24px;background:#1E293B;border-radius:12px;border:1px solid #334155;overflow:hidden}
+    .ranking-header{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #334155}
+    .ranking-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
+    .awarded-badge{background:rgba(16,185,129,0.15);color:#10B981;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700}
+    .ranking-table{width:100%;border-collapse:collapse;font-size:13px}
+    .ranking-table th{padding:8px 14px;text-align:left;color:#64748B;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;background:#0F172A}
+    .ranking-table td{padding:10px 14px;border-bottom:1px solid #0F172A}
+    .ranking-table tr:last-child td{border-bottom:none}
+    .rank-pos{font-weight:800;font-size:15px;width:50px}
+    .rank-1{color:#F59E0B}
+    .rank-2{color:#94A3B8}
+    .rank-3{color:#CD7F32}
+    .rank-name{font-weight:600}
+    .rank-medal{margin-right:4px}
+
     /* Empty/loading states */
     .empty{text-align:center;padding:60px 20px;color:#64748B}
     .empty .icon{font-size:48px;margin-bottom:12px}
@@ -431,6 +447,9 @@
         h+=renderEliminationBracket(draw.matches||[],draw.players?.length||8);
       }
 
+      // Classificacao / Ranking
+      h+=renderRanking(draw);
+
       document.getElementById('brackets-content').innerHTML=h;
     }
 
@@ -554,6 +573,96 @@
       }
 
       h+=`</div></div>`;
+      return h;
+    }
+
+    // === CLASSIFICACAO / RANKING ===
+    function renderRanking(draw){
+      const players=draw.players||[];
+      if(!players.length)return'';
+
+      // Calcular vitorias e derrotas de cada jogador
+      const stats={};
+      players.forEach(p=>{stats[p]={w:0,l:0,bestRound:0,name:p};});
+
+      // Pegar todos os matches (grupo + eliminacao)
+      let allMatches=[];
+      if(draw.type==='Grupos + Eliminatoria'&&draw.groupsData){
+        // Matches dos grupos
+        (draw.groupsData.groups||[]).forEach(g=>{
+          (g.matches||[]).forEach(m=>{if(m.winner)allMatches.push(m);});
+        });
+        // Matches da eliminacao
+        (draw.groupsData.eliminationMatches||[]).forEach(m=>{if(m.winner)allMatches.push(m);});
+      } else if(draw.type==='Todos contra Todos'){
+        (draw.matches||[]).forEach(m=>{if(m.winner)allMatches.push(m);});
+      } else {
+        // Eliminatoria simples
+        (draw.matches||[]).forEach(m=>{
+          if(m.winner&&!m.isBye)allMatches.push(m);
+        });
+      }
+
+      // Contar V e D
+      allMatches.forEach(m=>{
+        const p1=m.player1||'';
+        const p2=m.player2||'';
+        if(m.winner===1){
+          if(stats[p1])stats[p1].w++;
+          if(stats[p2])stats[p2].l++;
+        } else if(m.winner===2){
+          if(stats[p2])stats[p2].w++;
+          if(stats[p1])stats[p1].l++;
+        }
+        // Registrar rodada mais alta alcancada (para eliminatorias)
+        const r=m.round||0;
+        if(stats[p1])stats[p1].bestRound=Math.max(stats[p1].bestRound,r);
+        if(stats[p2])stats[p2].bestRound=Math.max(stats[p2].bestRound,r);
+      });
+
+      // Ordenar: mais vitorias primeiro, depois menos derrotas, depois rodada mais alta
+      const sorted=Object.values(stats).sort((a,b)=>{
+        if(b.w!==a.w)return b.w-a.w;
+        if(a.l!==b.l)return a.l-b.l;
+        return b.bestRound-a.bestRound;
+      });
+
+      // Se ninguem tem resultado ainda, nao mostrar ranking
+      const hasResults=sorted.some(s=>s.w>0||s.l>0);
+      if(!hasResults)return'';
+
+      // Medalhas
+      const medals=['&#129351;','&#129352;','&#129353;']; // ouro, prata, bronze
+
+      let h='<div class="ranking-section">';
+      h+=`<div class="ranking-header">`;
+      h+=`<div class="ranking-title">&#127942; Classificacao</div>`;
+      if(draw.awarded){
+        h+=`<div class="awarded-badge">&#10003; Premiada</div>`;
+      }
+      h+=`</div>`;
+
+      if(draw.awarded){
+        h+=`<div style="padding:8px 18px;font-size:12px;color:#10B981;background:rgba(16,185,129,0.05);border-bottom:1px solid #334155">Chave "${esc(draw.name)}" ja foi premiada</div>`;
+      }
+
+      h+=`<table class="ranking-table"><thead><tr>`;
+      h+=`<th>Pos.</th><th>Jogador</th><th style="text-align:center">V</th><th style="text-align:center">D</th>`;
+      h+=`</tr></thead><tbody>`;
+
+      sorted.forEach((s,i)=>{
+        const pos=i+1;
+        const medal=pos<=3?medals[pos-1]:'';
+        const posClass=pos===1?'rank-1':pos===2?'rank-2':pos===3?'rank-3':'';
+        h+=`<tr>`;
+        h+=`<td class="rank-pos ${posClass}">${medal?`<span class="rank-medal">${medal}</span>`:''}${pos}&#186;</td>`;
+        h+=`<td class="rank-name">${esc(s.name)}</td>`;
+        h+=`<td style="text-align:center;color:#10B981;font-weight:700">${s.w}</td>`;
+        h+=`<td style="text-align:center;color:#EF4444;font-weight:700">${s.l}</td>`;
+        h+=`</tr>`;
+      });
+
+      h+=`</tbody></table></div>`;
       return h;
     }
 
