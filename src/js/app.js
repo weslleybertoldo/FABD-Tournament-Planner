@@ -16,7 +16,7 @@ let gameProfiles = [];
 let lastScoreUpdateTimestamp = {};
 
 // Categorias e modalidades
-const CATEGORIES = ['Sub 13','Sub 15','Sub 17','Sub 19','Sub 23','Principal','Senior','Master I','Master II'];
+const CATEGORIES = ['Sub 11','Sub 13','Sub 15','Sub 17','Sub 19','Sub 23','Principal','Senior','Master I','Master II'];
 const MODALITIES = [
   { code: 'SM', name: 'Simples Masculino', isDupla: false },
   { code: 'SF', name: 'Simples Feminino', isDupla: false },
@@ -207,7 +207,7 @@ function checkCategoryConflict(dob, inscriptions){
   if(!dob||!inscriptions?.length)return false;
   const birth=new Date(dob+'T00:00:00');
   const age=new Date().getFullYear()-birth.getFullYear();
-  const catLimits={'Sub 13':13,'Sub 15':15,'Sub 17':17,'Sub 19':19,'Sub 23':23,'Senior':35,'Master I':45,'Master II':55};
+  const catLimits={'Sub 11':11,'Sub 13':13,'Sub 15':15,'Sub 17':17,'Sub 19':19,'Sub 23':23,'Senior':35,'Master I':45,'Master II':55};
   for(const insc of inscriptions){
     const cat=insc.cat;
     if(!cat||cat==='Principal')continue;
@@ -1481,7 +1481,7 @@ async function generateAllDraws() {
 
     rebuildMatchList();
     await window.api.saveTournament(tournament);
-    try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}
+    try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){console.warn('Sync Supabase:',e);}
     renderDraws();
     showToast(`${count} chave(s) sorteada(s)!`);
   } catch(e) {
@@ -1528,7 +1528,7 @@ async function generateSingleDraw(idx) {
 
   rebuildMatchList();
   await window.api.saveTournament(tournament);
-  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}
+  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){console.warn('Sync Supabase:',e);}
   renderDraws();
   showToast(`Chave "${d.name}" sorteada!`);
 }
@@ -2046,7 +2046,7 @@ async function deleteDraw(i) {
   if(!tournament.draws.length)tournament.matches=[];
   cleanOrphanMatches(); selectedDrawIdx=-1;
   await window.api.saveTournament(tournament);
-  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}
+  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){console.warn('Sync Supabase:',e);}
   renderDraws(); showToast('Chave excluida');
 }
 
@@ -2263,7 +2263,10 @@ function assignAutoTimes(matches) {
   matches.forEach(m => {
     if (m.time && (m.status === 'Finalizada' || m.status === 'WO' || m.status === 'Em Quadra' || m.status === 'Desistencia' || m.status === 'Desqualificacao')) return;
     if (m.time) {
-      const slotIdx = slots.indexOf(timeToMin(m.time));
+      const mMin = timeToMin(m.time);
+      // Verificar se horario nao cai em pausa
+      const inBreak = mMin >= bS && mMin < bE;
+      const slotIdx = inBreak ? -1 : slots.indexOf(mMin);
       if (slotIdx >= 0 && slotCount[slotIdx] < courts) {
         // Slot tem vaga — manter horario existente
         slotCount[slotIdx]++;
@@ -2468,7 +2471,7 @@ async function regenerateSchedule() {
   // Atribuir numeros sequenciais
   tournament.matches.forEach((m,i)=>{m.id=(i+1).toString();m.num=i+1;});
   await window.api.saveTournament(tournament);
-  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}
+  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){console.warn('Sync Supabase:',e);}
   renderSchedule();
   const total=tournament.matches.filter(m=>m.time).length;
   showToast(`Horarios regenerados e renumerados! ${total} jogos.`);
@@ -3026,7 +3029,7 @@ async function handleRealtimeScoreUpdate(data){
     m.liveScore='';
     try{propagateResultToDraws(m);}catch(e){console.warn('Erro ao propagar resultado:',e);showToast('Aviso: resultado recebido mas propagacao na chave falhou','warning');}
     await window.api.saveTournament(tournament);
-    try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}
+    try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){console.warn('Sync Supabase:',e);}
     showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
   }
 
@@ -3116,7 +3119,7 @@ async function saveScore() {
   try{
     const m=tournament.matches[scoringMatchIdx];if(!m)return;
     const status=document.getElementById('score-status').value,winner=document.getElementById('score-winner').value;
-    if(status==='WO'||status==='Desqualificacao'){if(!winner){alert('Selecione vencedor');return;}m.score=status==='WO'?'W.O.':'DSQ';m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();propagateResultToDraws(m);await window.api.saveTournament(tournament);try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}closeModal('modal-score');renderMatches();showToast('Resultado registrado');return;}
+    if(status==='WO'||status==='Desqualificacao'){if(!winner){alert('Selecione vencedor');return;}m.score=status==='WO'?'W.O.':'DSQ';m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();propagateResultToDraws(m);await window.api.saveTournament(tournament);try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){console.warn('Sync Supabase:',e);}closeModal('modal-score');renderMatches();showToast('Resultado registrado');return;}
     if(!winner){alert('Selecione vencedor');return;}
     const numSets=tournament?.scoring?.sets||3,pts=tournament?.scoring?.points||21,maxP=tournament?.scoring?.maxPoints||30;
     let scores=[];
@@ -3124,7 +3127,7 @@ async function saveScore() {
     if(!scores.length&&status!=='Desistencia'){alert('Insira placar');return;}
     m.score=scores.join(' / ')||(status==='Desistencia'?'RET':'');m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();
     propagateResultToDraws(m);
-    await window.api.saveTournament(tournament);try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}closeModal('modal-score');renderMatches();showToast('Placar salvo!');
+    await window.api.saveTournament(tournament);try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){console.warn('Sync Supabase:',e);}closeModal('modal-score');renderMatches();showToast('Placar salvo!');
   }catch(e){console.error(e);showToast('Erro: '+e.message,'error');}
 }
 
@@ -3205,7 +3208,7 @@ async function resetMatch(idx){
   try{await window.api.supabaseRemoveFromCourt(tournament.id,m);}catch(e){console.warn('Supabase cleanup:',e);}
   m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;m.liveScore='';m.liveSets=[];
   await window.api.saveTournament(tournament);
-  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){}
+  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){console.warn('Sync Supabase:',e);}
   renderMatches();renderFinishedMatches();showToast('Jogo resetado');
 }
 
@@ -3550,6 +3553,7 @@ function showTournamentConfig(){
   document.getElementById('tc-tab-scoring').style.display='none';
   document.getElementById('tc-tab-courts').style.display='none';
   document.getElementById('tc-tab-schedule').style.display='none';
+  document.getElementById('tc-tab-pricing').style.display='none';
   const sel=document.getElementById('tc-profile-select');sel.innerHTML='<option value="">Nenhum</option>';
   gameProfiles.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;if(tournament.gameProfileId===p.id)o.selected=true;sel.appendChild(o);});
   updateTournamentConfigPreview();
@@ -3588,6 +3592,7 @@ async function applyPricingToAll(){
   tournament.valorInscricao=valor;
   players.forEach(p=>{p.valorCategoria=valor;});
   await window.api.saveTournament(tournament);
+  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){console.warn('Sync Supabase:',e);}
   renderPricingSummary();
   updateOverview();
   showToast('Valor atualizado para R$ '+valor.toFixed(2)+' por inscricao!');
@@ -3992,7 +3997,11 @@ async function confirmImport(){
     players=tournament?.players||[];
 
     // Primeira passada: criar/atualizar jogadores com inscricoes
-    for(const row of vr){
+    const importStatus=document.getElementById('import-summary');
+    const totalVr=vr.length;
+    for(let ri=0;ri<vr.length;ri++){
+      const row=vr[ri];
+      if(importStatus)importStatus.innerHTML=`<strong>Importando ${ri+1}/${totalVr}...</strong>`;
       const ex=players.find(p=>p.firstName.toLowerCase()===row.firstName.toLowerCase()&&p.lastName.toLowerCase()===row.lastName.toLowerCase());
 
       // Processar inscricoes do CSV
@@ -4054,12 +4063,24 @@ async function confirmImport(){
       if(changed) await window.api.savePlayer(p);
     }
 
+    // Verificar parceiros nao vinculados
+    const unlinked=[];
+    players.forEach(p=>{
+      (p.inscriptions||[]).forEach(insc=>{
+        if(['DM','DF','DX'].includes(insc.mod)&&!insc.partner){
+          unlinked.push(`${p.firstName} ${p.lastName} (${insc.key})`);
+        }
+      });
+    });
+
     tournament=await window.api.getTournament();
     players=tournament?.players||[];
     syncEntriesFromPlayers();
     closeModal('modal-import');
     renderPlayers();
-    showToast(`${added} adicionado(s), ${updated} atualizado(s), inscricoes e duplas importadas!`);
+    let msg=`${added} adicionado(s), ${updated} atualizado(s), inscricoes e duplas importadas!`;
+    if(unlinked.length){msg+=`\n\nAtencao: ${unlinked.length} dupla(s) sem parceiro vinculado (nome nao encontrado):\n${unlinked.slice(0,5).join('\n')}${unlinked.length>5?'\n...e mais '+(unlinked.length-5):''}`;showToast(msg,'warning');}
+    else{showToast(msg);}
   }catch(e){console.error(e);showToast('Erro: '+e.message,'error');}
 }
 
