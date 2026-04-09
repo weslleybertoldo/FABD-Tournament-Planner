@@ -1227,6 +1227,7 @@ async function toggleAwarded(idx){
   }
   d.awarded=!d.awarded;
   await window.api.saveTournament(tournament);
+  try{await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}catch(e){console.warn('Sync premiacao:',e);}
   renderDraws();
   showToast(d.awarded?`Chave "${d.name}" premiada!`:`Premiacao removida de "${d.name}"`);
 }
