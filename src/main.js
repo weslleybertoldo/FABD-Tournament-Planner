@@ -80,12 +80,15 @@ function saveDatabase(data) {
     lastBackupTime = now;
   }
   saveTimeout = setTimeout(() => {
-    try {
-      // Escrita atômica: temp → rename (evita corrupção se crash)
-      const tmpPath = DB_PATH + '.tmp';
-      fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
-      fs.renameSync(tmpPath, DB_PATH);
-    } catch(e) { log('ERROR', 'Erro salvar:', e.message); }
+    // Escrita ASSINCRONA: nao bloqueia o main process (evita travar UI)
+    const tmpPath = DB_PATH + '.tmp';
+    const jsonStr = JSON.stringify(data, null, 2);
+    fs.writeFile(tmpPath, jsonStr, 'utf-8', (err) => {
+      if (err) { log('ERROR', 'Erro salvar:', err.message); return; }
+      fs.rename(tmpPath, DB_PATH, (err2) => {
+        if (err2) log('ERROR', 'Erro rename:', err2.message);
+      });
+    });
   }, 300);
 }
 
@@ -489,11 +492,24 @@ ipcMain.handle('db:saveSettings', (_, settings) => { db.settings = settings; sav
 ipcMain.on('log', (_, level, msg) => { log(level, '[renderer]', msg); });
 
 // === IPC: SUPABASE REALTIME ===
+// Debounce: agrupa syncs rapidos em 1 request (evita travar UI)
+let pendingUpsert = null;
+let upsertTimer = null;
+const UPSERT_DEBOUNCE_MS = 500; // espera 500ms antes de enviar
+
+function flushUpsert() {
+  if (!pendingUpsert) return;
+  const row = pendingUpsert;
+  pendingUpsert = null;
+  supabase.from('tournaments').upsert(row, { onConflict: 'id' })
+    .then(({ error }) => { if (error) log('ERROR', 'Supabase upsert:', error.message); })
+    .catch(e => log('ERROR', 'Supabase upsert:', e.message));
+}
+
 ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tournamentData) => {
   try {
     const row = { id: tournamentId, name, updated_at: new Date().toISOString() };
     if (tournamentData) {
-      // Enviar apenas matches e draws (dados necessarios pro site publico)
       row.data = {
         matches: tournamentData.matches || [],
         draws: tournamentData.draws || [],
@@ -506,9 +522,11 @@ ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tourna
         city: tournamentData.city
       };
     }
-    const { error } = await supabase.from('tournaments').upsert(row, { onConflict: 'id' });
-    if (error) throw error;
-    return true;
+    // Debounce: agendar envio em 500ms (agrupa chamadas rapidas)
+    pendingUpsert = row;
+    if (upsertTimer) clearTimeout(upsertTimer);
+    upsertTimer = setTimeout(flushUpsert, UPSERT_DEBOUNCE_MS);
+    return true; // retorna imediatamente sem esperar rede
   } catch(e) { log('ERROR', 'Supabase upsertTournament:', e.message); return false; }
 });
 
