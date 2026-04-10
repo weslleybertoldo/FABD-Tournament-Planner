@@ -2079,19 +2079,41 @@ function rebuildGroupsElimMatches(d, allM) {
     const matchesByRound = {};
     elimMatches.forEach((m, i) => { if (!matchesByRound[m.round]) matchesByRound[m.round] = []; matchesByRound[m.round].push({ match: m, idx: i }); });
     let futIdx = 0;
+    // Gerar nomes descritivos pra eliminatoria baseada em grupos
+    const numGroups = (d.groupsData.groups||[]).length;
+    const groupNames = (d.groupsData.groups||[]).map(g => g.name.replace('Grupo ',''));
+    const qual = d.groupQualifiers || 2;
+
     elimMatches.forEach((m, i) => {
       if (m.player2 === 'BYE' || m.player1 === 'BYE') return;
-      if (m.round === 1 && ((m.player1 && !m.player2) || (!m.player1 && m.player2))) return;
       const p1 = m.player1 || '', p2 = m.player2 || '';
       const def = !!(p1 && p2);
       let d1 = p1, d2 = p2;
-      if (!def && m.round > 1) {
+
+      // R1 da eliminatoria: gerar nomes descritivos baseados nos grupos
+      if (!def && m.round === 1) {
+        const slotIdx = m.slotIdx != null ? m.slotIdx : i;
+        // Padrao cruzamento: 1o do Grupo A vs 2o do Grupo B, etc.
+        if (numGroups >= 2 && !p1) {
+          const gIdx = slotIdx % numGroups;
+          const pos = Math.floor(slotIdx / numGroups) + 1;
+          d1 = `${pos}o do Grupo ${groupNames[gIdx] || String.fromCharCode(65+gIdx)}`;
+        }
+        if (numGroups >= 2 && !p2) {
+          const gIdx = (slotIdx + 1) % numGroups;
+          const pos = Math.floor(slotIdx / numGroups) + 1;
+          d2 = `${pos}o do Grupo ${groupNames[gIdx] || String.fromCharCode(65+gIdx)}`;
+        }
+        if (!d1) d1 = 'A definir';
+        if (!d2) d2 = 'A definir';
+      } else if (!def && m.round > 1) {
         const prevAll = matchesByRound[m.round - 1] || [];
         const feedMatch1 = prevAll[futIdx * 2], feedMatch2 = prevAll[futIdx * 2 + 1];
         if (!p1 && feedMatch1) { const fn = mNums.get(feedMatch1.idx); d1 = fn ? `Venc. jogo ${fn}` : 'A definir'; }
         if (!p2 && feedMatch2) { const fn = mNums.get(feedMatch2.idx); d2 = fn ? `Venc. jogo ${fn}` : 'A definir'; }
         futIdx++;
       }
+
       const totalR = Math.max(...elimMatches.map(x => x.round));
       const rn = m.round === totalR ? 'Final' : m.round === totalR - 1 ? 'Semifinal' : m.round === totalR - 2 ? 'Quartas' : `Elim R${m.round}`;
       allM.push({
@@ -2102,6 +2124,39 @@ function rebuildGroupsElimMatches(d, allM) {
         status: def ? 'Pendente' : 'A definir', phase: 'elimination'
       });
     });
+  } else {
+    // Eliminatoria ainda nao gerada — criar placeholders baseados nos grupos
+    const numGroups = (d.groupsData.groups||[]).length;
+    const qual = d.groupQualifiers || 2;
+    const groupNames = (d.groupsData.groups||[]).map(g => g.name.replace('Grupo ',''));
+
+    if (numGroups >= 2) {
+      // Calcular quantos classificam no total
+      const totalClassificados = numGroups * qual;
+      // Gerar semifinais e final
+      const elimPlaceholders = [];
+
+      if (totalClassificados >= 4) {
+        // Semifinais: 1oA vs 2oB, 1oB vs 2oA (padrao cruzamento)
+        elimPlaceholders.push({ round: 1, d1: `1o do Grupo ${groupNames[0]||'A'}`, d2: `2o do Grupo ${groupNames[1]||'B'}`, rn: 'Semifinal' });
+        elimPlaceholders.push({ round: 1, d1: `1o do Grupo ${groupNames[1]||'B'}`, d2: `2o do Grupo ${groupNames[0]||'A'}`, rn: 'Semifinal' });
+        // Final
+        elimPlaceholders.push({ round: 2, d1: 'Venc. Semifinal 1', d2: 'Venc. Semifinal 2', rn: 'Final' });
+      } else if (totalClassificados >= 2) {
+        // Apenas final
+        elimPlaceholders.push({ round: 1, d1: `1o do Grupo ${groupNames[0]||'A'}`, d2: `1o do Grupo ${groupNames[1]||'B'}`, rn: 'Final' });
+      }
+
+      elimPlaceholders.forEach((ep, i) => {
+        allM.push({
+          drawId: d.id, drawName: d.name, event: d.event, round: ep.round,
+          roundName: ep.rn, drawMatchIdx: matchIdx + i,
+          player1: '', player2: '', player1Display: ep.d1, player2Display: ep.d2,
+          isDefinida: false, score: '', court: '', time: '', umpire: '',
+          status: 'A definir', phase: 'elimination'
+        });
+      });
+    }
   }
 }
 
@@ -2160,9 +2215,30 @@ function rebuildMatchList() {
       });
     });
   });
-  const defs = allM.filter(m => m.isDefinida), adefs = allM.filter(m => !m.isDefinida);
-  const dist = distributeMatches(defs);
+  // Incluir todos os jogos (definidos e a definir) na lista
+  // Separar definidos e "A definir"
+  const dist = distributeMatches(allM.filter(m => m.isDefinida));
+  const adefs = allM.filter(m => !m.isDefinida);
+  // Atribuir horarios aos definidos
   assignAutoTimes(dist);
+  // Jogos "A definir": atribuir horario APOS o ultimo jogo de GRUPO da mesma categoria
+  // Ordenar adefs: semifinais antes de finais (por round)
+  adefs.sort((a,b) => (a.drawName===b.drawName ? (a.round||0)-(b.round||0) : 0));
+  const slotDur = (tournament.matchDuration || 30) + (tournament.restMinBetweenGames || 20);
+  adefs.forEach(m => {
+    // Pegar ultimo horario dos jogos de GRUPO (phase=group) da mesma categoria
+    const sameDrawGroupTimes = dist.filter(d => d.drawName === m.drawName && d.phase === 'group' && d.time).map(d => timeToMin(d.time));
+    // Tambem considerar outros adefs ja atribuidos da mesma categoria (pra encadear semi->final)
+    const sameDrawAdefTimes = adefs.filter(d => d.drawName === m.drawName && d.time && d !== m).map(d => timeToMin(d.time));
+    const allTimes = [...sameDrawGroupTimes, ...sameDrawAdefTimes];
+    if (allTimes.length) {
+      const lastTime = Math.max(...allTimes);
+      let nextT = lastTime + slotDur;
+      const rbS = timeToMin(tournament.breakStart||'12:00'), rbE = timeToMin(tournament.breakEnd||'13:30');
+      if (nextT >= rbS && nextT < rbE) nextT = rbE;
+      m.time = minToTime(nextT);
+    }
+  });
   tournament.matches = [...dist, ...adefs].map((m, i) => ({ ...m, id: (i + 1).toString(), num: i + 1 }));
 }
 
@@ -2247,14 +2323,30 @@ function assignAutoTimes(matches) {
   const slotCount = new Array(slots.length).fill(0);
   const playerLastSlot = {};
 
+  // Extrair nomes individuais de duplas ("Joao Silva / Maria Santos" -> ["Joao Silva", "Maria Santos"])
+  function getIndividualPlayers(name) {
+    if (!name) return [];
+    if (name.includes(' / ')) return name.split(' / ').map(n => n.trim()).filter(Boolean);
+    return [name.trim()];
+  }
+  function registerPlayerSlot(name, slotIdx) {
+    getIndividualPlayers(name).forEach(p => { playerLastSlot[p] = slotIdx; });
+  }
+  function checkPlayerAvailable(name, slotIdx) {
+    return getIndividualPlayers(name).every(p => {
+      const last = playerLastSlot[p];
+      return last == null || slotIdx > last;
+    });
+  }
+
   // Registrar jogos ja finalizados/em quadra
   matches.forEach(m => {
     if (m.time && (m.status === 'Finalizada' || m.status === 'WO' || m.status === 'Em Quadra' || m.status === 'Desistencia' || m.status === 'Desqualificacao')) {
       const slotIdx = slots.indexOf(timeToMin(m.time));
       if (slotIdx >= 0) {
         slotCount[slotIdx]++;
-        if (m.player1) playerLastSlot[m.player1] = slotIdx;
-        if (m.player2) playerLastSlot[m.player2] = slotIdx;
+        registerPlayerSlot(m.player1, slotIdx);
+        registerPlayerSlot(m.player2, slotIdx);
       }
     }
   });
@@ -2270,8 +2362,8 @@ function assignAutoTimes(matches) {
       if (slotIdx >= 0 && slotCount[slotIdx] < courts) {
         // Slot tem vaga — manter horario existente
         slotCount[slotIdx]++;
-        if (m.player1) playerLastSlot[m.player1] = slotIdx;
-        if (m.player2) playerLastSlot[m.player2] = slotIdx;
+        registerPlayerSlot(m.player1, slotIdx);
+        registerPlayerSlot(m.player2, slotIdx);
         return;
       }
       // Slot cheio — precisa reatribuir, limpar horario
@@ -2284,21 +2376,18 @@ function assignAutoTimes(matches) {
   matches.forEach(m => {
     if (m.time) return; // ja tem horario
 
-    // Encontrar proximo slot com vaga E onde ambos jogadores descansaram
+    // Encontrar proximo slot com vaga E onde TODOS jogadores individuais descansaram
     for (let si = startSearch; si < slots.length; si++) {
-      if (slotCount[si] >= courts) continue; // slot cheio
-
-      const p1Last = playerLastSlot[m.player1];
-      const p2Last = playerLastSlot[m.player2];
-      const p1Ok = p1Last == null || si > p1Last;
-      const p2Ok = p2Last == null || si > p2Last;
+      if (slotCount[si] >= courts) continue;
+      const p1Ok = checkPlayerAvailable(m.player1, si);
+      const p2Ok = checkPlayerAvailable(m.player2, si);
 
       if (p1Ok && p2Ok) {
         m.time = minToTime(slots[si]);
         if (!m.court) m.court = '';
         slotCount[si]++;
-        if (m.player1) playerLastSlot[m.player1] = si;
-        if (m.player2) playerLastSlot[m.player2] = si;
+        registerPlayerSlot(m.player1, si);
+        registerPlayerSlot(m.player2, si);
         return;
       }
     }
@@ -2308,8 +2397,8 @@ function assignAutoTimes(matches) {
         m.time = minToTime(slots[si]);
         if (!m.court) m.court = '';
         slotCount[si]++;
-        if (m.player1) playerLastSlot[m.player1] = si;
-        if (m.player2) playerLastSlot[m.player2] = si;
+        registerPlayerSlot(m.player1, si);
+        registerPlayerSlot(m.player2, si);
         return;
       }
     }
@@ -2360,7 +2449,7 @@ async function syncMatchesWithDraws() {
     if (d.type === 'Grupos + Eliminatoria' && d.groupsData) {
       const tempArr = [];
       rebuildGroupsElimMatches(d, tempArr);
-      tempArr.forEach(m => shouldExist.push({ drawName: d.name, drawId: d.id, drawMatchIdx: m.drawMatchIdx, player1: m.player1, player2: m.player2, player1Display: m.player1Display, player2Display: m.player2Display, round: m.round, event: d.event, group: m.group, phase: m.phase }));
+      tempArr.forEach(m => shouldExist.push({ drawName: d.name, drawId: d.id, drawMatchIdx: m.drawMatchIdx, player1: m.player1, player2: m.player2, player1Display: m.player1Display, player2Display: m.player2Display, round: m.round, roundName: m.roundName, event: d.event, group: m.group, phase: m.phase }));
       return;
     }
     // Numerar jogos reais para referencia
@@ -2403,15 +2492,19 @@ async function syncMatchesWithDraws() {
     if (existingInRound) return;
 
     const def = !!(s.player1 && s.player2);
-    const totalR = Math.max(...(tournament.draws.find(d => d.name === s.drawName)?.matches || []).map(x => x.round) || [1]);
-    const rn = s.round === totalR ? 'Final' : s.round === totalR - 1 ? 'Semifinal' : `R${s.round}`;
+    // Usar roundName do placeholder se disponivel, senao calcular
+    let rn = s.roundName || '';
+    if (!rn) {
+      const totalR = Math.max(...(tournament.draws.find(d => d.name === s.drawName)?.matches || []).map(x => x.round) || [1]);
+      rn = s.round === totalR ? 'Final' : s.round === totalR - 1 ? 'Semifinal' : `R${s.round}`;
+    }
 
     tournament.matches.push({
       drawId: s.drawId, drawName: s.drawName, drawMatchIdx: s.drawMatchIdx, event: s.event, round: s.round, roundName: rn,
       player1: s.player1, player2: s.player2,
       player1Display: s.player1Display || s.player1 || 'A definir', player2Display: s.player2Display || s.player2 || 'A definir',
       isDefinida: def, score: '', court: '', time: '', umpire: '',
-      status: def ? 'Pendente' : 'A definir'
+      status: def ? 'Pendente' : 'A definir', phase: s.phase || ''
     });
     added++;
   });
@@ -2434,33 +2527,112 @@ async function syncMatchesWithDraws() {
 }
 
 async function regenerateSchedule() {
-  if(!tournament?.matches?.length){showToast('Sem partidas','warning');return;}
+  if(!tournament?.matches?.length&&!tournament?.draws?.length){showToast('Sem partidas','warning');return;}
   if(!confirm('Regenerar todos os horarios e renumerar jogos? Jogos finalizados e em quadra serao preservados.'))return;
+
+  // Sincronizar matches com draws (inclui placeholders de eliminatoria)
+  await syncMatchesWithDraws();
+
   // Limpar horarios dos jogos pendentes
   tournament.matches.forEach(m=>{
     if(m.status!=='Finalizada'&&m.status!=='WO'&&m.status!=='Em Quadra'&&m.status!=='Desistencia'&&m.status!=='Desqualificacao'){
       m.time='';
     }
   });
-  // Redistribuir com max 4 por slot
-  assignAutoTimes(tournament.matches);
-  // Renumerar por ordem: dia -> horario -> numero atual
+
   const hasDays=tournament.daySchedule?.length>0;
+
   if(hasDays){
+    // Atribuir horarios POR DIA (cada dia comeca do horario configurado)
     const dayDraws=[];
     tournament.daySchedule.forEach(day=>{dayDraws.push(new Set(day.draws||[]));});
+
+    // Separar matches por dia
+    const matchesByDay=tournament.daySchedule.map(()=>[]);
+    const orphans=[];
+    tournament.matches.forEach(m=>{
+      let assigned=false;
+      dayDraws.forEach((s,i)=>{if(s.has(m.drawName)&&!assigned){matchesByDay[i].push(m);assigned=true;}});
+      if(!assigned)orphans.push(m);
+    });
+
+    // Atribuir horarios para cada dia separadamente
+    const slotDur = (tournament.matchDuration||30) + (tournament.restMinBetweenGames||20);
+    matchesByDay.forEach((dayMatches,i)=>{
+      if(!dayMatches.length)return;
+      const day=tournament.daySchedule[i];
+      const origStart=tournament.startTime, origEnd=tournament.endTime;
+      const origBS=tournament.breakStart, origBE=tournament.breakEnd;
+      tournament.startTime=day.startTime||origStart||'08:00';
+      tournament.endTime=day.endTime||origEnd||'18:00';
+      tournament.breakStart=day.breakStart||origBS||'12:00';
+      tournament.breakEnd=day.breakEnd||origBE||'13:30';
+
+      // Separar: jogos definidos (grupo+outros) vs eliminatoria "A definir"
+      const definidos = dayMatches.filter(m => m.status !== 'A definir');
+      const elimAdefs = dayMatches.filter(m => m.status === 'A definir');
+
+      // Atribuir horarios aos definidos primeiro
+      assignAutoTimes(definidos);
+
+      // Eliminatoria "A definir": horario APOS ultimo jogo de grupo da mesma categoria
+      const dayBS = timeToMin(tournament.breakStart||'12:00');
+      const dayBE = timeToMin(tournament.breakEnd||'13:30');
+      function nextTimeAfter(lastMin) {
+        let t = lastMin + slotDur;
+        // Se cai na pausa, pular pra depois
+        if (t >= dayBS && t < dayBE) t = dayBE;
+        return t;
+      }
+      elimAdefs.sort((a,b) => a.drawName===b.drawName ? (a.round||0)-(b.round||0) : 0);
+      elimAdefs.forEach(m => {
+        const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time).map(d => timeToMin(d.time));
+        const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && d !== m).map(d => timeToMin(d.time));
+        const allTimes = [...sameDrawGroupTimes, ...sameDrawAdefTimes];
+        if (allTimes.length) {
+          m.time = minToTime(nextTimeAfter(Math.max(...allTimes)));
+        }
+      });
+
+      tournament.startTime=origStart;tournament.endTime=origEnd;
+      tournament.breakStart=origBS;tournament.breakEnd=origBE;
+    });
+
+    // Orfaos (sem dia): atribuir com config padrao
+    if(orphans.length)assignAutoTimes(orphans);
+
+    // Ordenar: dia -> horario
     tournament.matches.sort((a,b)=>{
-      // Dia do jogo
       let dayA=dayDraws.length,dayB=dayDraws.length;
       dayDraws.forEach((s,i)=>{if(s.has(a.drawName))dayA=i;if(s.has(b.drawName))dayB=i;});
       if(dayA!==dayB)return dayA-dayB;
-      // Horario
       const ta=a.time?timeToMin(a.time):9999;
       const tb=b.time?timeToMin(b.time):9999;
       if(ta!==tb)return ta-tb;
       return(a.num||0)-(b.num||0);
     });
   } else {
+    // Sem daySchedule: separar definidos vs eliminatoria "A definir"
+    const definidos = tournament.matches.filter(m => m.status !== 'A definir');
+    const elimAdefs = tournament.matches.filter(m => m.status === 'A definir');
+    assignAutoTimes(definidos);
+    // Eliminatoria: apos ultimo jogo de grupo da mesma categoria (pulando pausa)
+    const slotDurNoDay = (tournament.matchDuration||30) + (tournament.restMinBetweenGames||20);
+    const noBrS = timeToMin(tournament.breakStart||'12:00');
+    const noBrE = timeToMin(tournament.breakEnd||'13:30');
+    function nextTimeNd(lastMin) {
+      let t = lastMin + slotDurNoDay;
+      if (t >= noBrS && t < noBrE) t = noBrE;
+      return t;
+    }
+    elimAdefs.sort((a,b) => a.drawName===b.drawName ? (a.round||0)-(b.round||0) : 0);
+    elimAdefs.forEach(m => {
+      const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time).map(d => timeToMin(d.time));
+      const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && d !== m).map(d => timeToMin(d.time));
+      const allTimes = [...sameDrawGroupTimes, ...sameDrawAdefTimes];
+      if (allTimes.length) { m.time = minToTime(nextTimeNd(Math.max(...allTimes))); }
+    });
+    tournament.matches = [...definidos, ...elimAdefs];
     tournament.matches.sort((a,b)=>{
       const ta=a.time?timeToMin(a.time):9999;
       const tb=b.time?timeToMin(b.time):9999;
@@ -2468,6 +2640,7 @@ async function regenerateSchedule() {
       return(a.num||0)-(b.num||0);
     });
   }
+
   // Atribuir numeros sequenciais
   tournament.matches.forEach((m,i)=>{m.id=(i+1).toString();m.num=i+1;});
   await window.api.saveTournament(tournament);
@@ -3086,7 +3259,7 @@ async function assignCourt(idx, value) {
       const ok=await window.api.supabaseUpsertMatch(tournament.id,m);
       if(!ok)showToast('Aviso: sincronizacao online falhou. O jogo pode nao aparecer no painel publico.','warning');
     }
-    else if(!value){await window.api.supabaseRemoveFromCourt(tournament.id,m);}
+    else if(!value){await window.api.supabaseRemoveFromCourt(tournament.id,m);await window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);}
   }catch(e){console.warn('Supabase sync:',e);showToast('Aviso: sincronizacao online falhou','warning');}
   renderCourtsPanel();renderMatches();
 }
@@ -3339,7 +3512,7 @@ function renderScheduleMatch(m){
   const done=m.status==='Finalizada'||m.status==='WO',eq=m.status==='Em Quadra',adef=m.status==='A definir';
   let bg='#fff';if(eq)bg='#FFF3E0';if(done)bg='#D1FAE5';if(adef)bg='#F9FAFB';
   const border=done?'#10B981':eq?'#F59E0B':adef?'var(--fabd-gray-300)':'var(--fabd-blue)';
-  const p1=esc(m.player1||'A definir'),p2=esc(m.player2||'A definir');
+  const p1=esc(m.player1Display||m.player1||'A definir'),p2=esc(m.player2Display||m.player2||'A definir');
   const p1Style=m.winner===1?'color:#10B981;font-weight:700':'font-weight:600';
   const p2Style=m.winner===2?'color:#10B981;font-weight:700':'font-weight:600';
   let scoreHtml='';
