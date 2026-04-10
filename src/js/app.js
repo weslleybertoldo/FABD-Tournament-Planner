@@ -4868,9 +4868,12 @@ function reportClassification(){
     return 99;
   }
 
-  // Separar simples (SM, SF) e duplas (DM, DF, DX)
-  const simples=draws.filter(d=>d.event==='SM'||d.event==='SF').sort((a,b)=>getCatSort(a.name)-getCatSort(b.name));
-  const duplas=draws.filter(d=>d.event==='DM'||d.event==='DF'||d.event==='DX').sort((a,b)=>getCatSort(a.name)-getCatSort(b.name));
+  // Ordem modalidades: SM antes SF, DM antes DF antes DX
+  const modOrder={'SM':0,'SF':1,'DM':0,'DF':1,'DX':2};
+
+  // Separar simples e duplas, ordenar por categoria crescente + modalidade
+  const simples=draws.filter(d=>d.event==='SM'||d.event==='SF').sort((a,b)=>getCatSort(a.name)-getCatSort(b.name)||(modOrder[a.event]||0)-(modOrder[b.event]||0));
+  const duplas=draws.filter(d=>d.event==='DM'||d.event==='DF'||d.event==='DX').sort((a,b)=>getCatSort(a.name)-getCatSort(b.name)||(modOrder[a.event]||0)-(modOrder[b.event]||0));
 
   function renderSection(drawList){
     let h='',count=0;
