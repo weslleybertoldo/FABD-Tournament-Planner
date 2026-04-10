@@ -4530,6 +4530,7 @@ function printReport(type){
     case 'results': body=reportResults(); break;
     case 'oop': body=reportOOP(); break;
     case 'winners': body=reportWinners(); break;
+    case 'classification': body=reportClassification(); break;
     case 'players': body=reportPlayers(); break;
     default: body='<p>Relatorio nao encontrado.</p>';
   }
@@ -4731,6 +4732,149 @@ function reportWinners(){
     h+='</tbody></table>';
   });
   if(!count)h+='<p>Nenhuma categoria finalizada.</p>';
+  return h;
+}
+
+function computeFullClassification(d){
+  if(!d.players?.length)return[];
+
+  if(d.type==='Eliminatoria'){
+    // Classificar pela rodada em que foi eliminado (mais longe = melhor posicao)
+    const totalR=Math.max(...(d.matches||[]).map(m=>m.round)||[1]);
+    const playerRound={}; // jogador -> rodada mais alta que jogou
+    d.players.forEach(p=>{playerRound[p]=0;});
+    (d.matches||[]).forEach(m=>{
+      if(m.isBye)return;
+      if(m.player1&&playerRound[m.player1]!==undefined)playerRound[m.player1]=Math.max(playerRound[m.player1],m.round);
+      if(m.player2&&m.player2!=='BYE'&&playerRound[m.player2]!==undefined)playerRound[m.player2]=Math.max(playerRound[m.player2],m.round);
+    });
+    // Campeao e vice
+    const finalM=(d.matches||[]).find(m=>m.round===totalR);
+    const champion=finalM?.winner===1?finalM.player1:finalM?.winner===2?finalM.player2:null;
+    const vice=finalM?.winner===1?finalM.player2:finalM?.winner===2?finalM.player1:null;
+
+    // Ordenar: campeao (1), vice (2), depois por rodada mais alta (desc)
+    const sorted=[...d.players].sort((a,b)=>{
+      if(a===champion)return-1;if(b===champion)return 1;
+      if(a===vice)return-1;if(b===vice)return 1;
+      return(playerRound[b]||0)-(playerRound[a]||0);
+    });
+
+    // Atribuir posicoes (empatados na mesma rodada = mesma posicao)
+    const result=[];
+    let pos=1;
+    for(let i=0;i<sorted.length;i++){
+      const p=sorted[i];
+      if(p===champion){result.push({pos:1,name:p,round:totalR,note:'Campeao'});pos=2;continue;}
+      if(p===vice){result.push({pos:2,name:p,round:totalR,note:'Vice'});pos=3;continue;}
+      // Mesmo round = mesma posicao
+      if(i>0&&sorted[i-1]!==champion&&sorted[i-1]!==vice&&playerRound[p]===playerRound[sorted[i-1]]){
+        result.push({pos:result[result.length-1].pos,name:p,round:playerRound[p]||0,note:''});
+      } else {
+        result.push({pos:i+1,name:p,round:playerRound[p]||0,note:''});
+      }
+    }
+    return result;
+  }
+
+  if(d.type==='Grupos + Eliminatoria'&&d.groupsData){
+    const classification=[];
+    // Fase de eliminatoria: top posicoes
+    const elimM=d.groupsData.eliminationMatches||[];
+    const hasFinalWinner=elimM.length&&elimM.find(m=>m.round===Math.max(...elimM.map(x=>x.round)))?.winner;
+    if(!hasFinalWinner){
+      // Eliminatoria nao concluida — nao mostrar classificacao parcial
+      return[{pos:0,name:'Chave em andamento',note:'Aguardando finalizacao',wins:null,losses:null}];
+    }
+    if(elimM.length){
+      const totalR=Math.max(...elimM.map(m=>m.round));
+      const finalM=elimM.find(m=>m.round===totalR);
+      if(finalM?.winner){
+        const champ=finalM.winner===1?finalM.player1:finalM.player2;
+        const vice=finalM.winner===1?finalM.player2:finalM.player1;
+        classification.push({pos:1,name:champ,note:'Campeao'});
+        classification.push({pos:2,name:vice,note:'Vice'});
+        // Perdedores das semis = 3o
+        if(totalR>=2){
+          elimM.filter(m=>m.round===totalR-1).forEach(sm=>{
+            if(!sm.winner)return;
+            const loser=sm.winner===1?sm.player2:sm.player1;
+            if(loser&&loser!==champ&&loser!==vice&&!classification.find(c=>c.name===loser)){
+              classification.push({pos:3,name:loser,note:'3o colocado'});
+            }
+          });
+        }
+        // Perdedores de rodadas anteriores
+        for(let r=totalR-2;r>=1;r--){
+          const roundLosers=elimM.filter(m=>m.round===r&&m.winner).map(m=>m.winner===1?m.player2:m.player1).filter(n=>n&&!classification.find(c=>c.name===n));
+          const nextPos=classification.length+1;
+          roundLosers.forEach(loser=>{classification.push({pos:nextPos,name:loser,note:''});});
+        }
+      }
+    }
+    // Fase de grupos: quem nao classificou
+    // Agrupar por colocacao no grupo (3o de todos os grupos = mesma posicao)
+    const classified=new Set(classification.map(c=>c.name));
+    const qualifiers=d.groupQualifiers||2;
+    const numGroups=(d.groupsData.groups||[]).length;
+    const maxPlayers=Math.max(...(d.groupsData.groups||[]).map(g=>g.players?.length||0));
+
+    for(let posInGroup=qualifiers;posInGroup<maxPlayers;posInGroup++){
+      const basePos=classification.length+1;
+      (d.groupsData.groups||[]).forEach(g=>{
+        const standings=computeGroupStandings(g.players,g.matches);
+        const s=standings[posInGroup];
+        if(!s||classified.has(s.name))return;
+        classified.add(s.name);
+        classification.push({pos:basePos,name:s.name,note:`${posInGroup+1}o ${g.name}`,wins:s.wins,losses:s.losses});
+      });
+    }
+    return classification;
+  }
+
+  // Todos contra Todos
+  if(d.type==='Todos contra Todos'){
+    const stats={};
+    d.players.forEach(p=>{stats[p]={name:p,wins:0,losses:0,ptsFor:0,ptsAgainst:0};});
+    (d.matches||[]).forEach(m=>{
+      if(!m.winner)return;
+      if(stats[m.player1]&&stats[m.player2]){
+        if(m.winner===1){stats[m.player1].wins++;stats[m.player2].losses++;}
+        else{stats[m.player2].wins++;stats[m.player1].losses++;}
+        if(m.score1&&m.score2){
+          const s1=String(m.score1).split(' ').map(Number).filter(n=>!isNaN(n));
+          const s2=String(m.score2).split(' ').map(Number).filter(n=>!isNaN(n));
+          s1.forEach(v=>{stats[m.player1].ptsFor+=v;});
+          s2.forEach(v=>{stats[m.player2].ptsFor+=v;stats[m.player1].ptsAgainst+=v;});
+          s1.forEach(v=>{stats[m.player2].ptsAgainst+=v;});
+        }
+      }
+    });
+    return Object.values(stats).sort((a,b)=>b.wins-a.wins||(b.ptsFor-b.ptsAgainst)-(a.ptsFor-a.ptsAgainst)||b.ptsFor-a.ptsFor).map((s,i)=>({pos:i+1,name:s.name,wins:s.wins,losses:s.losses,note:''}));
+  }
+
+  return[];
+}
+
+function reportClassification(){
+  const draws=tournament.draws||[];
+  if(!draws.length)return'<p>Nenhuma chave criada.</p>';
+  let h='<h2 style="color:#1E3A8A;margin-bottom:16px">Classificacao Geral</h2>';
+  let count=0;
+  draws.forEach(d=>{
+    const classification=computeFullClassification(d);
+    if(!classification.length)return;
+    count++;
+    h+=`<div class="cat-title">${esc(d.name)} <span style="font-size:11px;color:#666;font-weight:400">(${d.type} - ${d.players?.length||0} atletas)</span></div>`;
+    h+='<table><thead><tr><th style="width:50px">Pos.</th><th>Jogador</th><th style="width:60px">V</th><th style="width:60px">D</th><th>Obs.</th></tr></thead><tbody>';
+    classification.forEach(c=>{
+      const posStyle=c.pos===1?'color:#D4AF37;font-weight:800':c.pos===2?'color:#AAA;font-weight:700':c.pos===3?'color:#CD7F32;font-weight:700':'';
+      const medal=c.pos===1?'\uD83E\uDD47 ':c.pos===2?'\uD83E\uDD48 ':c.pos===3?'\uD83E\uDD49 ':'';
+      h+=`<tr><td style="${posStyle}">${medal}${c.pos}o</td><td>${esc(c.name)}</td><td style="text-align:center">${c.wins!=null?c.wins:'-'}</td><td style="text-align:center">${c.losses!=null?c.losses:'-'}</td><td style="font-size:11px;color:#666">${esc(c.note||'')}</td></tr>`;
+    });
+    h+='</tbody></table>';
+  });
+  if(!count)h+='<p>Nenhuma categoria com resultados.</p>';
   return h;
 }
 
