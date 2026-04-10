@@ -488,6 +488,7 @@ ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tourna
       row.data = {
         matches: tournamentData.matches || [],
         draws: tournamentData.draws || [],
+        rankings: tournamentData._rankings || {},
         courts: tournamentData.courts,
         courtNames: tournamentData.courtNames || [],
         startDate: tournamentData.startDate,

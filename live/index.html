@@ -585,58 +585,10 @@
 
     // === CLASSIFICACAO / RANKING ===
     function renderRanking(draw){
-      const players=draw.players||[];
-      if(!players.length)return'';
-
-      // Calcular vitorias e derrotas de cada jogador
-      const stats={};
-      players.forEach(p=>{stats[p]={w:0,l:0,bestRound:0,name:p};});
-
-      // Pegar todos os matches (grupo + eliminacao)
-      let allMatches=[];
-      if(draw.type==='Grupos + Eliminatoria'&&draw.groupsData){
-        // Matches dos grupos
-        (draw.groupsData.groups||[]).forEach(g=>{
-          (g.matches||[]).forEach(m=>{if(m.winner)allMatches.push(m);});
-        });
-        // Matches da eliminacao
-        (draw.groupsData.eliminationMatches||[]).forEach(m=>{if(m.winner)allMatches.push(m);});
-      } else if(draw.type==='Todos contra Todos'){
-        (draw.matches||[]).forEach(m=>{if(m.winner)allMatches.push(m);});
-      } else {
-        // Eliminatoria simples
-        (draw.matches||[]).forEach(m=>{
-          if(m.winner&&!m.isBye)allMatches.push(m);
-        });
-      }
-
-      // Contar V e D
-      allMatches.forEach(m=>{
-        const p1=m.player1||'';
-        const p2=m.player2||'';
-        if(m.winner===1){
-          if(stats[p1])stats[p1].w++;
-          if(stats[p2])stats[p2].l++;
-        } else if(m.winner===2){
-          if(stats[p2])stats[p2].w++;
-          if(stats[p1])stats[p1].l++;
-        }
-        // Registrar rodada mais alta alcancada (para eliminatorias)
-        const r=m.round||0;
-        if(stats[p1])stats[p1].bestRound=Math.max(stats[p1].bestRound,r);
-        if(stats[p2])stats[p2].bestRound=Math.max(stats[p2].bestRound,r);
-      });
-
-      // Ordenar: mais vitorias primeiro, depois menos derrotas, depois rodada mais alta
-      const sorted=Object.values(stats).sort((a,b)=>{
-        if(b.w!==a.w)return b.w-a.w;
-        if(a.l!==b.l)return a.l-b.l;
-        return b.bestRound-a.bestRound;
-      });
-
-      // Se ninguem tem resultado ainda, nao mostrar ranking
-      const hasResults=sorted.some(s=>s.w>0||s.l>0);
-      if(!hasResults)return'';
+      // Ler ranking calculado pelo desktop (nao calcular aqui)
+      const rankings = tournamentData?.rankings || {};
+      const ranking = rankings[draw.name];
+      if(!ranking||!ranking.length)return'';
 
       // Medalhas
       const medals=['&#129351;','&#129352;','&#129353;']; // ouro, prata, bronze
@@ -657,15 +609,15 @@
       h+=`<th>Pos.</th><th>Jogador</th><th style="text-align:center">V</th><th style="text-align:center">D</th>`;
       h+=`</tr></thead><tbody>`;
 
-      sorted.forEach((s,i)=>{
-        const pos=i+1;
+      ranking.forEach((r,i)=>{
+        const pos=r.pos||i+1;
         const medal=pos<=3?medals[pos-1]:'';
         const posClass=pos===1?'rank-1':pos===2?'rank-2':pos===3?'rank-3':'';
         h+=`<tr>`;
         h+=`<td class="rank-pos ${posClass}">${medal?`<span class="rank-medal">${medal}</span>`:''}${pos}&#186;</td>`;
-        h+=`<td class="rank-name">${esc(s.name)}</td>`;
-        h+=`<td style="text-align:center;color:#10B981;font-weight:700">${s.w}</td>`;
-        h+=`<td style="text-align:center;color:#EF4444;font-weight:700">${s.l}</td>`;
+        h+=`<td class="rank-name">${esc(r.name)}</td>`;
+        h+=`<td style="text-align:center;color:#10B981;font-weight:700">${r.wins!=null?r.wins:''}</td>`;
+        h+=`<td style="text-align:center;color:#EF4444;font-weight:700">${r.losses!=null?r.losses:''}</td>`;
         h+=`</tr>`;
       });
 
