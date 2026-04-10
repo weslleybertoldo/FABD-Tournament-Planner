@@ -4860,22 +4860,53 @@ function computeFullClassification(d){
 function reportClassification(){
   const draws=tournament.draws||[];
   if(!draws.length)return'<p>Nenhuma chave criada.</p>';
-  let h='<h2 style="color:#1E3A8A;margin-bottom:16px">Classificacao Geral</h2>';
-  let count=0;
-  draws.forEach(d=>{
-    const classification=computeFullClassification(d);
-    if(!classification.length)return;
-    count++;
-    h+=`<div class="cat-title">${esc(d.name)} <span style="font-size:11px;color:#666;font-weight:400">(${d.type} - ${d.players?.length||0} atletas)</span></div>`;
-    h+='<table><thead><tr><th style="width:50px">Pos.</th><th>Jogador</th><th style="width:60px">V</th><th style="width:60px">D</th><th>Obs.</th></tr></thead><tbody>';
-    classification.forEach(c=>{
-      const posStyle=c.pos===1?'color:#D4AF37;font-weight:800':c.pos===2?'color:#AAA;font-weight:700':c.pos===3?'color:#CD7F32;font-weight:700':'';
-      const medal=c.pos===1?'\uD83E\uDD47 ':c.pos===2?'\uD83E\uDD48 ':c.pos===3?'\uD83E\uDD49 ':'';
-      h+=`<tr><td style="${posStyle}">${medal}${c.pos}o</td><td>${esc(c.name)}</td><td style="text-align:center">${c.wins!=null?c.wins:'-'}</td><td style="text-align:center">${c.losses!=null?c.losses:'-'}</td><td style="font-size:11px;color:#666">${esc(c.note||'')}</td></tr>`;
+
+  // Ordem das categorias (crescente)
+  const catOrder=['Sub 11','Sub 13','Sub 15','Sub 17','Sub 19','Sub 23','Principal','Senior','Master I','Master II'];
+  function getCatSort(name){
+    for(let i=0;i<catOrder.length;i++){if(name.includes(catOrder[i]))return i;}
+    return 99;
+  }
+
+  // Separar simples (SM, SF) e duplas (DM, DF, DX)
+  const simples=draws.filter(d=>d.event==='SM'||d.event==='SF').sort((a,b)=>getCatSort(a.name)-getCatSort(b.name));
+  const duplas=draws.filter(d=>d.event==='DM'||d.event==='DF'||d.event==='DX').sort((a,b)=>getCatSort(a.name)-getCatSort(b.name));
+
+  function renderSection(drawList){
+    let h='',count=0;
+    drawList.forEach(d=>{
+      const classification=computeFullClassification(d);
+      if(!classification.length)return;
+      count++;
+      h+=`<div class="cat-title">${esc(d.name)} <span style="font-size:11px;color:#666;font-weight:400">(${d.type} - ${d.players?.length||0} atletas)</span></div>`;
+      h+='<table><thead><tr><th style="width:50px">Pos.</th><th>Jogador</th><th style="width:60px">V</th><th style="width:60px">D</th><th>Obs.</th></tr></thead><tbody>';
+      classification.forEach(c=>{
+        const posStyle=c.pos===1?'color:#D4AF37;font-weight:800':c.pos===2?'color:#AAA;font-weight:700':c.pos===3?'color:#CD7F32;font-weight:700':'';
+        const medal=c.pos===1?'\uD83E\uDD47 ':c.pos===2?'\uD83E\uDD48 ':c.pos===3?'\uD83E\uDD49 ':'';
+        h+=`<tr><td style="${posStyle}">${medal}${c.pos}o</td><td>${esc(c.name)}</td><td style="text-align:center">${c.wins!=null?c.wins:'-'}</td><td style="text-align:center">${c.losses!=null?c.losses:'-'}</td><td style="font-size:11px;color:#666">${esc(c.note||'')}</td></tr>`;
+      });
+      h+='</tbody></table>';
     });
-    h+='</tbody></table>';
-  });
-  if(!count)h+='<p>Nenhuma categoria com resultados.</p>';
+    return{html:h,count};
+  }
+
+  let h='<h2 style="color:#1E3A8A;margin-bottom:16px">Classificacao Geral</h2>';
+
+  // Simples
+  if(simples.length){
+    h+='<h3 style="color:#1E3A8A;margin:20px 0 12px;border-bottom:2px solid #1E3A8A;padding-bottom:6px">Classificacao Simples</h3>';
+    const s=renderSection(simples);
+    h+=s.html;
+  }
+
+  // Duplas
+  if(duplas.length){
+    h+='<h3 style="color:#1E3A8A;margin:30px 0 12px;border-bottom:2px solid #1E3A8A;padding-bottom:6px">Classificacao das Duplas</h3>';
+    const d=renderSection(duplas);
+    h+=d.html;
+  }
+
+  if(!simples.length&&!duplas.length)h+='<p>Nenhuma categoria com resultados.</p>';
   return h;
 }
 
