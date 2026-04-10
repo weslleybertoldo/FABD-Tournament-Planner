@@ -193,16 +193,25 @@ ipcMain.handle('app:checkUpdate', async () => {
 });
 
 ipcMain.handle('db:closeTournament', async () => {
-  // Limpar dados do Supabase antes de fechar
-  if (db.tournament?.id) {
-    try {
-      const tid = db.tournament.id;
+  // Limpar TODOS os dados do Supabase (torneio atual + residuos antigos)
+  const tid = db.tournament?.id;
+  try {
+    if (tid) {
+      // Limpar torneio atual
       await supabase.from('live_scores').delete().eq('tournament_id', tid);
       await supabase.from('live_matches').delete().eq('tournament_id', tid);
       await supabase.from('tournaments').delete().eq('id', tid);
-      log('INFO', 'Supabase cleanup ao fechar torneio', tid);
-    } catch (e) { log('ERROR', 'Erro cleanup Supabase:', e.message); }
-  }
+      log('INFO', 'Supabase: torneio removido', tid);
+    }
+    // Limpar residuos: live_matches e live_scores orfaos (sem torneio correspondente)
+    const { data: allTournaments } = await supabase.from('tournaments').select('id');
+    if (!allTournaments?.length) {
+      // Sem torneios no Supabase - limpar tudo
+      await supabase.from('live_scores').delete().neq('id', 0);
+      await supabase.from('live_matches').delete().neq('id', '0');
+      log('INFO', 'Supabase: limpeza completa (sem torneios ativos)');
+    }
+  } catch (e) { log('ERROR', 'Erro cleanup Supabase:', e.message); }
   db.tournament = null;
   saveDatabase(db);
   return true;

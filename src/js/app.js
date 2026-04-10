@@ -366,8 +366,11 @@ async function saveTournament() {
 
 async function closeTournament() {
   if (!tournament) return;
-  if (!confirm('Fechar o torneio atual?\n\nRecomendamos fazer backup antes.\nOs dados serao limpos do app.')) return;
+  if (!confirm('ATENÇÃO: Fechar o torneio atual?\n\n• Os dados serao removidos do app\n• O site publico sera limpo (chaves, partidas, placar)\n• Recomendamos fazer backup antes\n\nDeseja continuar?')) return;
+  if (!confirm('TEM CERTEZA?\n\nEsta acao ira:\n1. Limpar todos os dados locais\n2. Remover o torneio do site publico\n3. Apagar placares e partidas online\n\nDigite OK para confirmar.')) return;
+  showToast('Fechando torneio e limpando dados online...','info');
   await window.api.closeTournament();
+  showToast('Torneio fechado! Dados locais e online foram limpos.');
   tournament = null; players = [];
   selectedDrawIdx = -1;
   document.getElementById('breadcrumb').textContent = '';
