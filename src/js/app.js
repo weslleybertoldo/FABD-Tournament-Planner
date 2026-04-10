@@ -801,6 +801,7 @@ async function deleteAllPlayers() {
   selectedDrawIdx = -1;
 
   await window.api.saveTournament(tournament);
+  prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
   renderPlayers();
   showToast('Todos os jogadores excluidos');
 }
@@ -5032,7 +5033,7 @@ function computeRoundRobinRanking(d){
   // Assign positions
   const ranking=[];
   arr.forEach((s,i)=>{
-    const pos=i<1?1:i<2?2:3;
+    const pos=i+1;
     ranking.push({pos:Math.min(pos,3),name:s.name,wins:s.wins,losses:s.losses,ptsFor:s.ptsFor,ptsAgainst:s.ptsAgainst,ptsDiff:s.ptsFor-s.ptsAgainst});
   });
   return ranking;
