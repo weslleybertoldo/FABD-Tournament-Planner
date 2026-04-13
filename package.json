@@ -24,6 +24,16 @@
       "node_modules/**/*",
       "package.json"
     ],
+    "extraFiles": [
+      {
+        "from": "config.local.json",
+        "to": "config.local.json"
+      },
+      {
+        "from": "config.example.json",
+        "to": "config.example.json"
+      }
+    ],
     "win": {
       "target": [
         {
@@ -48,7 +58,8 @@
     "publish": null
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.100.1",
+    "@supabase/supabase-js": "^2.103.0",
+    "ws": "^8.20.0",
     "xlsx": "^0.18.5"
   }
 }

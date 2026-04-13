@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('api', {
   supabaseUpsertTournament: (tid, name, tournamentData) => ipcRenderer.invoke('supabase:upsertTournament', tid, name, tournamentData),
   supabaseUpsertMatch: (tid, m) => ipcRenderer.invoke('supabase:upsertMatch', tid, m),
   supabaseRemoveFromCourt: (tid, matchData) => ipcRenderer.invoke('supabase:removeFromCourt', tid, matchData),
+  supabaseCleanup: (tid) => ipcRenderer.invoke('supabase:cleanup', tid),
   supabaseSubscribe: (tid) => ipcRenderer.invoke('supabase:subscribe', tid),
   supabaseUnsubscribe: () => ipcRenderer.invoke('supabase:unsubscribe'),
   onScoreUpdate: (cb) => { ipcRenderer.removeAllListeners('supabase:scoreUpdate'); ipcRenderer.on('supabase:scoreUpdate', (_, data) => cb(data)); },

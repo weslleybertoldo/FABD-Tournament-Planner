@@ -3,4 +3,10 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
-dist/
+
+# Arquivos de ambiente (chaves e segredos)
+.env
+.env.*
+.env.local
+.env.production
+config.local.json

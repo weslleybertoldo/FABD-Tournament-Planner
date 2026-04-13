@@ -220,6 +220,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
+    // This is the publishable anon key - safe for client-side use with proper RLS
+    // Esta pagina so faz SELECT (leitura) - RLS garante que nao pode escrever dados
     const SUPABASE_URL='https://zwjgjtrmsqtyyjtuotuo.supabase.co';
     const SUPABASE_KEY='sb_publishable_sCMqtUOnE7McSgZelCkWJQ_cbyslJNX';
     const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;

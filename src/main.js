@@ -2,12 +2,44 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
+const WebSocket = require('ws');
 const XLSX = require('xlsx');
 
 // === SUPABASE ===
-const SUPABASE_URL = 'https://zwjgjtrmsqtyyjtuotuo.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Chaves carregadas de config.local.json (nao commitado no git)
+// Para configurar, copie config.example.json para config.local.json e preencha suas chaves
+function loadSupabaseConfig() {
+  const configPaths = [
+    path.join(__dirname, '..', 'config.local.json'),
+    path.join(process.resourcesPath, '..', 'config.local.json'),
+    path.join(app.getPath('userData'), 'config.local.json'),
+  ];
+  for (const configPath of configPaths) {
+    try {
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        if (config.SUPABASE_URL && config.SUPABASE_ANON_KEY) {
+          return config;
+        }
+      }
+    } catch (e) { /* tentar proximo */ }
+  }
+  // Fallback: variaveis de ambiente
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+    return { SUPABASE_URL: process.env.SUPABASE_URL, SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY };
+  }
+  console.error('ERRO: config.local.json nao encontrado. Copie config.example.json para config.local.json');
+  return { SUPABASE_URL: '', SUPABASE_ANON_KEY: '' };
+}
+const _supaConfig = loadSupabaseConfig();
+const SUPABASE_URL = _supaConfig.SUPABASE_URL;
+const SUPABASE_ANON_KEY = _supaConfig.SUPABASE_ANON_KEY;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  realtime: {
+    timeout: 30000,
+    transport: WebSocket,
+  },
+});
 let realtimeChannel = null;
 
 // === PATHS ===
@@ -137,9 +169,9 @@ function createWindow() {
       // Limpar Supabase ao fechar (fire-and-forget com log de erro)
       try {
         const tid = db.tournament.id;
-        supabase.from('live_scores').delete().eq('tournament_id', tid).catch(e => log('ERROR', 'Cleanup scores:', e.message));
-        supabase.from('live_matches').delete().eq('tournament_id', tid).catch(e => log('ERROR', 'Cleanup matches:', e.message));
-        supabase.from('tournaments').delete().eq('id', tid).catch(e => log('ERROR', 'Cleanup tournament:', e.message));
+        supabase.from('live_scores').delete().eq('tournament_id', tid).then(({ error }) => { if (error) log('ERROR', 'Cleanup scores:', error.message); });
+        supabase.from('live_matches').delete().eq('tournament_id', tid).then(({ error }) => { if (error) log('ERROR', 'Cleanup matches:', error.message); });
+        supabase.from('tournaments').delete().eq('id', tid).then(({ error }) => { if (error) log('ERROR', 'Cleanup tournament:', error.message); });
         log('INFO', 'Supabase cleanup ao fechar app');
       } catch(err) { log('ERROR', 'Erro cleanup Supabase:', err.message); }
       // Limpar torneio local
@@ -571,6 +603,19 @@ ipcMain.handle('supabase:removeFromCourt', async (_, tournamentId, matchData) =>
 let pollingInterval = null;
 let lastPollData = {};
 let realtimeRetryInterval = null;
+
+ipcMain.handle('supabase:cleanup', async (_, tournamentId) => {
+  try {
+    // Limpar dados ao vivo do Supabase (live_matches, live_scores)
+    // NÃO afeta torneio local — apenas dados do painel ao vivo
+    const { error: e1 } = await supabase.from('live_scores').delete().eq('tournament_id', tournamentId);
+    if (e1) log('ERROR', 'Cleanup scores:', e1.message);
+    const { error: e2 } = await supabase.from('live_matches').delete().eq('tournament_id', tournamentId);
+    if (e2) log('ERROR', 'Cleanup matches:', e2.message);
+    log('INFO', 'Supabase cleanup concluido para torneio ' + tournamentId);
+    return true;
+  } catch(e) { log('ERROR', 'Supabase cleanup:', e.message); return false; }
+});
 
 ipcMain.handle('supabase:subscribe', async (_, tournamentId) => {
   try {

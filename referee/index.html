@@ -274,6 +274,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
   <script>
+    // This is the publishable anon key - safe for client-side use with proper RLS
+    // Arbitros se autenticam via Google OAuth - RLS restringe writes ao proprio registro
     const SUPABASE_URL='https://zwjgjtrmsqtyyjtuotuo.supabase.co';
     const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY';
     if(!window.supabase){document.getElementById('login-error').textContent='Erro: Supabase nao carregou.';document.getElementById('login-error').style.display='block';}
