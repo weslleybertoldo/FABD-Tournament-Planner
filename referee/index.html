@@ -131,6 +131,19 @@
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
   </div>
 
+  <!-- ESCOLHER FEDERACAO (primeira vez ou sem federacao definida) -->
+  <div id="page-federation" class="pending-page" style="display:none;text-align:center">
+    <div style="font-size:48px;margin-bottom:8px">&#127942;</div>
+    <h3 style="color:#F59E0B;margin-bottom:8px">Em qual federacao voce vai arbitrar?</h3>
+    <p style="color:#94A3B8;font-size:13px;max-width:340px;margin-bottom:16px">Selecione a federacao para se cadastrar. Apos a escolha, o organizador da federacao precisa autorizar seu acesso.</p>
+    <select id="fed-select" style="width:90%;max-width:340px;padding:14px;border-radius:10px;border:1px solid #334155;background:#1E293B;color:#fff;font-size:15px;margin-bottom:12px">
+      <option value="">Carregando federacoes...</option>
+    </select>
+    <button class="btn btn-primary" style="padding:12px 28px;font-size:15px;font-weight:700" onclick="confirmFederation()">Confirmar</button>
+    <p id="fed-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
+    <button class="btn btn-danger" style="margin-top:24px;padding:6px 14px;font-size:11px" onclick="logout()">Sair</button>
+  </div>
+
   <!-- AGUARDANDO -->
   <div id="page-pending" class="pending-page">
     <div style="font-size:48px;margin-bottom:16px">&#9203;</div>
@@ -350,15 +363,56 @@
       }catch(e){errEl.style.color='#EF4444';errEl.textContent='Erro: '+e.message;}
     }
     function logout(){currentUser=null;sb?.auth.signOut();hideAll();document.getElementById('page-login').style.display='flex';if(pollInterval)clearInterval(pollInterval);}
-    function hideAll(){['page-login','page-pending','page-matches','page-scorer'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
+    function hideAll(){['page-login','page-federation','page-pending','page-matches','page-scorer'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
 
     async function registerReferee(u){try{await sb.from('referees').upsert({id:u.id,name:u.name,email:u.email||'',photo:u.photo||'',updated_at:new Date().toISOString()},{onConflict:'id'});}catch(e){}}
-    async function checkStatus(){if(!currentUser)return'pendente';try{const{data}=await sb.from('referees').select('status').eq('id',currentUser.id).single();return data?.status||'pendente';}catch(e){return'pendente';}}
+    async function getMyRefereeRecord(){if(!currentUser)return null;try{const{data}=await sb.from('referees').select('id,name,status,federation_id').eq('id',currentUser.id).single();return data||null;}catch(e){return null;}}
+    async function checkStatus(){const r=await getMyRefereeRecord();return r?.status||'pendente';}
+
+    async function loadFederationsIntoSelect(){
+      try{
+        const{data}=await sb.from('federations').select('id,slug,name,short_name,state').eq('active',true).order('short_name');
+        const sel=document.getElementById('fed-select');
+        if(!data?.length){sel.innerHTML='<option value="">Nenhuma federacao disponivel</option>';return;}
+        sel.innerHTML='<option value="">-- Escolha sua federacao --</option>'+data.map(f=>`<option value="${esc(f.id)}">${esc(f.short_name)} - ${esc(f.name)} (${esc(f.state)})</option>`).join('');
+      }catch(e){console.error('Erro ao carregar federacoes:',e);}
+    }
+
+    async function showFederationPicker(){
+      hideAll();
+      document.getElementById('page-federation').style.display='flex';
+      await loadFederationsIntoSelect();
+    }
+
+    async function confirmFederation(){
+      const sel=document.getElementById('fed-select');
+      const errEl=document.getElementById('fed-error');
+      const fid=sel.value;
+      if(!fid){errEl.textContent='Selecione uma federacao';errEl.style.display='block';return;}
+      errEl.style.display='none';
+      try{
+        const{error}=await sb.from('referees').update({federation_id:fid,updated_at:new Date().toISOString()}).eq('id',currentUser.id);
+        if(error)throw error;
+        currentUser.federation_id=fid;
+        const st=await checkStatus();
+        if(st==='autorizado')showMatches();
+        else showPending();
+      }catch(e){
+        errEl.textContent='Erro: '+e.message;errEl.style.display='block';
+      }
+    }
 
     async function handleLogin(u){
-      currentUser=u;await registerReferee(u);
-      const st=await checkStatus();
-      if(st==='autorizado')showMatches();
+      currentUser=u;
+      await registerReferee(u);
+      const rec=await getMyRefereeRecord();
+      if(!rec?.federation_id){
+        // Sem federacao definida -> mostra picker
+        showFederationPicker();
+        return;
+      }
+      currentUser.federation_id=rec.federation_id;
+      if(rec.status==='autorizado')showMatches();
       else showPending();
     }
     function showPending(){hideAll();document.getElementById('page-pending').style.display='flex';if(pollInterval)clearInterval(pollInterval);pollInterval=setInterval(async()=>{if(await checkStatus()==='autorizado')showMatches();},5000);}
@@ -378,11 +432,17 @@
 
     async function loadMatches(){
       try{
-        const{data:ts}=await sb.from('tournaments').select('id,name').order('updated_at',{ascending:false}).limit(1);
-        if(!ts?.length){document.getElementById('ref-tab-jogos').innerHTML='<div class="empty"><div style="font-size:48px">&#128580;</div><p>Nenhum torneio ativo</p></div>';return;}
+        if(!currentUser?.federation_id){return;}
+        // Pega o torneio mais recente DA FEDERACAO do arbitro
+        const{data:ts}=await sb.from('tournaments').select('id,name,federations(short_name,primary_color)').eq('federation_id',currentUser.federation_id).order('updated_at',{ascending:false}).limit(1);
+        if(!ts?.length){document.getElementById('ref-tab-jogos').innerHTML='<div class="empty"><div style="font-size:48px">&#128580;</div><p>Nenhum torneio ativo na sua federacao</p></div>';return;}
         currentTournamentId=ts[0].id;
+        const fed=ts[0].federations;
         document.getElementById('tournament-name').textContent=ts[0].name;
-        const{data:ms}=await sb.from('live_matches').select('*').eq('tournament_id',ts[0].id).eq('status','Em Quadra').order('court');
+        // Aplica cor da federacao no header
+        if(fed?.primary_color){document.querySelector('.matches-page .header').style.background=fed.primary_color;}
+        // Jogos em quadra DESTA federacao + tournament
+        const{data:ms}=await sb.from('live_matches').select('*').eq('federation_id',currentUser.federation_id).eq('tournament_id',ts[0].id).eq('status','Em Quadra').order('court');
         const list=document.getElementById('ref-tab-jogos');
         if(!ms?.length){list.innerHTML='<div class="empty"><div style="font-size:48px">&#9203;</div><p>Nenhum jogo em quadra.<br>Aguarde o organizador.</p></div>';return;}
         let h='';ms.forEach(m=>{h+=`<div class="match-card" onclick="openScorer('${m.id}')"><div class="court">${esc(m.court)}</div><div class="players">${esc(m.player1)} vs ${esc(m.player2)}</div><div class="draw">${esc(m.draw_name)} - ${esc(m.round_name||'')}</div></div>`;});
@@ -402,9 +462,9 @@
 
     let historyData=[];
     async function loadHistory(){
-      if(!sb||!currentTournamentId)return;
+      if(!sb||!currentTournamentId||!currentUser?.federation_id)return;
       try{
-        const{data:ms}=await sb.from('live_matches').select('*').eq('tournament_id',currentTournamentId).eq('status','Finalizada').order('updated_at',{ascending:false});
+        const{data:ms}=await sb.from('live_matches').select('*').eq('federation_id',currentUser.federation_id).eq('tournament_id',currentTournamentId).eq('status','Finalizada').order('updated_at',{ascending:false});
         if(!ms?.length){document.getElementById('hist-list').innerHTML='<div class="empty"><div style="font-size:48px">&#127942;</div><p>Nenhuma partida finalizada</p></div>';return;}
         const ids=ms.map(m=>m.id);
         const{data:scores}=await sb.from('live_scores').select('*').in('match_id',ids);
@@ -452,9 +512,9 @@
     }
 
     async function loadArbitros(){
-      if(!sb||!currentTournamentId)return;
+      if(!sb||!currentTournamentId||!currentUser?.federation_id)return;
       try{
-        const{data:ms}=await sb.from('live_matches').select('*').eq('tournament_id',currentTournamentId).eq('status','Finalizada');
+        const{data:ms}=await sb.from('live_matches').select('*').eq('federation_id',currentUser.federation_id).eq('tournament_id',currentTournamentId).eq('status','Finalizada');
         if(!ms?.length){document.getElementById('arb-list').innerHTML='<div class="empty"><div style="font-size:48px">&#128100;</div><p>Nenhum arbitro registrado</p></div>';return;}
         const ids=ms.map(m=>m.id);
         const{data:scores}=await sb.from('live_scores').select('umpire_name,match_id').in('match_id',ids);
