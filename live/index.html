@@ -353,11 +353,13 @@
     }
 
     function showHubButtonIfMultiple(){
-      const show = activeTournaments.length >= 2;
+      // Botao "Inicio" sempre visivel (Opcao B): permite acessar a lista de
+      // torneios mesmo quando so tem 1 ativo. Auto-load do unico torneio
+      // continua acontecendo no init para preservar UX de "abre direto".
       const navEl = document.getElementById('nav-hub');
       const mtabEl = document.getElementById('mtab-hub');
-      if (navEl) navEl.style.display = show ? '' : 'none';
-      if (mtabEl) mtabEl.style.display = show ? '' : 'none';
+      if (navEl) navEl.style.display = '';
+      if (mtabEl) mtabEl.style.display = '';
     }
 
     // Compatibilidade: getTournament continua existindo, mas pega o tournament atual pelo id
