@@ -1521,10 +1521,23 @@ function renderDrawDetail(idx) {
     ${has?`<button class="btn btn-sm" style="background:${d.awarded?'#D1FAE5;color:#065F46;border:1px solid #10B981':'#FEF3C7;color:#92400E;border:1px solid #F59E0B'}" onclick="toggleAwarded(${idx})">${d.awarded?'&#10003; Premiado':'&#127942; Premiar'}</button>`:''}
     <button class="btn btn-sm btn-danger" onclick="deleteDraw(${idx})">Excluir</button>
   </div></div>
-  <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+  <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
     <div><span style="font-size:12px;color:var(--fabd-gray-500)">Evento:</span> <span class="tag tag-blue">${esc(evNames[d.event]||d.event)}</span></div>
     <div><span style="font-size:12px;color:var(--fabd-gray-500)">Tipo:</span> <span class="tag tag-gray">${esc(d.type)}</span></div>
     <div><span style="font-size:12px;color:var(--fabd-gray-500)">Jogadores:</span> <strong>${d.players?.length||0}</strong></div>
+    ${d.type==='Grupos + Eliminatoria'?`
+      <div style="display:flex;gap:12px;align-items:center;padding:6px 10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fabd-gray-600)" title="${has?'Re-sorteie a chave para aplicar mudancas':'Quantidade de grupos'}">
+          <span>Grupos:</span>
+          <input type="number" min="1" max="8" value="${d.numGroups||2}" ${has?'disabled':''} onchange="updateDrawNumGroups(${idx}, this.value)" style="width:54px;padding:4px 6px;border:1px solid #CBD5E1;border-radius:6px;text-align:center;font-weight:700;${has?'background:#F1F5F9;cursor:not-allowed':''}">
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fabd-gray-600)" title="${has?'Re-sorteie a chave para aplicar mudancas':'Quantos se classificam por grupo para a eliminatoria'}">
+          <span>Classificados/grupo:</span>
+          <input type="number" min="1" max="4" value="${d.groupQualifiers||2}" ${has?'disabled':''} onchange="updateDrawQualifiers(${idx}, this.value)" style="width:54px;padding:4px 6px;border:1px solid #CBD5E1;border-radius:6px;text-align:center;font-weight:700;${has?'background:#F1F5F9;cursor:not-allowed':''}">
+        </label>
+        ${has?'<span style="font-size:11px;color:#D97706">(re-sorteie para mudar)</span>':''}
+      </div>
+    `:''}
   </div>`;
 
   if (has && d.type==='Eliminatoria') h += renderBracket(d);
@@ -1861,6 +1874,31 @@ async function updateSeed(drawIdx,seedIdx,playerName){
   while(d.seeds_list.length&&!d.seeds_list[d.seeds_list.length-1])d.seeds_list.pop();
   await window.api.saveTournament(tournament);
   renderDrawDetail(drawIdx);
+}
+
+// Handlers para edicao manual de grupos/classificados por chave (pre-sorteio).
+// Persistem no draw e sincronizam com Supabase. Nao mexe em chave ja sorteada
+// (input fica disabled na UI; validacao de seguranca aqui tambem).
+async function updateDrawNumGroups(idx, value) {
+  const d = tournament.draws?.[idx];
+  if (!d) return;
+  if (d.matches?.length) { showToast('Re-sorteie a chave para mudar o numero de grupos', 'warning'); return; }
+  const n = Math.max(1, Math.min(8, parseInt(value) || 2));
+  d.numGroups = n;
+  await window.api.saveTournament(tournament);
+  prepareRankingsForSync(); window.api.supabaseUpsertTournament(tournament.id, tournament.name, tournament);
+  renderDrawDetail(idx);
+}
+
+async function updateDrawQualifiers(idx, value) {
+  const d = tournament.draws?.[idx];
+  if (!d) return;
+  if (d.matches?.length) { showToast('Re-sorteie a chave para mudar classificados/grupo', 'warning'); return; }
+  const n = Math.max(1, Math.min(4, parseInt(value) || 2));
+  d.groupQualifiers = n;
+  await window.api.saveTournament(tournament);
+  prepareRankingsForSync(); window.api.supabaseUpsertTournament(tournament.id, tournament.name, tournament);
+  renderDrawDetail(idx);
 }
 
 // Sortear UMA chave individual
