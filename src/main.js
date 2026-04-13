@@ -1018,7 +1018,13 @@ ipcMain.handle('supabase:unsubscribe', async () => {
 
 ipcMain.handle('supabase:getReferees', async () => {
   try {
-    const { data, error } = await supabase.from('referees').select('*').order('created_at', { ascending: false });
+    if (!currentOrganizer) { log('WARN', 'getReferees: sem login'); return []; }
+    // Super_admin ve todos; outros so da propria federacao
+    let q = supabase.from('referees').select('*').order('created_at', { ascending: false });
+    if (currentOrganizer.role !== 'super_admin' && currentFederation?.id) {
+      q = q.eq('federation_id', currentFederation.id);
+    }
+    const { data, error } = await q;
     if (error) throw error;
     return data || [];
   } catch(e) { log('ERROR', 'getReferees:', e.message); return []; }
@@ -1026,6 +1032,20 @@ ipcMain.handle('supabase:getReferees', async () => {
 
 ipcMain.handle('supabase:updateRefereeStatus', async (_, id, status) => {
   try {
+    if (!currentOrganizer) { log('WARN', 'updateRefereeStatus: sem login'); return false; }
+    if (!['admin','super_admin'].includes(currentOrganizer.role)) {
+      log('WARN', 'updateRefereeStatus: role insuficiente:', currentOrganizer.role);
+      return false;
+    }
+    // Admin de federacao so pode atualizar arbitros da propria federacao
+    // RLS reforca server-side, mas validamos client-side tambem para feedback rapido
+    if (currentOrganizer.role === 'admin' && currentFederation?.id) {
+      const { data: ref } = await supabase.from('referees').select('federation_id').eq('id', id).maybeSingle();
+      if (ref && ref.federation_id && ref.federation_id !== currentFederation.id) {
+        log('WARN', 'updateRefereeStatus: arbitro de outra federacao');
+        return false;
+      }
+    }
     const { error } = await supabase.from('referees').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
     if (error) throw error;
     return true;
