@@ -92,7 +92,19 @@ let realtimeChannel = null;
 
 // === AUTH STATE ===
 let currentAuthUser = null;     // { id, email } depois do login
-let currentOrganizer = null;    // { email, name, role, active } da tabela organizers
+let currentOrganizer = null;    // { email, name, role, active, federation_id } da tabela organizers
+let currentFederation = null;   // { id, slug, name, short_name } resolvida para esta sessao
+let _defaultFedCache = null;    // cache da federacao FABD para super_admin
+
+async function getDefaultFederation() {
+  if (_defaultFedCache) return _defaultFedCache;
+  try {
+    const { data, error } = await supabase.from('federations').select('id,slug,name,short_name').eq('slug', 'fabd').maybeSingle();
+    if (error || !data) return null;
+    _defaultFedCache = data;
+    return data;
+  } catch (e) { return null; }
+}
 
 // === PATHS ===
 const DB_PATH = path.join(app.getPath('userData'), 'fabd-data.json');
@@ -595,7 +607,11 @@ function flushUpsert() {
 
 ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tournamentData) => {
   try {
-    const row = { id: tournamentId, name, updated_at: new Date().toISOString() };
+    if (!currentFederation?.id) {
+      log('ERROR', 'upsertTournament: sem federacao ativa (login pendente?)');
+      return false;
+    }
+    const row = { id: tournamentId, name, federation_id: currentFederation.id, updated_at: new Date().toISOString() };
     if (tournamentData) {
       row.data = {
         matches: tournamentData.matches || [],
@@ -632,9 +648,14 @@ function stableMatchId(tournamentId, matchData) {
 
 ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
   try {
+    if (!currentFederation?.id) {
+      log('ERROR', 'upsertMatch: sem federacao ativa (login pendente?)');
+      return false;
+    }
     const id = stableMatchId(tournamentId, matchData);
     const row = {
-      id, tournament_id: tournamentId, match_num: matchData.num,
+      id, tournament_id: tournamentId, federation_id: currentFederation.id,
+      match_num: matchData.num,
       draw_name: matchData.drawName || '', round: matchData.round || 1,
       round_name: matchData.roundName || '', player1: matchData.player1 || '',
       player2: matchData.player2 || '', court: matchData.court || '',
@@ -643,7 +664,7 @@ ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
     };
     const { error } = await supabase.from('live_matches').upsert(row, { onConflict: 'id' });
     if (error) throw error;
-    const { error: scoreError } = await supabase.from('live_scores').upsert({ match_id: id, tournament_id: tournamentId }, { onConflict: 'match_id' });
+    const { error: scoreError } = await supabase.from('live_scores').upsert({ match_id: id, tournament_id: tournamentId, federation_id: currentFederation.id }, { onConflict: 'match_id' });
     if (scoreError) { log('ERROR', 'Supabase score upsert:', scoreError.message); return false; }
     log('INFO', 'Supabase match upserted:', id);
     return true;
@@ -667,19 +688,31 @@ let realtimeRetryInterval = null;
 // === AUTH IPC ===
 async function refreshOrganizerStatus() {
   if (HAS_SERVICE_ROLE) {
-    currentOrganizer = { email: 'admin@local', name: 'Admin (service_role)', role: 'admin', active: true };
+    currentOrganizer = { email: 'admin@local', name: 'Admin (service_role)', role: 'super_admin', active: true, federation_id: null };
+    currentFederation = await getDefaultFederation();
     return currentOrganizer;
   }
-  if (!currentAuthUser?.email) { currentOrganizer = null; return null; }
+  if (!currentAuthUser?.email) { currentOrganizer = null; currentFederation = null; return null; }
   try {
-    const { data, error } = await supabase.from('organizers').select('email,name,role,active').eq('email', currentAuthUser.email.toLowerCase()).maybeSingle();
-    if (error) { log('ERROR', 'organizers lookup:', error.message); currentOrganizer = null; return null; }
-    if (!data || !data.active) { currentOrganizer = null; return null; }
+    const { data, error } = await supabase.from('organizers')
+      .select('email,name,role,active,federation_id')
+      .eq('email', currentAuthUser.email.toLowerCase())
+      .maybeSingle();
+    if (error) { log('ERROR', 'organizers lookup:', error.message); currentOrganizer = null; currentFederation = null; return null; }
+    if (!data || !data.active) { currentOrganizer = null; currentFederation = null; return null; }
     currentOrganizer = data;
+    // Resolver federacao efetiva: super_admin usa FABD como default; demais usam a propria
+    if (data.role === 'super_admin') {
+      currentFederation = await getDefaultFederation();
+    } else if (data.federation_id) {
+      const { data: fed } = await supabase.from('federations').select('id,slug,name,short_name').eq('id', data.federation_id).maybeSingle();
+      currentFederation = fed || null;
+    }
+    log('INFO', 'Organizador autenticado:', data.email, '| federacao:', currentFederation?.slug || 'NENHUMA');
     // Atualiza last_login_at (best-effort)
     supabase.from('organizers').update({ last_login_at: new Date().toISOString() }).eq('email', currentAuthUser.email.toLowerCase()).then(() => {}, () => {});
     return data;
-  } catch (e) { log('ERROR', 'refreshOrganizerStatus:', e.message); currentOrganizer = null; return null; }
+  } catch (e) { log('ERROR', 'refreshOrganizerStatus:', e.message); currentOrganizer = null; currentFederation = null; return null; }
 }
 
 // Boot: tenta restaurar sessao persistida
@@ -699,7 +732,8 @@ ipcMain.handle('auth:status', async () => ({
   hasServiceRole: HAS_SERVICE_ROLE,
   user: currentAuthUser,
   organizer: currentOrganizer,
-  isAuthorized: !!currentOrganizer
+  federation: currentFederation,
+  isAuthorized: !!currentOrganizer && !!currentFederation
 }));
 
 ipcMain.handle('auth:sendOtp', async (_, email) => {

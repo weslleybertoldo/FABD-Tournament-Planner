@@ -138,8 +138,10 @@ function showOrganizerBadge(st) {
     document.body.appendChild(el);
   }
   const name = st.organizer?.name || 'Organizador';
-  const role = st.organizer?.role === 'admin' ? '⚡' : '';
-  el.textContent = `${role} ${name}`.trim();
+  const role = st.organizer?.role === 'super_admin' ? '★' : (st.organizer?.role === 'admin' ? '⚡' : '');
+  const fed = st.federation?.short_name ? ` · ${st.federation.short_name}` : '';
+  el.textContent = `${role} ${name}${fed}`.trim();
+  el.title = `${st.organizer?.email || ''} · ${st.federation?.name || ''} · clique para sair`;
 }
 
 async function loadData(autoLoad=false) {
