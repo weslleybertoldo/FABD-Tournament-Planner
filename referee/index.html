@@ -210,8 +210,8 @@
         <div class="sets-info" id="d-left-sets">Sets: 0</div>
         <div class="shuttle" id="d-shuttle-left" style="display:none">&#127992;</div>
         <div class="server-name" id="d-server-left" style="display:none"></div>
-        <div class="player-name" id="d-left-top" style="top:8px;font-size:11px;left:12px;transform:none;text-align:left"></div>
-        <div class="player-name" id="d-left-bottom" style="top:auto;bottom:22px;font-size:11px;left:12px;transform:none;text-align:left"></div>
+        <div class="player-name" id="d-left-top" style="top:25%;font-size:26px;left:50%;transform:translate(-50%,-50%);text-align:center"></div>
+        <div class="player-name" id="d-left-bottom" style="top:75%;bottom:auto;font-size:26px;left:50%;transform:translate(-50%,-50%);text-align:center"></div>
       </div>
       <div class="court-divider">
         <div class="set-label" id="d-div-set">SET 1</div>
@@ -225,8 +225,8 @@
         <div class="sets-info" id="d-right-sets">Sets: 0</div>
         <div class="shuttle" id="d-shuttle-right" style="display:none">&#127992;</div>
         <div class="server-name" id="d-server-right" style="display:none"></div>
-        <div class="player-name" id="d-right-top" style="top:8px;font-size:11px;right:12px;left:auto;transform:none;text-align:right"></div>
-        <div class="player-name" id="d-right-bottom" style="top:auto;bottom:22px;font-size:11px;right:12px;left:auto;transform:none;text-align:right"></div>
+        <div class="player-name" id="d-right-top" style="top:25%;font-size:26px;left:50%;right:auto;transform:translate(-50%,-50%);text-align:center"></div>
+        <div class="player-name" id="d-right-bottom" style="top:75%;bottom:auto;font-size:26px;left:50%;right:auto;transform:translate(-50%,-50%);text-align:center"></div>
       </div>
     </div>
     <div class="scorer-bottom">
@@ -877,17 +877,9 @@
           shuttle.style[serverSide==='left'?'left':'right']='auto';
         }
 
-        // Nome do sacador ao lado da peteca
-        const serverFullName=getDoublesName(doublesServer);
-        document.getElementById('d-server-left').style.display=serverSide==='left'?'block':'none';
-        document.getElementById('d-server-right').style.display=serverSide==='right'?'block':'none';
-        const sNameEl=document.getElementById('d-server-'+serverSide);
-        sNameEl.textContent=serverFullName.split(' ')[0]+' ▸';
-        if(shuttle){
-          sNameEl.style.top=shuttle.style.top;
-          if(serverSide==='left'){sNameEl.style.right='48px';sNameEl.style.left='auto';}
-          else{sNameEl.style.left='48px';sNameEl.style.right='auto';}
-        }
+        // Nome do sacador nao aparece mais ao lado da peteca — ja aparece no centro da metade da quadra
+        document.getElementById('d-server-left').style.display='none';
+        document.getElementById('d-server-right').style.display='none';
 
         // Setinhas internas — só no inicio de cada set
         document.querySelectorAll('.swap-inner').forEach(el=>el.remove());
