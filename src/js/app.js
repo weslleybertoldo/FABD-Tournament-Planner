@@ -2202,6 +2202,54 @@ function generateRoundRobinSchedule(pls) {
 }
 
 // === GRUPOS + ELIMINATORIA ===
+// Fisher-Yates shuffle (usado antes da distribuicao de non-seeds)
+function _shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Retorna o clube do atleta (usa tournament.players como fonte). Aceita nome simples OU dupla "A / B"
+function _getPlayerClub(name) {
+  if (!tournament?.players || !name) return '';
+  const parts = name.split('/').map(s => s.trim()).filter(Boolean);
+  const clubs = parts.map(n => {
+    const p = tournament.players.find(pl => {
+      const full = ((pl.firstName || '') + ' ' + (pl.lastName || '')).trim().toLowerCase();
+      return full === n.toLowerCase();
+    });
+    return p?.club || '';
+  }).filter(Boolean);
+  return clubs.join('|');
+}
+
+// Distribui 1 jogador no grupo com menor numero de jogadores daquele clube.
+// Em empate de contagem de clube, usa grupo com menos jogadores totais (balanceamento).
+function _placePlayerWithClubProtection(groups, player) {
+  const clubs = _getPlayerClub(player).split('|').filter(Boolean);
+  if (!clubs.length) {
+    // Sem clube cadastrado — coloca no grupo menos populoso
+    const target = groups.reduce((a, b) => (a.players.length <= b.players.length ? a : b));
+    target.players.push(player);
+    return;
+  }
+  // Score = (atletas do mesmo clube ja no grupo) * 1000 + (total de atletas no grupo)
+  // Quanto menor o score, melhor
+  let best = groups[0], bestScore = Infinity;
+  groups.forEach(g => {
+    const clubsInGroup = g.players.reduce((acc, p) => {
+      const pc = _getPlayerClub(p).split('|').filter(Boolean);
+      return acc + clubs.filter(c => pc.includes(c)).length;
+    }, 0);
+    const score = clubsInGroup * 1000 + g.players.length;
+    if (score < bestScore) { bestScore = score; best = g; }
+  });
+  best.players.push(player);
+}
+
 function generateGroupsPhase(playerList, numGroups, seeds) {
   seeds = seeds || [];
   const groupLabels = 'ABCDEFGH';
@@ -2210,20 +2258,20 @@ function generateGroupsPhase(playerList, numGroups, seeds) {
     groups.push({ name: 'Grupo ' + groupLabels[i], players: [], matches: [] });
   }
 
-  // Distribute seeds first (snake draft across groups)
-  seeds.forEach((s, i) => {
-    groups[i % numGroups].players.push(s);
+  // BWF/BTP: seeds distribuidas em SNAKE draft (nao round-robin simples)
+  // Com 8 seeds e 4 grupos: A(1,8), B(2,7), C(3,6), D(4,5) — balanceamento de forca
+  let si = 0, sdir = 1;
+  seeds.forEach(s => {
+    groups[si].players.push(s);
+    si += sdir;
+    if (si >= numGroups) { si = numGroups - 1; sdir = -1; }
+    else if (si < 0) { si = 0; sdir = 1; }
   });
 
-  // Distribute remaining players (snake draft)
-  const remaining = playerList.filter(p => !seeds.includes(p));
-  let gi = 0, dir = 1;
-  remaining.forEach(p => {
-    groups[gi].players.push(p);
-    gi += dir;
-    if (gi >= numGroups) { gi = numGroups - 1; dir = -1; }
-    else if (gi < 0) { gi = 0; dir = 1; }
-  });
+  // BWF/BTP: non-seeds EMBARALHADOS (shuffle) antes da distribuicao pra aleatoriedade real
+  // + protecao de clube (atletas do mesmo clube evitam o mesmo grupo quando possivel)
+  const remaining = _shuffleArray(playerList.filter(p => !seeds.includes(p)));
+  remaining.forEach(p => _placePlayerWithClubProtection(groups, p));
 
   // Generate round-robin matches for each group
   groups.forEach(g => {
@@ -2254,16 +2302,47 @@ function computeGroupStandings(groupPlayers, matches) {
   });
   Object.values(stats).forEach(s => { s.ptsDiff = s.ptsFor - s.ptsAgainst; });
   const arr = Object.values(stats);
+
+  // Ordenacao inicial: wins -> ptsDiff -> ptsFor
   arr.sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
     if (b.ptsDiff !== a.ptsDiff) return b.ptsDiff - a.ptsDiff;
     if (b.ptsFor !== a.ptsFor) return b.ptsFor - a.ptsFor;
-    if (a.headToHead[b.name] !== undefined) {
-      if (a.headToHead[b.name] === 1) return -1;
-      if (a.headToHead[b.name] === 0) return 1;
-    }
     return 0;
   });
+
+  // BWF tiebreaker: empates (2+) em wins+ptsDiff+ptsFor sao resolvidos por
+  // MINI-CAMPEONATO entre os empatados (H2H entre o grupo de empatados).
+  // - Empate de 2: pega o resultado direto (quem venceu o outro)
+  // - Empate de 3+: conta quantos venceram DENTRO do sub-grupo (mini-league)
+  const tiedBlocks = [];
+  let i = 0;
+  while (i < arr.length) {
+    let j = i + 1;
+    while (j < arr.length
+      && arr[j].wins === arr[i].wins
+      && arr[j].ptsDiff === arr[i].ptsDiff
+      && arr[j].ptsFor === arr[i].ptsFor) j++;
+    if (j - i >= 2) tiedBlocks.push([i, j]); // [start, end) — bloco empatado
+    i = j;
+  }
+
+  tiedBlocks.forEach(([start, end]) => {
+    const block = arr.slice(start, end);
+    const names = new Set(block.map(s => s.name));
+    // Mini-wins: contagem de vitorias so contra oponentes DENTRO do bloco empatado
+    block.forEach(s => {
+      s._miniWins = 0;
+      Object.entries(s.headToHead).forEach(([opp, result]) => {
+        if (names.has(opp) && result === 1) s._miniWins++;
+      });
+    });
+    // Re-ordenar dentro do bloco: mini-wins desc; se ainda empatar, ordem original
+    block.sort((a, b) => (b._miniWins - a._miniWins) || 0);
+    // Escrever de volta no arr mantendo as posicoes do bloco
+    for (let k = start; k < end; k++) arr[k] = block[k - start];
+  });
+
   return arr;
 }
 
