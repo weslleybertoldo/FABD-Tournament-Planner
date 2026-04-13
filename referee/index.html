@@ -212,6 +212,8 @@
         <div class="server-name" id="d-server-left" style="display:none"></div>
         <div class="player-name" id="d-left-top" style="top:25%;font-size:26px;left:50%;transform:translate(-50%,-50%);text-align:center"></div>
         <div class="player-name" id="d-left-bottom" style="top:75%;bottom:auto;font-size:26px;left:50%;transform:translate(-50%,-50%);text-align:center"></div>
+        <div class="player-name" id="d-left-top-club" style="top:8px;font-size:11px;left:12px;transform:none;text-align:left;opacity:0.75"></div>
+        <div class="player-name" id="d-left-bottom-club" style="top:auto;bottom:22px;font-size:11px;left:12px;transform:none;text-align:left;opacity:0.75"></div>
       </div>
       <div class="court-divider">
         <div class="set-label" id="d-div-set">SET 1</div>
@@ -227,6 +229,8 @@
         <div class="server-name" id="d-server-right" style="display:none"></div>
         <div class="player-name" id="d-right-top" style="top:25%;font-size:26px;left:50%;right:auto;transform:translate(-50%,-50%);text-align:center"></div>
         <div class="player-name" id="d-right-bottom" style="top:75%;bottom:auto;font-size:26px;left:50%;right:auto;transform:translate(-50%,-50%);text-align:center"></div>
+        <div class="player-name" id="d-right-top-club" style="top:8px;font-size:11px;right:12px;left:auto;transform:none;text-align:right;opacity:0.75"></div>
+        <div class="player-name" id="d-right-bottom-club" style="top:auto;bottom:22px;font-size:11px;right:12px;left:auto;transform:none;text-align:right;opacity:0.75"></div>
       </div>
     </div>
     <div class="scorer-bottom">
@@ -282,6 +286,7 @@
     const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
 
     let currentUser=null,currentMatch=null,pollInterval=null,deferredPrompt=null;
+    let clubMap=new Map(); // mapeia nome completo -> clube do jogador
     // Sides: quem esta em qual lado da tela
     let leftPlayer=1,rightPlayer=2; // 1=player1, 2=player2
     let state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
@@ -482,6 +487,11 @@
         const{data:match}=await sb.from('live_matches').select('*').eq('id',matchId).single();
         if(!match){alert('Jogo nao encontrado');return;}
         currentMatch=match;
+        // Carregar clubes dos jogadores (para exibir nos cantos da quadra)
+        try{
+          const{data:td}=await sb.from('tournaments').select('data').eq('id',match.tournament_id).single();
+          clubMap=new Map(((td?.data?.players)||[]).map(p=>[(p.name||'').trim(),p.club||'']));
+        }catch(e){clubMap=new Map();}
         leftPlayer=1;rightPlayer=2;
         state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
         interval11Asked=false;
@@ -564,6 +574,10 @@
     function getDoublesName(key){
       const map={p1a,p1b,p2a,p2b};
       return map[key]||key;
+    }
+
+    function getClub(name){
+      return clubMap.get((name||'').trim())||'';
     }
 
     function swapInnerLeft(){
@@ -856,6 +870,11 @@
         document.getElementById('d-left-bottom').textContent=lbName.split(' ')[0];
         document.getElementById('d-right-top').textContent=rtName.split(' ')[0];
         document.getElementById('d-right-bottom').textContent=rbName.split(' ')[0];
+        // Clubes nos cantos (posicoes antigas dos nomes)
+        document.getElementById('d-left-top-club').textContent=getClub(ltName);
+        document.getElementById('d-left-bottom-club').textContent=getClub(lbName);
+        document.getElementById('d-right-top-club').textContent=getClub(rtName);
+        document.getElementById('d-right-bottom-club').textContent=getClub(rbName);
         document.getElementById('d-left-name').textContent=lName;
         document.getElementById('d-right-name').textContent=rName;
         // Esconder nome principal central (já tem nos cantos)
