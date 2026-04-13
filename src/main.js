@@ -6,8 +6,12 @@ const WebSocket = require('ws');
 const XLSX = require('xlsx');
 
 // === SUPABASE ===
-// Chaves carregadas de config.local.json (nao commitado no git)
-// Para configurar, copie config.example.json para config.local.json e preencha suas chaves
+// Anon key e publica por design (protegida por RLS no Supabase).
+// Ordem de resolucao: config.local.json -> env vars -> defaults do projeto FABD.
+// Para apontar pra outro projeto, crie config.local.json ou defina as env vars.
+const DEFAULT_SUPABASE_URL = 'https://zwjgjtrmsqtyyjtuotuo.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY';
+
 function loadSupabaseConfig() {
   const configPaths = [
     path.join(__dirname, '..', 'config.local.json'),
@@ -28,8 +32,8 @@ function loadSupabaseConfig() {
   if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
     return { SUPABASE_URL: process.env.SUPABASE_URL, SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY };
   }
-  console.error('ERRO: config.local.json nao encontrado. Copie config.example.json para config.local.json');
-  return { SUPABASE_URL: '', SUPABASE_ANON_KEY: '' };
+  // Fallback final: defaults do projeto FABD (anon key publica, protegida por RLS)
+  return { SUPABASE_URL: DEFAULT_SUPABASE_URL, SUPABASE_ANON_KEY: DEFAULT_SUPABASE_ANON_KEY };
 }
 const _supaConfig = loadSupabaseConfig();
 const SUPABASE_URL = _supaConfig.SUPABASE_URL;
