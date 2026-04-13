@@ -8,6 +8,41 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+  <!-- LOGIN OVERLAY -->
+  <div id="auth-overlay" style="display:none;position:fixed;inset:0;background:#0F172A;z-index:99999;align-items:center;justify-content:center;font-family:'Inter','Segoe UI',sans-serif">
+    <div style="background:#1E293B;border-radius:16px;padding:36px 32px;max-width:420px;width:92%;color:#fff;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+      <div style="text-align:center;margin-bottom:24px">
+        <div style="width:64px;height:64px;background:#1E3A8A;border-radius:16px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:32px">&#127992;</div>
+        <h2 style="margin:0;font-size:20px;color:#fff">FABD Tournament Planner</h2>
+        <p style="margin:6px 0 0;font-size:13px;color:#94A3B8">Acesso restrito a organizadores autorizados</p>
+      </div>
+
+      <div id="auth-step-email">
+        <label style="display:block;font-size:13px;color:#CBD5E1;margin-bottom:6px">Email do organizador</label>
+        <input id="auth-email" type="email" autocomplete="email" placeholder="seu@email.com"
+          style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid #334155;background:#0F172A;color:#fff;font-size:15px;box-sizing:border-box">
+        <button id="auth-send-btn" onclick="authSendCode()"
+          style="width:100%;margin-top:12px;padding:12px;background:#1E3A8A;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">Enviar codigo</button>
+        <div id="auth-email-msg" style="margin-top:10px;font-size:12px;color:#F59E0B;min-height:16px"></div>
+      </div>
+
+      <div id="auth-step-code" style="display:none">
+        <p style="font-size:13px;color:#CBD5E1;margin:0 0 6px">Codigo enviado para <strong id="auth-email-shown" style="color:#fff"></strong></p>
+        <p style="font-size:11px;color:#64748B;margin:0 0 12px">Confira sua caixa de entrada (e spam). Validade: 10 minutos.</p>
+        <input id="auth-code" type="text" inputmode="numeric" maxlength="6" pattern="[0-9]*" placeholder="000000"
+          style="width:100%;padding:14px;border-radius:10px;border:1px solid #334155;background:#0F172A;color:#fff;font-size:24px;letter-spacing:12px;text-align:center;font-weight:700;box-sizing:border-box">
+        <button id="auth-verify-btn" onclick="authVerifyCode()"
+          style="width:100%;margin-top:12px;padding:12px;background:#10B981;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">Entrar</button>
+        <button onclick="authBackToEmail()" style="width:100%;margin-top:8px;padding:10px;background:transparent;color:#94A3B8;border:1px solid #334155;border-radius:10px;font-size:13px;cursor:pointer">Voltar</button>
+        <div id="auth-code-msg" style="margin-top:10px;font-size:12px;color:#F59E0B;min-height:16px"></div>
+      </div>
+
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #334155;font-size:11px;color:#64748B;text-align:center">
+        Sem acesso? Solicite a <strong style="color:#94A3B8">admin@fabd.com</strong>
+      </div>
+    </div>
+  </div>
+
   <!-- Barra de atualização automática (hidden por padrão, JS mostra quando há update) -->
   <div id="update-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#1E3A8A;color:#fff;padding:8px 16px;font-size:13px;font-family:'Inter',sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.2);align-items:center;justify-content:center;gap:12px">
     <span id="update-bar-text"></span>

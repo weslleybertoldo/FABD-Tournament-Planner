@@ -43,6 +43,12 @@ contextBridge.exposeInMainWorld('api', {
   supabaseRemoveFromCourt: (tid, matchData) => ipcRenderer.invoke('supabase:removeFromCourt', tid, matchData),
   supabaseCleanup: (tid) => ipcRenderer.invoke('supabase:cleanup', tid),
   supabaseIsOrganizer: () => ipcRenderer.invoke('supabase:isOrganizer'),
+
+  // Auth (login OTP por email)
+  authStatus: () => ipcRenderer.invoke('auth:status'),
+  authSendOtp: (email) => ipcRenderer.invoke('auth:sendOtp', email),
+  authVerifyOtp: (email, token) => ipcRenderer.invoke('auth:verifyOtp', email, token),
+  authSignOut: () => ipcRenderer.invoke('auth:signOut'),
   supabaseSubscribe: (tid) => ipcRenderer.invoke('supabase:subscribe', tid),
   supabaseUnsubscribe: () => ipcRenderer.invoke('supabase:unsubscribe'),
   onScoreUpdate: (cb) => { ipcRenderer.removeAllListeners('supabase:scoreUpdate'); ipcRenderer.on('supabase:scoreUpdate', (_, data) => cb(data)); },

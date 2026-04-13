@@ -27,6 +27,10 @@ const MODALITIES = [
 
 // === INIT ===
 document.addEventListener('DOMContentLoaded', async () => {
+  // Gate de autenticacao: bloqueia o app ate o organizador estar logado
+  const authOk = await ensureAuthenticated();
+  if (!authOk) return; // Login overlay esta visivel; app nao prossegue
+
   await loadData();
   setupNavigation();
   setupValidation();
@@ -34,6 +38,109 @@ document.addEventListener('DOMContentLoaded', async () => {
   const verEl=document.getElementById('current-version');
   if(verEl)verEl.textContent=`Versao atual: v${APP_VERSION}`;
 });
+
+// === AUTH (login OTP por email) ===
+let _authState = { email: '' };
+
+async function ensureAuthenticated() {
+  try {
+    const st = await window.api.authStatus();
+    if (st.hasServiceRole || st.isAuthorized) {
+      // Atualiza badge no rodape (se houver)
+      showOrganizerBadge(st);
+      return true;
+    }
+    showAuthOverlay();
+    return false;
+  } catch (e) {
+    console.error('Auth status:', e);
+    showAuthOverlay();
+    return false;
+  }
+}
+
+function showAuthOverlay() {
+  const o = document.getElementById('auth-overlay');
+  if (o) o.style.display = 'flex';
+  document.getElementById('auth-step-email').style.display = 'block';
+  document.getElementById('auth-step-code').style.display = 'none';
+  setTimeout(() => document.getElementById('auth-email')?.focus(), 100);
+}
+
+function hideAuthOverlay() {
+  const o = document.getElementById('auth-overlay');
+  if (o) o.style.display = 'none';
+}
+
+async function authSendCode() {
+  const emailEl = document.getElementById('auth-email');
+  const msgEl = document.getElementById('auth-email-msg');
+  const btnEl = document.getElementById('auth-send-btn');
+  const email = (emailEl.value || '').trim().toLowerCase();
+  if (!email || !email.includes('@')) { msgEl.textContent = 'Informe um email valido'; return; }
+  msgEl.style.color = '#94A3B8'; msgEl.textContent = 'Enviando...';
+  btnEl.disabled = true;
+  try {
+    const res = await window.api.authSendOtp(email);
+    if (!res.ok) { msgEl.style.color = '#EF4444'; msgEl.textContent = res.error || 'Falhou ao enviar codigo'; btnEl.disabled = false; return; }
+    _authState.email = email;
+    document.getElementById('auth-email-shown').textContent = email;
+    document.getElementById('auth-step-email').style.display = 'none';
+    document.getElementById('auth-step-code').style.display = 'block';
+    setTimeout(() => document.getElementById('auth-code')?.focus(), 100);
+  } catch (e) { msgEl.style.color = '#EF4444'; msgEl.textContent = e.message || 'Erro'; }
+  finally { btnEl.disabled = false; }
+}
+
+async function authVerifyCode() {
+  const codeEl = document.getElementById('auth-code');
+  const msgEl = document.getElementById('auth-code-msg');
+  const btnEl = document.getElementById('auth-verify-btn');
+  const token = (codeEl.value || '').trim();
+  if (!/^\d{6}$/.test(token)) { msgEl.style.color = '#EF4444'; msgEl.textContent = 'Codigo deve ter 6 digitos'; return; }
+  msgEl.style.color = '#94A3B8'; msgEl.textContent = 'Verificando...';
+  btnEl.disabled = true;
+  try {
+    const res = await window.api.authVerifyOtp(_authState.email, token);
+    if (!res.ok) { msgEl.style.color = '#EF4444'; msgEl.textContent = res.error || 'Codigo invalido'; btnEl.disabled = false; return; }
+    msgEl.style.color = '#10B981'; msgEl.textContent = 'Sucesso! Carregando...';
+    hideAuthOverlay();
+    showOrganizerBadge(await window.api.authStatus());
+    await loadData();
+    setupNavigation();
+    setupValidation();
+    updateOverview();
+  } catch (e) { msgEl.style.color = '#EF4444'; msgEl.textContent = e.message || 'Erro'; }
+  finally { btnEl.disabled = false; }
+}
+
+function authBackToEmail() {
+  document.getElementById('auth-step-code').style.display = 'none';
+  document.getElementById('auth-step-email').style.display = 'block';
+  document.getElementById('auth-code').value = '';
+  document.getElementById('auth-code-msg').textContent = '';
+  setTimeout(() => document.getElementById('auth-email')?.focus(), 100);
+}
+
+function showOrganizerBadge(st) {
+  if (!st) return;
+  let el = document.getElementById('organizer-badge');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'organizer-badge';
+    el.style.cssText = 'position:fixed;bottom:8px;right:12px;background:#1E3A8A;color:#fff;padding:4px 10px;border-radius:12px;font-size:11px;z-index:9000;font-family:Inter,sans-serif;cursor:pointer';
+    el.title = 'Clique para sair';
+    el.onclick = async () => {
+      if (!confirm('Deseja sair do app?')) return;
+      await window.api.authSignOut();
+      location.reload();
+    };
+    document.body.appendChild(el);
+  }
+  const name = st.organizer?.name || 'Organizador';
+  const role = st.organizer?.role === 'admin' ? '⚡' : '';
+  el.textContent = `${role} ${name}`.trim();
+}
 
 async function loadData(autoLoad=false) {
   try {

@@ -52,18 +52,47 @@ const SUPABASE_URL = _supaConfig.SUPABASE_URL;
 const SUPABASE_ANON_KEY = _supaConfig.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = _supaConfig.SUPABASE_SERVICE_ROLE_KEY;
 const HAS_SERVICE_ROLE = !!SUPABASE_SERVICE_ROLE_KEY;
-// Cliente principal: usa service_role se disponivel (Modo Organizador), senao anon (somente leitura)
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY, {
-  realtime: {
-    timeout: 30000,
-    transport: WebSocket,
+
+// === SESSION STORAGE ===
+// Persiste sessao Supabase em arquivo (Node nao tem localStorage)
+const SESSION_FILE = path.join(app.getPath('userData'), 'auth-session.json');
+const fileStorage = {
+  getItem(key) {
+    try {
+      const data = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf-8'));
+      return data[key] != null ? data[key] : null;
+    } catch (e) { return null; }
   },
-  auth: { persistSession: false, autoRefreshToken: false }
+  setItem(key, value) {
+    let data = {};
+    try { data = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf-8')); } catch (e) {}
+    data[key] = value;
+    try { fs.writeFileSync(SESSION_FILE, JSON.stringify(data), { mode: 0o600 }); } catch (e) {}
+  },
+  removeItem(key) {
+    try {
+      const data = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf-8'));
+      delete data[key];
+      fs.writeFileSync(SESSION_FILE, JSON.stringify(data), { mode: 0o600 });
+    } catch (e) {}
+  }
+};
+
+// Cliente principal: prioridade service_role (legacy/emergencia) -> sessao autenticada (login OTP) -> anon
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY, {
+  realtime: { timeout: 30000, transport: WebSocket },
+  auth: HAS_SERVICE_ROLE
+    ? { persistSession: false, autoRefreshToken: false }
+    : { storage: fileStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
 });
 console.log(HAS_SERVICE_ROLE
-  ? '[Supabase] Modo ORGANIZADOR ativado (service_role detectado em config.local.json)'
-  : '[Supabase] Modo SOMENTE LEITURA — sem service_role. Para habilitar escritas, peca o config.local.json ao administrador FABD/CBBd.');
+  ? '[Supabase] Modo ADMIN (service_role detectado) — login dispensado'
+  : '[Supabase] Modo padrao — login OTP por email obrigatorio para escrita');
 let realtimeChannel = null;
+
+// === AUTH STATE ===
+let currentAuthUser = null;     // { id, email } depois do login
+let currentOrganizer = null;    // { email, name, role, active } da tabela organizers
 
 // === PATHS ===
 const DB_PATH = path.join(app.getPath('userData'), 'fabd-data.json');
@@ -206,7 +235,10 @@ function createWindow() {
   log('INFO', 'App iniciado');
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  await restoreAuthSession();
+  createWindow();
+});
 app.on('window-all-closed', () => {
   if(saveTimeout)clearTimeout(saveTimeout);
   if(realtimeChannel){supabase.removeChannel(realtimeChannel);realtimeChannel=null;}
@@ -632,8 +664,89 @@ let pollingInterval = null;
 let lastPollData = {};
 let realtimeRetryInterval = null;
 
-// Renderer pergunta se desktop esta em Modo Organizador (service_role disponivel)
-ipcMain.handle('supabase:isOrganizer', () => HAS_SERVICE_ROLE);
+// === AUTH IPC ===
+async function refreshOrganizerStatus() {
+  if (HAS_SERVICE_ROLE) {
+    currentOrganizer = { email: 'admin@local', name: 'Admin (service_role)', role: 'admin', active: true };
+    return currentOrganizer;
+  }
+  if (!currentAuthUser?.email) { currentOrganizer = null; return null; }
+  try {
+    const { data, error } = await supabase.from('organizers').select('email,name,role,active').eq('email', currentAuthUser.email.toLowerCase()).maybeSingle();
+    if (error) { log('ERROR', 'organizers lookup:', error.message); currentOrganizer = null; return null; }
+    if (!data || !data.active) { currentOrganizer = null; return null; }
+    currentOrganizer = data;
+    // Atualiza last_login_at (best-effort)
+    supabase.from('organizers').update({ last_login_at: new Date().toISOString() }).eq('email', currentAuthUser.email.toLowerCase()).then(() => {}, () => {});
+    return data;
+  } catch (e) { log('ERROR', 'refreshOrganizerStatus:', e.message); currentOrganizer = null; return null; }
+}
+
+// Boot: tenta restaurar sessao persistida
+async function restoreAuthSession() {
+  if (HAS_SERVICE_ROLE) return; // admin nao precisa
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      currentAuthUser = { id: session.user.id, email: session.user.email };
+      await refreshOrganizerStatus();
+      log('INFO', 'Sessao restaurada:', session.user.email, 'organizador:', !!currentOrganizer);
+    }
+  } catch (e) { log('ERROR', 'restoreAuthSession:', e.message); }
+}
+
+ipcMain.handle('auth:status', async () => ({
+  hasServiceRole: HAS_SERVICE_ROLE,
+  user: currentAuthUser,
+  organizer: currentOrganizer,
+  isAuthorized: !!currentOrganizer
+}));
+
+ipcMain.handle('auth:sendOtp', async (_, email) => {
+  if (HAS_SERVICE_ROLE) return { ok: true, skipped: true };
+  if (!email || !email.includes('@')) return { ok: false, error: 'Email invalido' };
+  try {
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+      options: { shouldCreateUser: true }
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('auth:verifyOtp', async (_, email, token) => {
+  if (HAS_SERVICE_ROLE) return { ok: true, skipped: true };
+  if (!email || !token) return { ok: false, error: 'Email e codigo obrigatorios' };
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: String(token).trim(),
+      type: 'email'
+    });
+    if (error) return { ok: false, error: error.message };
+    if (!data?.session?.user) return { ok: false, error: 'Sessao nao retornada' };
+    currentAuthUser = { id: data.session.user.id, email: data.session.user.email };
+    const org = await refreshOrganizerStatus();
+    if (!org) {
+      // Email autenticado mas nao esta em organizers -> bloquear
+      await supabase.auth.signOut();
+      currentAuthUser = null;
+      return { ok: false, error: 'Email nao autorizado. Solicite acesso a um administrador.' };
+    }
+    return { ok: true, user: currentAuthUser, organizer: currentOrganizer };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('auth:signOut', async () => {
+  try { await supabase.auth.signOut(); } catch (e) {}
+  currentAuthUser = null;
+  currentOrganizer = null;
+  return { ok: true };
+});
+
+// Legacy IPC mantido para compatibilidade
+ipcMain.handle('supabase:isOrganizer', () => HAS_SERVICE_ROLE || !!currentOrganizer);
 
 ipcMain.handle('supabase:cleanup', async (_, tournamentId) => {
   try {
