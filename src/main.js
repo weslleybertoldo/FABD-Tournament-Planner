@@ -557,7 +557,10 @@ ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tourna
         location: tournamentData.location,
         city: tournamentData.city,
         // Apenas nome + clube — sem PII (telefone/dob/email) para nao vazar publicamente
-        players: (tournamentData.players || []).map(p => ({ name: p.name || '', club: p.club || '' }))
+        players: (tournamentData.players || []).map(p => ({
+          name: ((p.firstName || '') + ' ' + (p.lastName || '')).trim() || p.name || '',
+          club: p.club || ''
+        }))
       };
     }
     // Debounce: agendar envio em 500ms (agrupa chamadas rapidas)
