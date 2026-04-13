@@ -69,6 +69,7 @@
         <div class="nav-item" data-page="schedule"><span class="icon">&#128197;</span><span>Agenda</span></div>
         <div class="nav-section-title">Outros</div>
         <div class="nav-item" data-page="reports"><span class="icon">&#128200;</span><span>Relatorios</span></div>
+        <div class="nav-item" id="nav-access" data-page="access" style="display:none"><span class="icon">&#128274;</span><span>Gerenciar Acessos</span></div>
         <div class="nav-item" data-page="settings"><span class="icon">&#9881;</span><span>Configuracoes</span></div>
       </nav>
       <div class="sidebar-footer" id="app-version-footer">FABD Tournament Planner</div>
@@ -283,6 +284,44 @@
             <div class="quick-action" onclick="printReport('winners')"><div class="icon">&#127942;</div><div class="label">Premiacao</div></div>
             <div class="quick-action" onclick="printReport('classification')"><div class="icon">&#127941;</div><div class="label">Classificacao Geral</div></div>
             <div class="quick-action" onclick="printReport('players')"><div class="icon">&#128101;</div><div class="label">Jogadores</div></div>
+          </div>
+        </div>
+
+        <!-- GERENCIAR ACESSOS (admin/super_admin only) -->
+        <div class="page" id="page-access">
+          <div class="card">
+            <div class="card-header">
+              <h3>&#128274; Gerenciar Acessos da Federacao</h3>
+              <div id="access-fed-switcher" style="display:none">
+                <label style="font-size:12px;color:#64748B;margin-right:6px">Federacao:</label>
+                <select id="access-fed-select" class="form-control" style="width:auto;display:inline-block;padding:6px 10px;font-size:13px" onchange="loadAccessOrganizers()"></select>
+              </div>
+            </div>
+            <p style="color:#64748B;font-size:13px;margin-bottom:16px">
+              Adicione organizadores autorizados a usar o app FABD Tournament Planner pela sua federacao.
+              Cada organizador faz login com email + codigo enviado por email.
+            </p>
+            <div id="access-list" style="margin-bottom:24px">
+              <p style="color:#94A3B8">Carregando...</p>
+            </div>
+            <div style="border-top:1px solid #E5E7EB;padding-top:20px">
+              <h4 style="margin-bottom:12px;font-size:15px;color:#1F2937">Adicionar novo organizador</h4>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                <input type="email" id="access-new-email" class="form-control" placeholder="email@exemplo.com">
+                <input type="text" id="access-new-name" class="form-control" placeholder="Nome completo">
+              </div>
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                <select id="access-new-role" class="form-control" style="width:auto;padding:8px 12px">
+                  <option value="organizer">Organizador</option>
+                  <option value="admin">Admin (gerencia outros organizers)</option>
+                </select>
+                <button class="btn btn-primary" onclick="addAccessOrganizer()">+ Adicionar</button>
+                <span id="access-msg" style="font-size:12px;color:#10B981"></span>
+              </div>
+              <p style="font-size:11px;color:#94A3B8;margin-top:8px">
+                Apos adicionado, a pessoa abre o app, faz login com este email e ja entra autorizado.
+              </p>
+            </div>
           </div>
         </div>
 

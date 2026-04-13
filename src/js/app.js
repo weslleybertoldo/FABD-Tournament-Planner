@@ -114,6 +114,90 @@ async function authVerifyCode() {
   finally { btnEl.disabled = false; }
 }
 
+// === GERENCIAR ACESSOS (admin/super_admin) ===
+let _accessCurrentFedId = null;
+let _accessFedList = [];
+
+async function renderAccessPage() {
+  const st = await window.api.authStatus();
+  const role = st?.organizer?.role;
+  if (role !== 'admin' && role !== 'super_admin') {
+    document.getElementById('access-list').innerHTML = '<p style="color:#EF4444">Acesso restrito a admin/super_admin.</p>';
+    return;
+  }
+  const switcher = document.getElementById('access-fed-switcher');
+  if (role === 'super_admin') {
+    switcher.style.display = '';
+    if (!_accessFedList.length) {
+      const r = await window.api.federationsList();
+      _accessFedList = r?.federations || [];
+    }
+    const sel = document.getElementById('access-fed-select');
+    sel.innerHTML = _accessFedList.map(f => `<option value="${f.id}">${esc(f.short_name)} - ${esc(f.name)}</option>`).join('');
+    if (!_accessCurrentFedId) _accessCurrentFedId = st?.federation?.id || _accessFedList[0]?.id;
+    sel.value = _accessCurrentFedId;
+  } else {
+    switcher.style.display = 'none';
+    _accessCurrentFedId = st?.federation?.id;
+  }
+  await loadAccessOrganizers();
+}
+
+async function loadAccessOrganizers() {
+  const sel = document.getElementById('access-fed-select');
+  if (sel && sel.value) _accessCurrentFedId = sel.value;
+  const cnt = document.getElementById('access-list');
+  cnt.innerHTML = '<p style="color:#94A3B8">Carregando...</p>';
+  const r = await window.api.organizersList(_accessCurrentFedId);
+  if (!r.ok) { cnt.innerHTML = `<p style="color:#EF4444">Erro: ${esc(r.error)}</p>`; return; }
+  if (!r.organizers.length) { cnt.innerHTML = '<p style="color:#94A3B8">Nenhum organizador nesta federacao ainda.</p>'; return; }
+  const me = (await window.api.authStatus())?.organizer?.email?.toLowerCase();
+  let h = '<table class="data-table" style="width:100%;font-size:13px"><thead><tr><th>Status</th><th>Nome</th><th>Email</th><th>Role</th><th>Ultimo login</th><th></th></tr></thead><tbody>';
+  r.organizers.forEach(o => {
+    const fmt = o.last_login_at ? new Date(o.last_login_at).toLocaleString('pt-BR') : 'Nunca';
+    const isMe = o.email?.toLowerCase() === me;
+    const dot = o.active ? '<span style="display:inline-block;width:8px;height:8px;background:#10B981;border-radius:50%"></span>' : '<span style="display:inline-block;width:8px;height:8px;background:#EF4444;border-radius:50%"></span>';
+    const roleBadge = o.role === 'super_admin' ? '<span style="background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">★ Super</span>'
+      : o.role === 'admin' ? '<span style="background:#DBEAFE;color:#1E40AF;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">⚡ Admin</span>'
+      : '<span style="background:#F3F4F6;color:#6B7280;padding:2px 8px;border-radius:10px;font-size:11px">Organizer</span>';
+    const actions = isMe ? '<span style="color:#94A3B8;font-size:11px">(voce)</span>' :
+      `<button class="btn btn-sm" style="background:#F3F4F6;color:#374151;margin-right:4px" onclick="toggleAccessOrganizer('${esc(o.email)}',${!o.active})">${o.active?'Desativar':'Ativar'}</button>
+       <button class="btn btn-sm btn-danger" onclick="removeAccessOrganizer('${esc(o.email)}')">Remover</button>`;
+    h += `<tr><td>${dot}</td><td><strong>${esc(o.name)}</strong></td><td>${esc(o.email)}</td><td>${roleBadge}</td><td style="font-size:11px;color:#64748B">${fmt}</td><td>${actions}</td></tr>`;
+  });
+  h += '</tbody></table>';
+  cnt.innerHTML = h;
+}
+
+async function addAccessOrganizer() {
+  const email = document.getElementById('access-new-email').value;
+  const name = document.getElementById('access-new-name').value;
+  const role = document.getElementById('access-new-role').value;
+  const msg = document.getElementById('access-msg');
+  msg.style.color = '#94A3B8'; msg.textContent = 'Enviando...';
+  const r = await window.api.organizersAdd({ email, name, role, federation_id: _accessCurrentFedId });
+  if (!r.ok) { msg.style.color = '#EF4444'; msg.textContent = r.error || 'Erro'; return; }
+  msg.style.color = '#10B981'; msg.textContent = 'Adicionado!';
+  document.getElementById('access-new-email').value = '';
+  document.getElementById('access-new-name').value = '';
+  document.getElementById('access-new-role').value = 'organizer';
+  await loadAccessOrganizers();
+  setTimeout(() => { msg.textContent = ''; }, 3000);
+}
+
+async function toggleAccessOrganizer(email, active) {
+  const r = await window.api.organizersUpdate(email, { active });
+  if (!r.ok) { alert('Erro: ' + r.error); return; }
+  await loadAccessOrganizers();
+}
+
+async function removeAccessOrganizer(email) {
+  if (!confirm(`Remover organizador "${email}" permanentemente?`)) return;
+  const r = await window.api.organizersRemove(email);
+  if (!r.ok) { alert('Erro: ' + r.error); return; }
+  await loadAccessOrganizers();
+}
+
 function authBackToEmail() {
   document.getElementById('auth-step-code').style.display = 'none';
   document.getElementById('auth-step-email').style.display = 'block';
@@ -122,8 +206,18 @@ function authBackToEmail() {
   setTimeout(() => document.getElementById('auth-email')?.focus(), 100);
 }
 
+// Mostra/esconde aba "Gerenciar Acessos" baseado no role
+function applyAccessVisibility(st) {
+  const navEl = document.getElementById('nav-access');
+  if (!navEl) return;
+  const role = st?.organizer?.role;
+  const canManage = role === 'admin' || role === 'super_admin';
+  navEl.style.display = canManage ? '' : 'none';
+}
+
 function showOrganizerBadge(st) {
   if (!st) return;
+  applyAccessVisibility(st);
   let el = document.getElementById('organizer-badge');
   if (!el) {
     el = document.createElement('div');
@@ -391,7 +485,7 @@ function navigateTo(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const el = document.getElementById(`page-${page}`);
   if (el) el.classList.add('active');
-  const titles = { overview:'Visao Geral', tournaments:'Torneio', players:'Jogadores', roster:'Inscritos', draws:'Chaves', matches:'Partidas', schedule:'Agenda', reports:'Relatorios', settings:'Configuracoes' };
+  const titles = { overview:'Visao Geral', tournaments:'Torneio', players:'Jogadores', roster:'Inscritos', draws:'Chaves', matches:'Partidas', schedule:'Agenda', reports:'Relatorios', access:'Gerenciar Acessos', settings:'Configuracoes' };
   document.getElementById('page-title').textContent = titles[page] || page;
 
   switch(page) {
@@ -402,6 +496,7 @@ function navigateTo(page) {
     case 'draws': showTournamentPages(); renderDraws(); break;
     case 'matches': showTournamentPages(); if(tournament){ cleanOrphanMatches(); } renderMatches(); break;
     case 'schedule': showTournamentPages(); renderSchedule(); break;
+    case 'access': renderAccessPage(); break;
   }
 }
 

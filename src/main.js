@@ -782,6 +782,90 @@ ipcMain.handle('auth:signOut', async () => {
 // Legacy IPC mantido para compatibilidade
 ipcMain.handle('supabase:isOrganizer', () => HAS_SERVICE_ROLE || !!currentOrganizer);
 
+// === IPC: Federacoes (lista) ===
+ipcMain.handle('federations:list', async () => {
+  try {
+    const { data, error } = await supabase.from('federations').select('id,slug,name,short_name,state,city,active').order('short_name');
+    if (error) throw error;
+    return { ok: true, federations: data || [] };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// === IPC: Organizadores (CRUD pela federacao do admin/super_admin) ===
+ipcMain.handle('organizers:list', async (_, federationId) => {
+  try {
+    const fid = federationId || currentFederation?.id;
+    if (!fid) return { ok: false, error: 'Federacao nao definida' };
+    const { data, error } = await supabase.from('organizers')
+      .select('email,name,role,active,federation_id,created_at,last_login_at')
+      .eq('federation_id', fid)
+      .order('email');
+    if (error) throw error;
+    return { ok: true, organizers: data || [] };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('organizers:add', async (_, payload) => {
+  try {
+    if (!currentOrganizer) return { ok: false, error: 'Login necessario' };
+    if (currentOrganizer.role !== 'admin' && currentOrganizer.role !== 'super_admin') {
+      return { ok: false, error: 'Apenas admin/super_admin pode adicionar organizadores' };
+    }
+    const email = (payload?.email || '').trim().toLowerCase();
+    const name = (payload?.name || '').trim();
+    const role = ['admin','organizer'].includes(payload?.role) ? payload.role : 'organizer';
+    const fid = payload?.federation_id || currentOrganizer.federation_id || currentFederation?.id;
+    if (!email || !email.includes('@') || !name) return { ok: false, error: 'Email e nome obrigatorios' };
+    if (!fid) return { ok: false, error: 'Federacao nao definida' };
+    // Admin de federacao so pode adicionar na propria federacao (RLS reforca)
+    if (currentOrganizer.role === 'admin' && fid !== currentOrganizer.federation_id) {
+      return { ok: false, error: 'Voce so pode adicionar organizadores na sua federacao' };
+    }
+    const { error } = await supabase.from('organizers').insert({
+      email, name, role, federation_id: fid, active: true
+    });
+    if (error) {
+      if (error.code === '23505') return { ok: false, error: 'Email ja cadastrado' };
+      throw error;
+    }
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('organizers:update', async (_, email, patch) => {
+  try {
+    if (!currentOrganizer) return { ok: false, error: 'Login necessario' };
+    if (currentOrganizer.role !== 'admin' && currentOrganizer.role !== 'super_admin') {
+      return { ok: false, error: 'Apenas admin/super_admin' };
+    }
+    const safePatch = {};
+    if (typeof patch?.active === 'boolean') safePatch.active = patch.active;
+    if (typeof patch?.name === 'string') safePatch.name = patch.name.trim();
+    if (['organizer','admin'].includes(patch?.role)) safePatch.role = patch.role;
+    if (currentOrganizer.role === 'super_admin' && patch?.federation_id !== undefined) {
+      safePatch.federation_id = patch.federation_id;
+    }
+    const { error } = await supabase.from('organizers').update(safePatch).eq('email', email.toLowerCase());
+    if (error) throw error;
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('organizers:remove', async (_, email) => {
+  try {
+    if (!currentOrganizer) return { ok: false, error: 'Login necessario' };
+    if (currentOrganizer.role !== 'admin' && currentOrganizer.role !== 'super_admin') {
+      return { ok: false, error: 'Apenas admin/super_admin' };
+    }
+    if (email.toLowerCase() === currentOrganizer.email?.toLowerCase()) {
+      return { ok: false, error: 'Voce nao pode remover seu proprio acesso' };
+    }
+    const { error } = await supabase.from('organizers').delete().eq('email', email.toLowerCase());
+    if (error) throw error;
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
 ipcMain.handle('supabase:cleanup', async (_, tournamentId) => {
   try {
     // Limpar dados ao vivo do Supabase (live_matches, live_scores)

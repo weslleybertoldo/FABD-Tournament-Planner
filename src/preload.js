@@ -49,6 +49,13 @@ contextBridge.exposeInMainWorld('api', {
   authSendOtp: (email) => ipcRenderer.invoke('auth:sendOtp', email),
   authVerifyOtp: (email, token) => ipcRenderer.invoke('auth:verifyOtp', email, token),
   authSignOut: () => ipcRenderer.invoke('auth:signOut'),
+
+  // Federacoes / Organizadores (gerenciar acessos)
+  federationsList: () => ipcRenderer.invoke('federations:list'),
+  organizersList: (fid) => ipcRenderer.invoke('organizers:list', fid),
+  organizersAdd: (payload) => ipcRenderer.invoke('organizers:add', payload),
+  organizersUpdate: (email, patch) => ipcRenderer.invoke('organizers:update', email, patch),
+  organizersRemove: (email) => ipcRenderer.invoke('organizers:remove', email),
   supabaseSubscribe: (tid) => ipcRenderer.invoke('supabase:subscribe', tid),
   supabaseUnsubscribe: () => ipcRenderer.invoke('supabase:unsubscribe'),
   onScoreUpdate: (cb) => { ipcRenderer.removeAllListeners('supabase:scoreUpdate'); ipcRenderer.on('supabase:scoreUpdate', (_, data) => cb(data)); },
