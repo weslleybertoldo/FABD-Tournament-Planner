@@ -6,9 +6,13 @@ const WebSocket = require('ws');
 const XLSX = require('xlsx');
 
 // === SUPABASE ===
-// Anon key e publica por design (protegida por RLS no Supabase).
-// Ordem de resolucao: config.local.json -> env vars -> defaults do projeto FABD.
-// Para apontar pra outro projeto, crie config.local.json ou defina as env vars.
+// Anon key: publica por design (RLS protege). Embutida no .exe.
+// Service role key: PRIVADA — bypassa RLS. NUNCA hardcoded; carregada de
+// config.local.json (distribuida apenas para organizadores autorizados).
+//
+// Modos:
+//   - Modo Organizador: service_role presente -> escrita liberada
+//   - Modo Somente Leitura: so anon -> escrita bloqueada pelo RLS (Passo 5)
 const DEFAULT_SUPABASE_URL = 'https://zwjgjtrmsqtyyjtuotuo.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY';
 
@@ -22,28 +26,43 @@ function loadSupabaseConfig() {
     try {
       if (fs.existsSync(configPath)) {
         const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-        if (config.SUPABASE_URL && config.SUPABASE_ANON_KEY) {
-          return config;
+        if (config.SUPABASE_URL || config.SUPABASE_ANON_KEY || config.SUPABASE_SERVICE_ROLE_KEY) {
+          return {
+            SUPABASE_URL: config.SUPABASE_URL || DEFAULT_SUPABASE_URL,
+            SUPABASE_ANON_KEY: config.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY,
+            SUPABASE_SERVICE_ROLE_KEY: config.SUPABASE_SERVICE_ROLE_KEY || ''
+          };
         }
       }
     } catch (e) { /* tentar proximo */ }
   }
   // Fallback: variaveis de ambiente
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
-    return { SUPABASE_URL: process.env.SUPABASE_URL, SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY };
+  if (process.env.SUPABASE_URL || process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return {
+      SUPABASE_URL: process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL,
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY,
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+    };
   }
-  // Fallback final: defaults do projeto FABD (anon key publica, protegida por RLS)
-  return { SUPABASE_URL: DEFAULT_SUPABASE_URL, SUPABASE_ANON_KEY: DEFAULT_SUPABASE_ANON_KEY };
+  // Fallback final: defaults publicos sem service_role -> modo somente leitura
+  return { SUPABASE_URL: DEFAULT_SUPABASE_URL, SUPABASE_ANON_KEY: DEFAULT_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY: '' };
 }
 const _supaConfig = loadSupabaseConfig();
 const SUPABASE_URL = _supaConfig.SUPABASE_URL;
 const SUPABASE_ANON_KEY = _supaConfig.SUPABASE_ANON_KEY;
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+const SUPABASE_SERVICE_ROLE_KEY = _supaConfig.SUPABASE_SERVICE_ROLE_KEY;
+const HAS_SERVICE_ROLE = !!SUPABASE_SERVICE_ROLE_KEY;
+// Cliente principal: usa service_role se disponivel (Modo Organizador), senao anon (somente leitura)
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY, {
   realtime: {
     timeout: 30000,
     transport: WebSocket,
   },
+  auth: { persistSession: false, autoRefreshToken: false }
 });
+console.log(HAS_SERVICE_ROLE
+  ? '[Supabase] Modo ORGANIZADOR ativado (service_role detectado em config.local.json)'
+  : '[Supabase] Modo SOMENTE LEITURA — sem service_role. Para habilitar escritas, peca o config.local.json ao administrador FABD/CBBd.');
 let realtimeChannel = null;
 
 // === PATHS ===
@@ -612,6 +631,9 @@ ipcMain.handle('supabase:removeFromCourt', async (_, tournamentId, matchData) =>
 let pollingInterval = null;
 let lastPollData = {};
 let realtimeRetryInterval = null;
+
+// Renderer pergunta se desktop esta em Modo Organizador (service_role disponivel)
+ipcMain.handle('supabase:isOrganizer', () => HAS_SERVICE_ROLE);
 
 ipcMain.handle('supabase:cleanup', async (_, tournamentId) => {
   try {

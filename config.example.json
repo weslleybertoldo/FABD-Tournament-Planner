@@ -1,4 +1,6 @@
 {
+  "_README": "Renomeie este arquivo para config.local.json e preencha os valores. SUPABASE_SERVICE_ROLE_KEY e necessaria APENAS para organizadores (escrita); usuarios comuns podem deixar em branco e usar somente leitura.",
   "SUPABASE_URL": "https://SEU-PROJETO.supabase.co",
-  "SUPABASE_ANON_KEY": "sua-anon-key-aqui"
+  "SUPABASE_ANON_KEY": "sua-anon-key-aqui",
+  "SUPABASE_SERVICE_ROLE_KEY": ""
 }
