@@ -99,7 +99,7 @@ let _defaultFedCache = null;    // cache da federacao FABD para super_admin
 async function getDefaultFederation() {
   if (_defaultFedCache) return _defaultFedCache;
   try {
-    const { data, error } = await supabase.from('federations').select('id,slug,name,short_name').eq('slug', 'fabd').maybeSingle();
+    const { data, error } = await supabase.from('federations').select('id,slug,name,short_name,logo_url,primary_color').eq('slug', 'fabd').maybeSingle();
     if (error || !data) return null;
     _defaultFedCache = data;
     return data;
@@ -705,7 +705,7 @@ async function refreshOrganizerStatus() {
     if (data.role === 'super_admin') {
       currentFederation = await getDefaultFederation();
     } else if (data.federation_id) {
-      const { data: fed } = await supabase.from('federations').select('id,slug,name,short_name').eq('id', data.federation_id).maybeSingle();
+      const { data: fed } = await supabase.from('federations').select('id,slug,name,short_name,logo_url,primary_color').eq('id', data.federation_id).maybeSingle();
       currentFederation = fed || null;
     }
     log('INFO', 'Organizador autenticado:', data.email, '| federacao:', currentFederation?.slug || 'NENHUMA');
@@ -785,9 +785,65 @@ ipcMain.handle('supabase:isOrganizer', () => HAS_SERVICE_ROLE || !!currentOrgani
 // === IPC: Federacoes (lista) ===
 ipcMain.handle('federations:list', async () => {
   try {
-    const { data, error } = await supabase.from('federations').select('id,slug,name,short_name,state,city,active').order('short_name');
+    const { data, error } = await supabase.from('federations').select('id,slug,name,short_name,state,city,active,logo_url').order('short_name');
     if (error) throw error;
     return { ok: true, federations: data || [] };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// Upload de logo da federacao (chamado pelo renderer com ArrayBuffer + mimeType)
+ipcMain.handle('federations:uploadLogo', async (_, arrayBuffer, mimeType) => {
+  try {
+    if (!currentOrganizer || !['super_admin','admin'].includes(currentOrganizer.role)) {
+      return { ok: false, error: 'Apenas admin/super_admin pode fazer upload' };
+    }
+    if (!currentFederation?.id || !currentFederation?.slug) return { ok: false, error: 'Federacao nao definida' };
+    const buffer = Buffer.from(arrayBuffer);
+    if (buffer.length > 2 * 1024 * 1024) return { ok: false, error: 'Arquivo maior que 2MB' };
+    const extMap = { 'image/png':'png', 'image/jpeg':'jpg', 'image/webp':'webp', 'image/svg+xml':'svg' };
+    const ext = extMap[mimeType];
+    if (!ext) return { ok: false, error: 'Formato invalido (use PNG, JPG, WebP ou SVG)' };
+    // Remove arquivos antigos desta federacao (pode haver .png e .jpg antigos)
+    try {
+      const { data: existing } = await supabase.storage.from('federation-logos').list(currentFederation.slug);
+      if (existing?.length) {
+        const paths = existing.map(f => `${currentFederation.slug}/${f.name}`);
+        await supabase.storage.from('federation-logos').remove(paths);
+      }
+    } catch (e) { /* se falhar remocao, ignora */ }
+    const storagePath = `${currentFederation.slug}/logo.${ext}`;
+    const { error: upErr } = await supabase.storage.from('federation-logos').upload(storagePath, buffer, {
+      contentType: mimeType, upsert: true, cacheControl: '3600'
+    });
+    if (upErr) throw upErr;
+    // Adiciona cache-buster na URL pra forcar refresh
+    const { data: urlData } = supabase.storage.from('federation-logos').getPublicUrl(storagePath);
+    const publicUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+    const { error: updErr } = await supabase.from('federations').update({ logo_url: publicUrl }).eq('id', currentFederation.id);
+    if (updErr) throw updErr;
+    currentFederation.logo_url = publicUrl;
+    log('INFO', 'Logo upload:', storagePath);
+    return { ok: true, url: publicUrl };
+  } catch (e) { log('ERROR', 'uploadLogo:', e.message); return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('federations:removeLogo', async () => {
+  try {
+    if (!currentOrganizer || !['super_admin','admin'].includes(currentOrganizer.role)) {
+      return { ok: false, error: 'Apenas admin/super_admin' };
+    }
+    if (!currentFederation?.id || !currentFederation?.slug) return { ok: false, error: 'Federacao nao definida' };
+    try {
+      const { data: existing } = await supabase.storage.from('federation-logos').list(currentFederation.slug);
+      if (existing?.length) {
+        const paths = existing.map(f => `${currentFederation.slug}/${f.name}`);
+        await supabase.storage.from('federation-logos').remove(paths);
+      }
+    } catch (e) {}
+    const { error: updErr } = await supabase.from('federations').update({ logo_url: null }).eq('id', currentFederation.id);
+    if (updErr) throw updErr;
+    currentFederation.logo_url = null;
+    return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });
 

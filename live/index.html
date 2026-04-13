@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#1E3A8A">
   <title>FABD - Torneio Ao Vivo</title>
+  <script src="https://code.iconify.design/iconify-icon/3.0.2/iconify-icon.min.js"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'Segoe UI',sans-serif;background:#0F172A;color:#fff;min-height:100vh;display:flex;flex-direction:column}
@@ -185,7 +186,7 @@
 
   <!-- Mobile tabs -->
   <div class="mobile-tabs">
-    <div class="mobile-tab" id="mtab-hub" style="display:none" onclick="switchSection('hub')">&#127968; Inicio</div>
+    <div class="mobile-tab" id="mtab-hub" style="display:none" onclick="switchSection('hub')"><iconify-icon icon="lucide:home" style="vertical-align:-2px;margin-right:4px"></iconify-icon> Inicio</div>
     <div class="mobile-tab active" id="mtab-live" onclick="switchSection('live')"><span class="live-dot"></span> Ao Vivo</div>
     <div class="mobile-tab" id="mtab-schedule" onclick="switchSection('schedule')">Tabela de Jogos</div>
     <div class="mobile-tab" id="mtab-brackets" onclick="switchSection('brackets')">Chaves</div>
@@ -195,7 +196,7 @@
     <!-- Sidebar (desktop) -->
     <nav class="sidebar">
       <div class="nav-item" id="nav-hub" style="display:none" onclick="switchSection('hub')">
-        <span class="nav-icon">&#127968;</span>
+        <span class="nav-icon"><iconify-icon icon="lucide:home"></iconify-icon></span>
         Inicio
       </div>
       <div class="nav-item active" id="nav-live" onclick="switchSection('live')">
@@ -203,11 +204,11 @@
         Ao Vivo
       </div>
       <div class="nav-item" id="nav-schedule" onclick="switchSection('schedule')">
-        <span class="nav-icon">&#128203;</span>
+        <span class="nav-icon"><iconify-icon icon="lucide:clipboard-list"></iconify-icon></span>
         Tabela de Jogos
       </div>
       <div class="nav-item" id="nav-brackets" onclick="switchSection('brackets')">
-        <span class="nav-icon">&#127942;</span>
+        <span class="nav-icon"><iconify-icon icon="lucide:trophy"></iconify-icon></span>
         Chaves
       </div>
       <div class="nav-info">
@@ -221,7 +222,7 @@
       <div class="section" id="sec-hub">
         <div class="container">
           <div class="hub-intro">
-            <h2>&#127992; Torneios ao Vivo</h2>
+            <h2><iconify-icon icon="mdi:badminton" style="vertical-align:-4px;margin-right:6px;color:#F59E0B"></iconify-icon> Torneios ao Vivo</h2>
             <div class="sub" id="hub-date">Hoje</div>
           </div>
           <div id="hub-content">
@@ -243,7 +244,7 @@
       <!-- Secao: Tabela de Jogos -->
       <div class="section" id="sec-schedule">
         <div class="container">
-          <div class="section-title">&#128203; Tabela de Jogos</div>
+          <div class="section-title"><iconify-icon icon="lucide:clipboard-list" style="color:#F59E0B"></iconify-icon> Tabela de Jogos</div>
           <div id="schedule-content">
             <div class="empty"><div class="icon">&#128203;</div><h3>Carregando tabela...</h3></div>
           </div>
@@ -253,7 +254,7 @@
       <!-- Secao: Chaves -->
       <div class="section" id="sec-brackets">
         <div class="container">
-          <div class="section-title">&#127942; Chaves</div>
+          <div class="section-title"><iconify-icon icon="lucide:trophy" style="color:#F59E0B"></iconify-icon> Chaves</div>
           <div id="brackets-content">
             <div class="empty"><div class="icon">&#127942;</div><h3>Carregando chaves...</h3></div>
           </div>

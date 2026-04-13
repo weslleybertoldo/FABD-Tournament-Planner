@@ -1,4 +1,4 @@
-const CACHE='fabd-referee-v5';
+const CACHE='fabd-referee-v6';
 
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll([
@@ -17,7 +17,7 @@ self.addEventListener('activate',e=>{
 
 self.addEventListener('fetch',e=>{
   // Network only for API and auth
-  if(e.request.url.includes('supabase.co')||e.request.url.includes('googleapis.com')||e.request.url.includes('cdn.jsdelivr.net')){
+  if(e.request.url.includes('supabase.co')||e.request.url.includes('googleapis.com')||e.request.url.includes('cdn.jsdelivr.net')||e.request.url.includes('iconify.design')||e.request.url.includes('simplesvg.com')||e.request.url.includes('unisvg.com')){
     e.respondWith(fetch(e.request));
     return;
   }

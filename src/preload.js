@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld('api', {
 
   // Federacoes / Organizadores (gerenciar acessos)
   federationsList: () => ipcRenderer.invoke('federations:list'),
+  federationsUploadLogo: (buffer, mimeType) => ipcRenderer.invoke('federations:uploadLogo', buffer, mimeType),
+  federationsRemoveLogo: () => ipcRenderer.invoke('federations:removeLogo'),
   organizersList: (fid) => ipcRenderer.invoke('organizers:list', fid),
   organizersAdd: (payload) => ipcRenderer.invoke('organizers:add', payload),
   organizersUpdate: (email, patch) => ipcRenderer.invoke('organizers:update', email, patch),

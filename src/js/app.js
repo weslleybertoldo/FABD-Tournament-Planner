@@ -209,10 +209,84 @@ function authBackToEmail() {
 // Mostra/esconde aba "Gerenciar Acessos" baseado no role
 function applyAccessVisibility(st) {
   const navEl = document.getElementById('nav-access');
-  if (!navEl) return;
-  const role = st?.organizer?.role;
-  const canManage = role === 'admin' || role === 'super_admin';
-  navEl.style.display = canManage ? '' : 'none';
+  if (navEl) {
+    const role = st?.organizer?.role;
+    const canManage = role === 'admin' || role === 'super_admin';
+    navEl.style.display = canManage ? '' : 'none';
+  }
+  applyFederationBrandingToSidebar(st?.federation);
+  applyFederationLogoToSettings(st?.federation);
+}
+
+// Sidebar: se tiver logo_url -> mostra imagem; senao -> mostra sigla
+function applyFederationBrandingToSidebar(fed) {
+  if (!fed) return;
+  const imgEl = document.getElementById('sidebar-fed-logo');
+  const initialsEl = document.getElementById('sidebar-fed-initials');
+  const nameEl = document.getElementById('sidebar-fed-name');
+  if (fed.logo_url) {
+    if (imgEl) { imgEl.src = fed.logo_url; imgEl.style.display = ''; }
+    if (initialsEl) initialsEl.style.display = 'none';
+  } else {
+    if (imgEl) imgEl.style.display = 'none';
+    if (initialsEl) {
+      initialsEl.textContent = (fed.short_name || '?').substring(0, 6).toUpperCase();
+      initialsEl.style.display = 'flex';
+    }
+  }
+  if (nameEl && fed.name) nameEl.textContent = fed.name.toUpperCase();
+}
+
+// Preview na pagina de configuracoes
+function applyFederationLogoToSettings(fed) {
+  const previewEl = document.getElementById('logo-preview');
+  const removeBtn = document.getElementById('logo-remove-btn');
+  if (!previewEl) return;
+  if (fed?.logo_url) {
+    previewEl.innerHTML = `<img src="${esc(fed.logo_url)}" alt="Logo" style="width:100%;height:100%;object-fit:cover">`;
+    previewEl.style.border = 'none';
+    if (removeBtn) removeBtn.style.display = '';
+  } else {
+    previewEl.innerHTML = esc((fed?.short_name||'?').substring(0,4));
+    previewEl.style.border = '2px dashed var(--fabd-gray-300)';
+    previewEl.style.color = 'var(--fabd-gray-400)';
+    if (removeBtn) removeBtn.style.display = 'none';
+  }
+}
+
+async function uploadFederationLogo(ev) {
+  const file = ev.target.files?.[0];
+  if (!file) return;
+  const msg = document.getElementById('logo-msg');
+  msg.style.color = 'var(--fabd-gray-500)'; msg.textContent = 'Enviando...';
+  try {
+    if (file.size > 2 * 1024 * 1024) { msg.style.color = '#DC2626'; msg.textContent = 'Arquivo maior que 2MB'; return; }
+    const buffer = await file.arrayBuffer();
+    const r = await window.api.federationsUploadLogo(buffer, file.type);
+    if (!r.ok) { msg.style.color = '#DC2626'; msg.textContent = r.error || 'Erro'; return; }
+    msg.style.color = '#10B981'; msg.textContent = 'Logo atualizada!';
+    const st = await window.api.authStatus();
+    applyFederationBrandingToSidebar(st?.federation);
+    applyFederationLogoToSettings(st?.federation);
+    setTimeout(() => { msg.textContent = ''; }, 3000);
+  } catch (e) {
+    msg.style.color = '#DC2626'; msg.textContent = 'Erro: ' + e.message;
+  } finally {
+    ev.target.value = '';
+  }
+}
+
+async function removeFederationLogo() {
+  if (!confirm('Remover a logo da federacao? Voltara a exibir apenas a sigla.')) return;
+  const msg = document.getElementById('logo-msg');
+  msg.style.color = 'var(--fabd-gray-500)'; msg.textContent = 'Removendo...';
+  const r = await window.api.federationsRemoveLogo();
+  if (!r.ok) { msg.style.color = '#DC2626'; msg.textContent = r.error || 'Erro'; return; }
+  msg.style.color = '#10B981'; msg.textContent = 'Logo removida.';
+  const st = await window.api.authStatus();
+  applyFederationBrandingToSidebar(st?.federation);
+  applyFederationLogoToSettings(st?.federation);
+  setTimeout(() => { msg.textContent = ''; }, 3000);
 }
 
 function showOrganizerBadge(st) {

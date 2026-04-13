@@ -8,6 +8,7 @@
   <meta name="screen-orientation" content="landscape">
   <title>FABD - Arbitro</title>
   <link rel="manifest" href="manifest.webmanifest">
+  <script src="https://code.iconify.design/iconify-icon/3.0.2/iconify-icon.min.js"></script>
   <link rel="apple-touch-icon" href="icon-192.png">
   <style>
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -121,7 +122,7 @@
 <body>
   <!-- LOGIN -->
   <div id="page-login" class="login-page">
-    <div class="logo">&#127992;</div>
+    <div class="logo"><iconify-icon icon="mdi:badminton" style="font-size:56px;color:#1E3A8A"></iconify-icon></div>
     <h2>FABD Arbitro</h2>
     <p>Acesse com sua conta Google para arbitrar partidas</p>
     <button class="btn-google" onclick="loginGoogle()">
@@ -133,7 +134,7 @@
 
   <!-- ESCOLHER FEDERACAO (primeira vez ou sem federacao definida) -->
   <div id="page-federation" class="pending-page" style="display:none;text-align:center">
-    <div style="font-size:48px;margin-bottom:8px">&#127942;</div>
+    <div style="margin-bottom:8px"><iconify-icon icon="lucide:trophy" style="font-size:56px;color:#F59E0B"></iconify-icon></div>
     <h3 style="color:#F59E0B;margin-bottom:8px">Em qual federacao voce vai arbitrar?</h3>
     <p style="color:#94A3B8;font-size:13px;max-width:340px;margin-bottom:16px">Selecione a federacao para se cadastrar. Apos a escolha, o organizador da federacao precisa autorizar seu acesso.</p>
     <select id="fed-select" style="width:90%;max-width:340px;padding:14px;border-radius:10px;border:1px solid #334155;background:#1E293B;color:#fff;font-size:15px;margin-bottom:12px">
@@ -146,7 +147,7 @@
 
   <!-- AGUARDANDO -->
   <div id="page-pending" class="pending-page">
-    <div style="font-size:48px;margin-bottom:16px">&#9203;</div>
+    <div style="margin-bottom:16px"><iconify-icon icon="lucide:clock-3" style="font-size:56px;color:#F59E0B"></iconify-icon></div>
     <h3 style="color:#F59E0B;margin-bottom:12px">Aguardando Autorizacao</h3>
     <p style="color:#94A3B8;font-size:14px;max-width:300px">Seu acesso foi solicitado. Aguarde o organizador liberar.</p>
     <p style="color:#475569;font-size:12px;margin-top:24px">Verificando a cada 5s...</p>

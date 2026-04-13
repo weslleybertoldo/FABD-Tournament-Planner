@@ -2,10 +2,11 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://code.iconify.design; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.supabase.co; connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com https://*.supabase.co wss://*.supabase.co;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FABD - Planejador de Torneios</title>
   <link rel="stylesheet" href="css/styles.css">
+  <script src="https://code.iconify.design/iconify-icon/3.0.2/iconify-icon.min.js"></script>
 </head>
 <body>
   <!-- LOGIN OVERLAY -->
@@ -54,23 +55,26 @@
     <!-- SIDEBAR -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <img src="assets/logo-fabd.jpg" alt="FABD">
-        <h2>FEDERACAO ALAGOANA<br>DE BADMINTON</h2>
+        <div id="sidebar-fed-logo-wrap" style="display:flex;align-items:center;justify-content:center">
+          <img src="assets/logo-fabd.jpg" alt="FABD" id="sidebar-fed-logo">
+          <div id="sidebar-fed-initials" style="display:none;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;align-items:center;justify-content:center;font-weight:800;font-size:18px;letter-spacing:0.5px"></div>
+        </div>
+        <h2 id="sidebar-fed-name">FEDERACAO ALAGOANA<br>DE BADMINTON</h2>
       </div>
       <nav class="sidebar-nav">
         <div class="nav-section-title">Principal</div>
-        <div class="nav-item active" data-page="overview"><span class="icon">&#127968;</span><span>Visao Geral</span></div>
-        <div class="nav-item" data-page="tournaments"><span class="icon">&#127942;</span><span>Torneios</span></div>
-        <div class="nav-item" data-page="players"><span class="icon">&#128101;</span><span>Jogadores</span></div>
+        <div class="nav-item active" data-page="overview"><span class="icon"><iconify-icon icon="lucide:home"></iconify-icon></span><span>Visao Geral</span></div>
+        <div class="nav-item" data-page="tournaments"><span class="icon"><iconify-icon icon="lucide:trophy"></iconify-icon></span><span>Torneios</span></div>
+        <div class="nav-item" data-page="players"><span class="icon"><iconify-icon icon="lucide:users"></iconify-icon></span><span>Jogadores</span></div>
         <div class="nav-section-title">Torneio Ativo</div>
-        <div class="nav-item" data-page="roster"><span class="icon">&#128203;</span><span>Inscritos</span></div>
-        <div class="nav-item" data-page="draws"><span class="icon">&#127960;</span><span>Chaves</span></div>
-        <div class="nav-item" data-page="matches"><span class="icon">&#127992;</span><span>Partidas</span></div>
-        <div class="nav-item" data-page="schedule"><span class="icon">&#128197;</span><span>Agenda</span></div>
+        <div class="nav-item" data-page="roster"><span class="icon"><iconify-icon icon="lucide:clipboard-list"></iconify-icon></span><span>Inscritos</span></div>
+        <div class="nav-item" data-page="draws"><span class="icon"><iconify-icon icon="lucide:list-tree"></iconify-icon></span><span>Chaves</span></div>
+        <div class="nav-item" data-page="matches"><span class="icon"><iconify-icon icon="mdi:badminton"></iconify-icon></span><span>Partidas</span></div>
+        <div class="nav-item" data-page="schedule"><span class="icon"><iconify-icon icon="lucide:calendar"></iconify-icon></span><span>Agenda</span></div>
         <div class="nav-section-title">Outros</div>
-        <div class="nav-item" data-page="reports"><span class="icon">&#128200;</span><span>Relatorios</span></div>
-        <div class="nav-item" id="nav-access" data-page="access" style="display:none"><span class="icon">&#128274;</span><span>Gerenciar Acessos</span></div>
-        <div class="nav-item" data-page="settings"><span class="icon">&#9881;</span><span>Configuracoes</span></div>
+        <div class="nav-item" data-page="reports"><span class="icon"><iconify-icon icon="lucide:bar-chart-3"></iconify-icon></span><span>Relatorios</span></div>
+        <div class="nav-item" id="nav-access" data-page="access" style="display:none"><span class="icon"><iconify-icon icon="lucide:lock-keyhole"></iconify-icon></span><span>Gerenciar Acessos</span></div>
+        <div class="nav-item" data-page="settings"><span class="icon"><iconify-icon icon="lucide:settings"></iconify-icon></span><span>Configuracoes</span></div>
       </nav>
       <div class="sidebar-footer" id="app-version-footer">FABD Tournament Planner</div>
     </aside>
@@ -344,6 +348,25 @@
             </div>
             <div class="form-group"><label>E-mail de Contato</label><input type="email" class="form-control" id="cfg-email" placeholder="contato@fabd.org.br"></div>
             <button class="btn btn-primary" onclick="saveSettings()">&#128190; Salvar</button>
+
+            <!-- LOGO DA FEDERACAO -->
+            <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--fabd-gray-200)">
+              <h4 style="margin-bottom:8px;color:var(--fabd-gray-700)">Logo da Federacao</h4>
+              <p style="font-size:12px;color:var(--fabd-gray-500);margin-bottom:12px">Arquivo PNG, JPG, WebP ou SVG (max 2MB). Aparece no topo da barra lateral, no site ao vivo e no app do arbitro. Se nao tiver logo, o sistema usa a sigla.</p>
+              <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+                <div id="logo-preview" style="width:80px;height:80px;border-radius:12px;border:2px dashed var(--fabd-gray-300);display:flex;align-items:center;justify-content:center;background:var(--fabd-gray-50);overflow:hidden;color:var(--fabd-gray-400);font-weight:800;font-size:14px">
+                  sem logo
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <input type="file" id="logo-file-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" onchange="uploadFederationLogo(event)">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-primary" style="font-size:13px;padding:8px 14px" onclick="document.getElementById('logo-file-input').click()">Enviar Logo</button>
+                    <button class="btn btn-danger" id="logo-remove-btn" style="font-size:13px;padding:8px 14px;display:none" onclick="removeFederationLogo()">Remover</button>
+                  </div>
+                  <span id="logo-msg" style="font-size:12px;color:var(--fabd-gray-500)"></span>
+                </div>
+              </div>
+            </div>
             <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--fabd-gray-200)">
               <h4 style="margin-bottom:8px;color:var(--fabd-gray-700)">Atualizacao</h4>
               <p style="font-size:12px;color:var(--fabd-gray-500);margin-bottom:8px" id="current-version"></p>
