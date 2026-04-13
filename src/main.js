@@ -791,6 +791,22 @@ ipcMain.handle('federations:list', async () => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
+// Re-valida a sessao Supabase (forca refresh do JWT se proximo de expirar).
+// Operacoes RLS-sensitive devem chamar isto antes pra evitar silent-deny.
+async function ensureFreshSession() {
+  if (HAS_SERVICE_ROLE) return true;
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session) { log('WARN', 'ensureFreshSession: sem sessao'); return false; }
+    // Re-aplicar a session forca o supabase-js a usar o JWT no proximo request
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token
+    });
+    return true;
+  } catch (e) { log('ERROR', 'ensureFreshSession:', e.message); return false; }
+}
+
 // Upload de logo da federacao (chamado pelo renderer com ArrayBuffer + mimeType)
 ipcMain.handle('federations:uploadLogo', async (_, arrayBuffer, mimeType) => {
   try {
@@ -798,6 +814,7 @@ ipcMain.handle('federations:uploadLogo', async (_, arrayBuffer, mimeType) => {
       return { ok: false, error: 'Apenas admin/super_admin pode fazer upload' };
     }
     if (!currentFederation?.id || !currentFederation?.slug) return { ok: false, error: 'Federacao nao definida' };
+    await ensureFreshSession();
     const buffer = Buffer.from(arrayBuffer);
     if (buffer.length > 2 * 1024 * 1024) return { ok: false, error: 'Arquivo maior que 2MB' };
     const extMap = { 'image/png':'png', 'image/jpeg':'jpg', 'image/webp':'webp', 'image/svg+xml':'svg' };
@@ -819,10 +836,18 @@ ipcMain.handle('federations:uploadLogo', async (_, arrayBuffer, mimeType) => {
     // Adiciona cache-buster na URL pra forcar refresh
     const { data: urlData } = supabase.storage.from('federation-logos').getPublicUrl(storagePath);
     const publicUrl = `${urlData.publicUrl}?v=${Date.now()}`;
-    const { error: updErr } = await supabase.from('federations').update({ logo_url: publicUrl }).eq('id', currentFederation.id);
+    // .select() apos .update() retorna rows afetadas — RLS silent-deny retorna 0 rows sem error
+    const { data: updated, error: updErr } = await supabase
+      .from('federations')
+      .update({ logo_url: publicUrl })
+      .eq('id', currentFederation.id)
+      .select('id,logo_url');
     if (updErr) throw updErr;
+    if (!updated || updated.length === 0) {
+      throw new Error('UPDATE federations bloqueado por RLS (sessao nao reconhecida como super_admin/admin). Faca logout e login novamente.');
+    }
     currentFederation.logo_url = publicUrl;
-    log('INFO', 'Logo upload:', storagePath);
+    log('INFO', 'Logo upload OK:', storagePath, 'rows:', updated.length);
     return { ok: true, url: publicUrl };
   } catch (e) { log('ERROR', 'uploadLogo:', e.message); return { ok: false, error: e.message }; }
 });
@@ -833,18 +858,26 @@ ipcMain.handle('federations:removeLogo', async () => {
       return { ok: false, error: 'Apenas admin/super_admin' };
     }
     if (!currentFederation?.id || !currentFederation?.slug) return { ok: false, error: 'Federacao nao definida' };
+    await ensureFreshSession();
     try {
       const { data: existing } = await supabase.storage.from('federation-logos').list(currentFederation.slug);
       if (existing?.length) {
         const paths = existing.map(f => `${currentFederation.slug}/${f.name}`);
         await supabase.storage.from('federation-logos').remove(paths);
       }
-    } catch (e) {}
-    const { error: updErr } = await supabase.from('federations').update({ logo_url: null }).eq('id', currentFederation.id);
+    } catch (e) { log('WARN', 'removeLogo storage:', e.message); }
+    const { data: updated, error: updErr } = await supabase
+      .from('federations')
+      .update({ logo_url: null })
+      .eq('id', currentFederation.id)
+      .select('id,logo_url');
     if (updErr) throw updErr;
+    if (!updated || updated.length === 0) {
+      throw new Error('UPDATE bloqueado por RLS — refaca login');
+    }
     currentFederation.logo_url = null;
     return { ok: true };
-  } catch (e) { return { ok: false, error: e.message }; }
+  } catch (e) { log('ERROR', 'removeLogo:', e.message); return { ok: false, error: e.message }; }
 });
 
 // === IPC: Organizadores (CRUD pela federacao do admin/super_admin) ===
