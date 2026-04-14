@@ -1308,12 +1308,18 @@ async function exportPlayersCSV() {
   if (!players.length) { showToast('Nenhum jogador','warning'); return; }
 
   // Gerar uma linha POR INSCRICAO (atleta pode ter varias linhas, uma por categoria)
+  // v3.50+: tambem emite DOB+Clube do parceiro (dupla e mista) em colunas dedicadas
   const data = [];
-  const findPartnerName = (p, mod, cat) => {
+  const findPartnerInfo = (p, mod, cat) => {
     const insc = (p.inscriptions||[]).find(i=>i.mod===mod&&i.cat===cat);
-    if (!insc?.partner) return '';
+    if (!insc?.partner) return { name:'', dob:'', club:'' };
     const partner = players.find(x=>x.id===insc.partner);
-    return partner ? (partner.firstName+' '+partner.lastName).trim() : '';
+    if (!partner) return { name:'', dob:'', club:'' };
+    return {
+      name: (partner.firstName+' '+partner.lastName).trim(),
+      dob: partner.dob || '',
+      club: partner.club || '',
+    };
   };
 
   players.forEach(p => {
@@ -1325,10 +1331,24 @@ async function exportPlayersCSV() {
     const catMap = {};
     inscs.forEach(i => {
       const cat = i.cat || 'Principal';
-      if (!catMap[cat]) catMap[cat] = { simples: false, dupla: false, mista: false, parceiroDupla: '', parceiroMista: '' };
+      if (!catMap[cat]) catMap[cat] = { simples:false, dupla:false, mista:false,
+        parceiroDupla:'', parceiroDuplaDOB:'', parceiroDuplaClube:'',
+        parceiroMista:'', parceiroMistaDOB:'', parceiroMistaClube:'' };
       if (i.mod === 'SM' || i.mod === 'SF') catMap[cat].simples = true;
-      if (i.mod === 'DM' || i.mod === 'DF') { catMap[cat].dupla = true; catMap[cat].parceiroDupla = findPartnerName(p, i.mod, cat); }
-      if (i.mod === 'DX') { catMap[cat].mista = true; catMap[cat].parceiroMista = findPartnerName(p, 'DX', cat); }
+      if (i.mod === 'DM' || i.mod === 'DF') {
+        catMap[cat].dupla = true;
+        const info = findPartnerInfo(p, i.mod, cat);
+        catMap[cat].parceiroDupla = info.name;
+        catMap[cat].parceiroDuplaDOB = info.dob;
+        catMap[cat].parceiroDuplaClube = info.club;
+      }
+      if (i.mod === 'DX') {
+        catMap[cat].mista = true;
+        const info = findPartnerInfo(p, 'DX', cat);
+        catMap[cat].parceiroMista = info.name;
+        catMap[cat].parceiroMistaDOB = info.dob;
+        catMap[cat].parceiroMistaClube = info.club;
+      }
     });
 
     // Uma linha por categoria
@@ -1337,9 +1357,15 @@ async function exportPlayersCSV() {
       data.push({
         name, gender: p.gender||'', dob: p.dob||'', club: p.club||'',
         categoria: cat, phone: first ? (p.phone||'') : '',
-        simples: m.simples ? 'X' : '', dupla: m.dupla ? 'X' : '',
-        parceiroDupla: m.parceiroDupla, mista: m.mista ? 'X' : '',
+        simples: m.simples ? 'X' : '',
+        dupla: m.dupla ? 'X' : '',
+        parceiroDupla: m.parceiroDupla,
+        parceiroDuplaDOB: m.parceiroDuplaDOB,
+        parceiroDuplaClube: m.parceiroDuplaClube,
+        mista: m.mista ? 'X' : '',
         parceiroMista: m.parceiroMista,
+        parceiroMistaDOB: m.parceiroMistaDOB,
+        parceiroMistaClube: m.parceiroMistaClube,
       });
       first = false;
     });
@@ -5049,68 +5075,112 @@ async function selectImportFile(){
     if(!xlsxRows.length){showToast('Planilha vazia','warning');return;}
 
     // Fase 1: Agrupar linhas por atleta (nome sem acento + data nascimento = mesma pessoa)
-    const atletaMap = {}; // chave: nome_normalizado|dob -> { dados basicos, inscricoes[] }
-    xlsxRows.forEach(r => {
-      const nomeOriginal = (r.nome||'').trim();
+    // v3.50+: Alem disso, se a linha trouxer DOB+Clube do parceiro nas colunas estendidas,
+    // criamos AUTOMATICAMENTE o atleta-parceiro (sem precisar de linha propria dele) e
+    // ja pre-vinculamos a dupla. Dedup continua funcionando por nome+DOB.
+    const atletaMap = {}; // chave: nome_normalizado|dob -> { dados, inscricoes, duplas }
+
+    // Helper: cria/obtem atleta e registra uma dupla contra outro atleta
+    const ensureAtleta = (nomeOriginal, gender, dob, club, phone, email) => {
+      if (!nomeOriginal) return null;
       const nomeNorm = normalizeName(nomeOriginal);
-      if (!nomeNorm) return;
-
-      const parts = nomeOriginal.split(/\s+/);
-      const firstName = parts[0]||'';
-      const lastName = parts.slice(1).join(' ')||'';
-      const gender = normalizeGender(r.sexo||'');
-      const dob = normalizeDate(r.dob||'');
-      const cat = (r.categoria||'').trim() || calculateCategory(dob) || 'Principal';
-
-      // Chave unica: nome sem acento + data nascimento (diferencia homonimos)
-      const atletaKey = nomeNorm + '|' + dob;
-
-      // Criar ou atualizar atleta
-      if (!atletaMap[atletaKey]) {
-        atletaMap[atletaKey] = {
-          firstName, lastName, gender, dob,
-          club: r.clube||'', phone: r.telefone||'', email: r.email||'',
-          inscricoes: new Set(), // "MOD Categoria" ex: "SM Principal"
-          duplas: {}, // "MOD Categoria" -> parceiro nome
+      if (!nomeNorm) return null;
+      const key = nomeNorm + '|' + (dob || '');
+      if (!atletaMap[key]) {
+        const parts = nomeOriginal.trim().split(/\s+/);
+        atletaMap[key] = {
+          firstName: parts[0] || '',
+          lastName: parts.slice(1).join(' ') || '',
+          gender: gender || '',
+          dob: dob || '',
+          club: club || '',
+          phone: phone || '',
+          email: email || '',
+          inscricoes: new Set(),
+          duplas: {}, // "MOD Categoria" -> { name, dob, club } do parceiro
         };
       }
-      const atleta = atletaMap[atletaKey];
-      // Atualizar dados basicos se estavam vazios
-      if (!atleta.phone && r.telefone) atleta.phone = r.telefone;
-      if (!atleta.email && r.email) atleta.email = r.email;
-      if (!atleta.club && r.clube) atleta.club = r.clube;
+      // Completa campos vazios (quem chegar depois com mais dados preenche)
+      const a = atletaMap[key];
+      if (!a.gender && gender) a.gender = gender;
+      if (!a.club && club) a.club = club;
+      if (!a.phone && phone) a.phone = phone;
+      if (!a.email && email) a.email = email;
+      return a;
+    };
 
-      // Adicionar inscricoes (descarta duplicatas automaticamente via Set)
+    xlsxRows.forEach(r => {
+      const nomeOriginal = (r.nome || '').trim();
+      if (!nomeOriginal) return;
+
+      const gender = normalizeGender(r.sexo || '');
+      const dob = normalizeDate(r.dob || '');
+      const cat = (r.categoria || '').trim() || calculateCategory(dob) || 'Principal';
+
+      const atleta = ensureAtleta(nomeOriginal, gender, dob, r.clube || '', r.telefone || '', r.email || '');
+      if (!atleta) return;
+
+      // Simples
       if (r.simples) {
         const mod = gender === 'M' ? 'SM' : 'SF';
         atleta.inscricoes.add(mod + ' ' + cat);
       }
-      if (r.dupla) {
+
+      // Dupla (mesmo sexo) — v3.50: cria parceiro automaticamente se tiver DOB+Clube
+      if (r.dupla && r.parceiroDupla) {
         const mod = gender === 'M' ? 'DM' : 'DF';
         const key = mod + ' ' + cat;
         atleta.inscricoes.add(key);
-        if (r.parceiroDupla) atleta.duplas[key] = r.parceiroDupla.trim();
+        const pName = (r.parceiroDupla || '').trim();
+        const pDob = normalizeDate(r.parceiroDuplaDOB || '');
+        const pClub = (r.parceiroDuplaClube || '').trim();
+        atleta.duplas[key] = { name: pName, dob: pDob, club: pClub };
+
+        // Se DOB do parceiro foi fornecido, cria entrada dele no mapa e ja refleta a dupla
+        if (pName && pDob) {
+          const partner = ensureAtleta(pName, gender, pDob, pClub, '', '');
+          if (partner) {
+            partner.inscricoes.add(key);
+            if (!partner.duplas[key]) partner.duplas[key] = { name: nomeOriginal, dob: dob, club: atleta.club };
+          }
+        }
       }
-      if (r.mista) {
+
+      // Mista (sexo oposto)
+      if (r.mista && r.parceiroMista) {
         const key = 'DX ' + cat;
         atleta.inscricoes.add(key);
-        if (r.parceiroMista) atleta.duplas[key] = r.parceiroMista.trim();
+        const pName = (r.parceiroMista || '').trim();
+        const pDob = normalizeDate(r.parceiroMistaDOB || '');
+        const pClub = (r.parceiroMistaClube || '').trim();
+        atleta.duplas[key] = { name: pName, dob: pDob, club: pClub };
+
+        if (pName && pDob) {
+          const partnerGender = gender === 'M' ? 'F' : 'M';
+          const partner = ensureAtleta(pName, partnerGender, pDob, pClub, '', '');
+          if (partner) {
+            partner.inscricoes.add(key);
+            if (!partner.duplas[key]) partner.duplas[key] = { name: nomeOriginal, dob: dob, club: atleta.club };
+          }
+        }
       }
     });
 
     // Fase 2: Converter pra formato que o confirmImport espera
+    // v3.50+: duplaMap agora carrega objeto {name, dob, club} em vez de string.
     importedRows = [];
     Object.values(atletaMap).forEach(a => {
       const inscricoesRaw = [...a.inscricoes].join('|');
 
       // Extrair parceiros por modalidade (primeiro encontrado como fallback + mapa completo por chave)
       let duplaDM = '', duplaDF = '', duplaDX = '';
-      const duplaMap = {}; // "DM Sub 19" -> "Mateus Oliveira"
-      Object.entries(a.duplas).forEach(([key, parceiro]) => {
-        duplaMap[key] = parceiro;
-        if (key.startsWith('DM')) duplaDM = duplaDM || parceiro;
-        if (key.startsWith('DF')) duplaDF = duplaDF || parceiro;
-        if (key.startsWith('DX')) duplaDX = duplaDX || parceiro;
+      const duplaMap = {}; // "DM Sub 19" -> { name, dob, club }
+      Object.entries(a.duplas).forEach(([key, parceiroObj]) => {
+        duplaMap[key] = parceiroObj;
+        const parceiroNome = (parceiroObj && parceiroObj.name) || '';
+        if (key.startsWith('DM')) duplaDM = duplaDM || parceiroNome;
+        if (key.startsWith('DF')) duplaDF = duplaDF || parceiroNome;
+        if (key.startsWith('DX')) duplaDX = duplaDX || parceiroNome;
       });
 
       const row = {
@@ -5206,27 +5276,41 @@ async function confirmImport(){
     }
 
     // Segunda passada: vincular duplas (por chave especifica: "DM Sub 19" -> parceiro)
+    // v3.50+: duplaMap carrega {name,dob,club}. Match prioriza nome+DOB (anti-homonimo);
+    // cai de volta pra nome apenas se DOB nao foi fornecido.
     for(const p of players){
       let changed=false;
       const duplaMap=p._duplaMap||{};
 
-      // Vincular por chave especifica primeiro (ex: "DM Sub 19" -> "Mateus Oliveira")
       (p.inscriptions||[]).forEach(insc=>{
         if(insc.partner) return; // ja tem parceiro
         if(!['DM','DF','DX'].includes(insc.mod)) return;
         const key=insc.mod+' '+insc.cat;
-        const parcName=duplaMap[key]||'';
+        let parcObj=duplaMap[key];
+        // Compat: se ainda vier string (planilha antiga), converte
+        if (typeof parcObj === 'string') parcObj = { name: parcObj, dob: '', club: '' };
+
+        let parcName = parcObj?.name || '';
+        let parcDob  = parcObj?.dob  || '';
+
         if(!parcName){
-          // Fallback: usar _duplaDM/_duplaDF/_duplaDX generico
-          const fallback=insc.mod==='DM'?p._duplaDM:insc.mod==='DF'?p._duplaDF:insc.mod==='DX'?p._duplaDX:'';
-          if(!fallback) return;
-          const dn=normalizeName(fallback);
-          const partner=players.find(x=>x.id!==p.id&&normalizeName(x.firstName+' '+x.lastName)===dn);
-          if(partner){insc.partner=partner.id;changed=true;}
-          return;
+          // Fallback: _duplaDM/_duplaDF/_duplaDX generico (sem DOB)
+          parcName = insc.mod==='DM'?p._duplaDM:insc.mod==='DF'?p._duplaDF:insc.mod==='DX'?p._duplaDX:'';
+          if(!parcName) return;
         }
-        const dn=normalizeName(parcName);
-        const partner=players.find(x=>x.id!==p.id&&normalizeName(x.firstName+' '+x.lastName)===dn);
+
+        const dn = normalizeName(parcName);
+        let partner = null;
+        if (parcDob) {
+          // Match preciso: nome+DOB (anti-homonimo)
+          partner = players.find(x=>x.id!==p.id
+            && normalizeName(x.firstName+' '+x.lastName)===dn
+            && normalizeDate(x.dob||'')===normalizeDate(parcDob));
+        }
+        if (!partner) {
+          // Fallback: match por nome apenas
+          partner = players.find(x=>x.id!==p.id && normalizeName(x.firstName+' '+x.lastName)===dn);
+        }
         if(partner){insc.partner=partner.id;changed=true;}
       });
 

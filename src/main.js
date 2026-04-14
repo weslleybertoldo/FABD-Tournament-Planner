@@ -414,11 +414,12 @@ ipcMain.handle('xlsx:export', async (_, playersData) => {
     if (result.canceled || !result.filePath) return false;
 
     const wb = XLSX.utils.book_new();
-    const header = ['Nome Completo','Sexo\n(M ou F)','Data de\nNascimento','Clube','Categoria','Telefone','Simples\n(marque X)','Dupla\n(marque X)','Parceiro(a)\nDupla','Mista\n(marque X)','Parceiro(a)\nMista'];
+    // v3.50+: formato estendido com DOB+Clube do parceiro inline (4 colunas novas)
+    const header = ['Nome Completo','Sexo\n(M ou F)','Data de\nNascimento','Clube','Categoria','Telefone','Simples\n(marque X)','Dupla\n(marque X)','Parceiro(a)\nDupla','Nasc. Dupla','Clube Dupla','Mista\n(marque X)','Parceiro(a)\nMista','Nasc. Mista','Clube Mista'];
     const rows = [header];
-    (playersData || []).forEach(p => { rows.push([p.name, p.gender, p.dob, p.club, p.categoria, p.phone, p.simples, p.dupla, p.parceiroDupla, p.mista, p.parceiroMista]); });
+    (playersData || []).forEach(p => { rows.push([p.name, p.gender, p.dob, p.club, p.categoria, p.phone, p.simples, p.dupla, p.parceiroDupla, p.parceiroDuplaDOB||'', p.parceiroDuplaClube||'', p.mista, p.parceiroMista, p.parceiroMistaDOB||'', p.parceiroMistaClube||'']); });
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{wch:28},{wch:8},{wch:14},{wch:20},{wch:14},{wch:16},{wch:10},{wch:10},{wch:22},{wch:10},{wch:22}];
+    ws['!cols'] = [{wch:28},{wch:8},{wch:14},{wch:18},{wch:14},{wch:16},{wch:10},{wch:10},{wch:22},{wch:14},{wch:16},{wch:10},{wch:22},{wch:14},{wch:16}];
     XLSX.utils.book_append_sheet(wb, ws, 'Inscricoes');
     XLSX.writeFile(wb, result.filePath);
     return true;
@@ -456,20 +457,34 @@ ipcMain.handle('xlsx:import', async () => {
     }
     const headerRow = rows[headerIdx].map(h => String(h).toLowerCase().trim().replace(/\n/g,' '));
     const findCol = (keywords) => headerRow.findIndex(h => keywords.some(k => h.includes(k)));
+    // v3.50+: colunas estendidas (Nasc./Clube do parceiro) sao lidas se existirem, senao fallback
+    // IMPORTANTE: findCol usa .includes(), entao para "Clube" nao retornar "Clube Dupla"/"Clube Mista",
+    // procuramos primeiro as variantes mais especificas. findIndex retorna o PRIMEIRO match.
     const colMap = {
       nome: findCol(['nome completo','nome']),
       sexo: findCol(['sexo','genero']),
-      dob: findCol(['nascimento','data de','datanascimento']),
+      dob: findCol(['data de nascimento','data nascimento','data de','nascimento']),
       clube: findCol(['clube']),
       categoria: findCol(['categoria']),
       telefone: findCol(['telefone','fone','celular']),
       email: findCol(['email','e-mail']),
       simples: findCol(['simples']),
+      dupla: findCol(['dupla (','dupla (marque']),
       parceiroDupla: findCol(['parceiro(a) dupla','parceiro dupla','parceirodupla','dupla_dm','dupla_df']),
-      dupla: findCol(['dupla (','dupla (marque','dupla']),
-      mista: findCol(['mista']),
+      parceiroDuplaDOB: findCol(['nasc. dupla','nasc dupla','nascimento dupla']),
+      parceiroDuplaClube: findCol(['clube dupla']),
+      mista: findCol(['mista (','mista (marque']),
       parceiroMista: findCol(['parceiro(a) mista','parceiro mista','parceiromista','dupla_dx']),
+      parceiroMistaDOB: findCol(['nasc. mista','nasc mista','nascimento mista']),
+      parceiroMistaClube: findCol(['clube mista']),
     };
+    // Fallback se 'dupla' nao foi achada com marcador: tentar generico sem confundir com parceiro/clube
+    if (colMap.dupla < 0) {
+      colMap.dupla = headerRow.findIndex(h => h === 'dupla' || h.startsWith('dupla ') && !h.includes('parceiro') && !h.includes('clube') && !h.includes('nasc'));
+    }
+    if (colMap.mista < 0) {
+      colMap.mista = headerRow.findIndex(h => h === 'mista' || h.startsWith('mista ') && !h.includes('parceiro') && !h.includes('clube') && !h.includes('nasc'));
+    }
 
     const players = [];
     for (let i = headerIdx + 1; i < rows.length; i++) {
@@ -489,8 +504,12 @@ ipcMain.handle('xlsx:import', async () => {
         simples: get(colMap.simples).toUpperCase() === 'X',
         dupla: get(colMap.dupla).toUpperCase() === 'X',
         parceiroDupla: get(colMap.parceiroDupla),
+        parceiroDuplaDOB: get(colMap.parceiroDuplaDOB),
+        parceiroDuplaClube: get(colMap.parceiroDuplaClube),
         mista: get(colMap.mista).toUpperCase() === 'X',
         parceiroMista: get(colMap.parceiroMista),
+        parceiroMistaDOB: get(colMap.parceiroMistaDOB),
+        parceiroMistaClube: get(colMap.parceiroMistaClube),
       });
     }
     return { type: 'xlsx', rows: players, fileName: path.basename(filePath) };
