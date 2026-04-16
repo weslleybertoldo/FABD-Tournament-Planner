@@ -441,7 +441,7 @@ function isNewerVersion(remote, local){
 async function checkAutoUpdate(){
   try{
     const data=await window.api.checkUpdate();
-    if(data.error)return;
+    if(!data||data.error)return;
     const latestVersion=(data.tag_name||'').replace('v','');
     if(!latestVersion)return;
     if(isNewerVersion(latestVersion,APP_VERSION)){
