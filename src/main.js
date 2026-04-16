@@ -631,22 +631,53 @@ ipcMain.on('log', (_, level, msg) => { log(level, '[renderer]', msg); });
 // Debounce: agrupa syncs rapidos em 1 request (evita travar UI)
 let pendingUpsert = null;
 let upsertTimer = null;
+let pendingResolvers = []; // promessas aguardando o proximo flush
 const UPSERT_DEBOUNCE_MS = 500; // espera 500ms antes de enviar
+// C4: telemetria real de sync. Antes o IPC retornava true imediatamente
+// sem saber se a escrita ocorreu. Agora renderer pode obter status real.
+let lastSyncStatus = { state: 'idle', at: 0, error: null };
 
-function flushUpsert() {
+function broadcastSyncStatus() {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('supabase:sync-status', lastSyncStatus);
+    }
+  } catch(_) {}
+}
+
+async function flushUpsert() {
   if (!pendingUpsert) return;
   const row = pendingUpsert;
+  const resolvers = pendingResolvers;
   pendingUpsert = null;
-  supabase.from('tournaments').upsert(row, { onConflict: 'id' })
-    .then(({ error }) => { if (error) log('ERROR', 'Supabase upsert:', error.message); })
-    .catch(e => log('ERROR', 'Supabase upsert:', e.message));
+  pendingResolvers = [];
+  lastSyncStatus = { state: 'syncing', at: Date.now(), error: null };
+  broadcastSyncStatus();
+  try {
+    const { error } = await supabase.from('tournaments').upsert(row, { onConflict: 'id' });
+    if (error) {
+      log('ERROR', 'Supabase upsert:', error.message);
+      lastSyncStatus = { state: 'error', at: Date.now(), error: error.message };
+      resolvers.forEach(r => r({ ok: false, error: error.message }));
+    } else {
+      lastSyncStatus = { state: 'ok', at: Date.now(), error: null };
+      resolvers.forEach(r => r({ ok: true }));
+    }
+  } catch(e) {
+    log('ERROR', 'Supabase upsert:', e.message);
+    lastSyncStatus = { state: 'error', at: Date.now(), error: e.message };
+    resolvers.forEach(r => r({ ok: false, error: e.message }));
+  }
+  broadcastSyncStatus();
 }
 
 ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tournamentData) => {
   try {
     if (!currentFederation?.id) {
       log('ERROR', 'upsertTournament: sem federacao ativa (login pendente?)');
-      return false;
+      lastSyncStatus = { state: 'error', at: Date.now(), error: 'sem federacao' };
+      broadcastSyncStatus();
+      return { ok: false, error: 'sem federacao' };
     }
     const row = { id: tournamentId, name, federation_id: currentFederation.id, updated_at: new Date().toISOString() };
     if (tournamentData) {
@@ -667,13 +698,24 @@ ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tourna
         }))
       };
     }
-    // Debounce: agendar envio em 500ms (agrupa chamadas rapidas)
+    // Debounce: agendar envio em 500ms (agrupa chamadas rapidas).
+    // Promise resolve quando o upsert REAL completar (ou com erro).
     pendingUpsert = row;
+    lastSyncStatus = { state: 'pending', at: Date.now(), error: null };
+    broadcastSyncStatus();
+    const result = new Promise(resolve => pendingResolvers.push(resolve));
     if (upsertTimer) clearTimeout(upsertTimer);
     upsertTimer = setTimeout(flushUpsert, UPSERT_DEBOUNCE_MS);
-    return true; // retorna imediatamente sem esperar rede
-  } catch(e) { log('ERROR', 'Supabase upsertTournament:', e.message); return false; }
+    return await result;
+  } catch(e) {
+    log('ERROR', 'Supabase upsertTournament:', e.message);
+    lastSyncStatus = { state: 'error', at: Date.now(), error: e.message };
+    broadcastSyncStatus();
+    return { ok: false, error: e.message };
+  }
 });
+
+ipcMain.handle('supabase:getSyncStatus', () => lastSyncStatus);
 
 // Gerar ID estavel para match (nao depende de numeracao)
 function stableMatchId(tournamentId, matchData) {
