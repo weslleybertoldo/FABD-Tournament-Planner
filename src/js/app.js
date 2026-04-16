@@ -157,8 +157,9 @@ async function loadAccessOrganizers() {
     const fmt = o.last_login_at ? new Date(o.last_login_at).toLocaleString('pt-BR') : 'Nunca';
     const isMe = o.email?.toLowerCase() === me;
     const dot = o.active ? '<span style="display:inline-block;width:8px;height:8px;background:#10B981;border-radius:50%"></span>' : '<span style="display:inline-block;width:8px;height:8px;background:#EF4444;border-radius:50%"></span>';
-    const roleBadge = o.role === 'super_admin' ? '<span style="background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">★ Super</span>'
-      : o.role === 'admin' ? '<span style="background:#DBEAFE;color:#1E40AF;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">⚡ Admin</span>'
+    // O1: remover emojis, usar texto simples (institucional).
+    const roleBadge = o.role === 'super_admin' ? '<span style="background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Super admin</span>'
+      : o.role === 'admin' ? '<span style="background:#DBEAFE;color:#1E40AF;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Admin</span>'
       : '<span style="background:#F3F4F6;color:#6B7280;padding:2px 8px;border-radius:10px;font-size:11px">Organizer</span>';
     const actions = isMe ? '<span style="color:#94A3B8;font-size:11px">(voce)</span>' :
       `<button class="btn btn-sm" style="background:#F3F4F6;color:#374151;margin-right:4px" onclick="toggleAccessOrganizer('${esc(o.email)}',${!o.active})">${o.active?'Desativar':'Ativar'}</button>
@@ -5793,17 +5794,18 @@ function computeFullClassification(d){
     });
 
     // Atribuir posicoes (empatados na mesma rodada = mesma posicao)
+    // R10: shape consistente — todos pushes incluem wins/losses (null em eliminatoria).
     const result=[];
     let pos=1;
     for(let i=0;i<sorted.length;i++){
       const p=sorted[i];
-      if(p===champion){result.push({pos:1,name:p,round:totalR,note:'Campeao'});pos=2;continue;}
-      if(p===vice){result.push({pos:2,name:p,round:totalR,note:'Vice'});pos=3;continue;}
+      if(p===champion){result.push({pos:1,name:p,round:totalR,note:'Campeao',wins:null,losses:null});pos=2;continue;}
+      if(p===vice){result.push({pos:2,name:p,round:totalR,note:'Vice',wins:null,losses:null});pos=3;continue;}
       // Mesmo round = mesma posicao
       if(i>0&&sorted[i-1]!==champion&&sorted[i-1]!==vice&&playerRound[p]===playerRound[sorted[i-1]]){
-        result.push({pos:result[result.length-1].pos,name:p,round:playerRound[p]||0,note:''});
+        result.push({pos:result[result.length-1].pos,name:p,round:playerRound[p]||0,note:'',wins:null,losses:null});
       } else {
-        result.push({pos:i+1,name:p,round:playerRound[p]||0,note:''});
+        result.push({pos:i+1,name:p,round:playerRound[p]||0,note:'',wins:null,losses:null});
       }
     }
     return result;
@@ -5824,15 +5826,15 @@ function computeFullClassification(d){
       if(finalM?.winner){
         const champ=finalM.winner===1?finalM.player1:finalM.player2;
         const vice=finalM.winner===1?finalM.player2:finalM.player1;
-        classification.push({pos:1,name:champ,note:'Campeao'});
-        classification.push({pos:2,name:vice,note:'Vice'});
+        classification.push({pos:1,name:champ,note:'Campeao',wins:null,losses:null});
+        classification.push({pos:2,name:vice,note:'Vice',wins:null,losses:null});
         // Perdedores das semis = 3o
         if(totalR>=2){
           elimM.filter(m=>m.round===totalR-1).forEach(sm=>{
             if(!sm.winner)return;
             const loser=sm.winner===1?sm.player2:sm.player1;
             if(loser&&loser!==champ&&loser!==vice&&!classification.find(c=>c.name===loser)){
-              classification.push({pos:3,name:loser,note:'3o colocado'});
+              classification.push({pos:3,name:loser,note:'3o colocado',wins:null,losses:null});
             }
           });
         }
@@ -5840,7 +5842,7 @@ function computeFullClassification(d){
         for(let r=totalR-2;r>=1;r--){
           const roundLosers=elimM.filter(m=>m.round===r&&m.winner).map(m=>m.winner===1?m.player2:m.player1).filter(n=>n&&!classification.find(c=>c.name===n));
           const nextPos=classification.length+1;
-          roundLosers.forEach(loser=>{classification.push({pos:nextPos,name:loser,note:''});});
+          roundLosers.forEach(loser=>{classification.push({pos:nextPos,name:loser,note:'',wins:null,losses:null});});
         }
       }
     }

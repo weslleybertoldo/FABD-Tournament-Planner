@@ -989,12 +989,16 @@ ipcMain.handle('organizers:add', async (_, payload) => {
     if (currentOrganizer.role === 'admin' && fid !== currentOrganizer.federation_id) {
       return { ok: false, error: 'Voce so pode adicionar organizadores na sua federacao' };
     }
-    const { error } = await supabase.from('organizers').insert({
+    // R2: .select('email') para validar que INSERT passou RLS (0 rows sem erro = silent deny).
+    const { data, error } = await supabase.from('organizers').insert({
       email, name, role, federation_id: fid, active: true
-    });
+    }).select('email');
     if (error) {
       if (error.code === '23505') return { ok: false, error: 'Email ja cadastrado' };
       throw error;
+    }
+    if (!data || data.length === 0) {
+      return { ok: false, error: 'RLS bloqueou insert — sem permissao para esta federacao' };
     }
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
@@ -1013,8 +1017,13 @@ ipcMain.handle('organizers:update', async (_, email, patch) => {
     if (currentOrganizer.role === 'super_admin' && patch?.federation_id !== undefined) {
       safePatch.federation_id = patch.federation_id;
     }
-    const { error } = await supabase.from('organizers').update(safePatch).eq('email', email.toLowerCase());
+    // R1: .select('email') para detectar RLS silent-deny (0 rows afetadas sem erro).
+    const { data, error } = await supabase.from('organizers')
+      .update(safePatch).eq('email', email.toLowerCase()).select('email');
     if (error) throw error;
+    if (!data || data.length === 0) {
+      return { ok: false, error: 'Nenhuma linha atualizada (organizador inexistente ou RLS bloqueou)' };
+    }
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });

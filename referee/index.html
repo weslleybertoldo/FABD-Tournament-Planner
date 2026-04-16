@@ -900,13 +900,10 @@
       const elCourt=document.getElementById('scorer-court');if(elCourt)elCourt.textContent=currentMatch.court;
       const elDrawInfo=document.getElementById('scorer-draw-info');if(elDrawInfo)elDrawInfo.textContent=`#${currentMatch.match_num} | ${currentMatch.draw_name}`;
 
-      // Historico de sets
-      let hist='';state.setsP1.forEach((s,i)=>{
-        const s1=leftPlayer===1?s:state.setsP2[i];
-        const s2=leftPlayer===1?state.setsP2[i]:s;
-        hist+=s1+'-'+s2+'<br>';
-      });
-
+      // Historico de sets — R4: construir com DOM em vez de innerHTML.
+      // Dados vem do Supabase (live_scores.sets_p1/sets_p2 JSONB) e nao sao
+      // sanitizados no server; usar textContent evita XSS se campo for
+      // injetado upstream.
       const px=isDoubles?'d':'s'; // prefixo dos IDs
 
       document.getElementById(px+'-left-score').textContent=lScore;
@@ -914,7 +911,15 @@
       document.getElementById(px+'-left-sets').textContent='Sets: '+lSets;
       document.getElementById(px+'-right-sets').textContent='Sets: '+rSets;
       document.getElementById(px+'-div-set').textContent='SET '+state.set;
-      document.getElementById(px+'-div-history').innerHTML=hist;
+      const histEl=document.getElementById(px+'-div-history');
+      histEl.textContent='';
+      state.setsP1.forEach((s,i)=>{
+        const s1=leftPlayer===1?s:state.setsP2[i];
+        const s2=leftPlayer===1?state.setsP2[i]:s;
+        const line=document.createElement('div');
+        line.textContent=Number(s1)+'-'+Number(s2);
+        histEl.appendChild(line);
+      });
 
       // Botão de trocar saque — só aparece antes do primeiro ponto de cada set
       const swapServeBtn=document.getElementById(px+'-swap-serve');
@@ -1025,14 +1030,19 @@
             return;
           }
         }
-        const {error}=await sb.from('live_scores').upsert({
+        // R3: .select('match_id') detecta RLS silent-deny (arbitro nao
+        // autorizado ou federation_id mismatch -> 0 rows sem erro).
+        const {data,error}=await sb.from('live_scores').upsert({
           match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,
           current_set:state.set,score_p1:state.p1,score_p2:state.p2,
           sets_p1:state.setsP1,sets_p2:state.setsP2,
           sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,
           umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()
-        },{onConflict:'match_id'});
+        },{onConflict:'match_id'}).select('match_id');
         if(error){throw error;}
+        if(!data||data.length===0){
+          throw new Error('Placar nao persistiu (RLS bloqueou ou arbitro nao autorizado). Verifique seu status.');
+        }
         document.getElementById('sync-status').style.background='#10B981';
       }catch(e){
         console.error('[Referee] Sync error:',e?.message||e);
