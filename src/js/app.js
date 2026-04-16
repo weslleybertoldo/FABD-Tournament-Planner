@@ -2349,7 +2349,7 @@ function generateGroupsPhase(playerList, numGroups, seeds) {
 
   // Generate round-robin matches for each group
   groups.forEach(g => {
-    const gLabel = g.name.replace('Grupo ', '');
+    const gLabel = (g.name || 'Grupo').replace('Grupo ', '');
     const rr = generateRoundRobinSchedule(g.players);
     g.matches = rr.map(m => ({ ...m, group: gLabel, phase: 'group' }));
   });
@@ -2523,7 +2523,7 @@ function renderGroupsElimination(d) {
 
   // Paineis dos grupos
   groups.forEach((g, gi) => {
-    const gLabel = g.name.replace('Grupo ', '');
+    const gLabel = (g.name || 'Grupo').replace('Grupo ', '');
     const groupMatches = d.matches.filter(m => m.group === gLabel && m.phase === 'group');
     g.matches = groupMatches.length ? groupMatches : g.matches;
     const standings = computeGroupStandings(g.players, g.matches);
@@ -2627,7 +2627,7 @@ function rebuildGroupsElimMatches(d, allM) {
       if (m.player2 === 'BYE' || m.player1 === 'BYE') return;
       const p1 = m.player1 || '', p2 = m.player2 || '';
       if (!p1 || !p2) return;
-      const groupLabel = m.group || g.name.replace('Grupo ', '');
+      const groupLabel = m.group || (g.name || 'Grupo').replace('Grupo ', '');
       allM.push({
         drawId: d.id, drawName: d.name, event: d.event, round: m.round,
         roundName: `Grupo ${groupLabel} - R${m.round}`,
@@ -2650,7 +2650,7 @@ function rebuildGroupsElimMatches(d, allM) {
     let futIdx = 0;
     // Gerar nomes descritivos pra eliminatoria baseada em grupos
     const numGroups = (d.groupsData.groups||[]).length;
-    const groupNames = (d.groupsData.groups||[]).map(g => g.name.replace('Grupo ',''));
+    const groupNames = (d.groupsData.groups||[]).map(g => (g.name || 'Grupo').replace('Grupo ',''));
     const qual = d.groupQualifiers || 2;
 
     elimMatches.forEach((m, i) => {
@@ -2695,7 +2695,7 @@ function rebuildGroupsElimMatches(d, allM) {
     // Eliminatoria ainda nao gerada — criar placeholders baseados nos grupos
     const numGroups = (d.groupsData.groups||[]).length;
     const qual = d.groupQualifiers || 2;
-    const groupNames = (d.groupsData.groups||[]).map(g => g.name.replace('Grupo ',''));
+    const groupNames = (d.groupsData.groups||[]).map(g => (g.name || 'Grupo').replace('Grupo ',''));
 
     if (numGroups >= 2) {
       // Calcular quantos classificam no total
