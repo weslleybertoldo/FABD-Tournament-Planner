@@ -55,7 +55,9 @@ let _authState = { email: '' };
 
 async function ensureAuthenticated() {
   try {
+    console.log('[AUTH] Calling authStatus...');
     const st = await window.api.authStatus();
+    console.log('[AUTH] authStatus returned:', st);
     if (st.hasServiceRole || st.isAuthorized) {
       // Atualiza badge no rodape (se houver)
       showOrganizerBadge(st);
@@ -4093,7 +4095,8 @@ function renderCourtsPanel() {
 
 // Receber atualizacao de placar em tempo real do Supabase
 async function handleRealtimeScoreUpdate(data){
-  if(!data||!tournament?.matches?.length)return;
+  try {
+    if(!data||!data.match_id||!tournament?.matches?.length)return;
   const matchId=data.match_id||'';
   // Buscar match pelo ID estavel (drawName + players) ou fallback por match_num
   let m=null;
@@ -4146,6 +4149,7 @@ async function handleRealtimeScoreUpdate(data){
 
   renderCourtsPanel();
   renderMatches();
+  } catch(e) { console.error('[RealtimeScoreUpdate] Error:', e.message); }
 }
 
 function getCourtOptions(sel) {
