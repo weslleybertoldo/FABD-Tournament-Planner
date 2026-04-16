@@ -4676,7 +4676,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-game')renderGameProfiles();
   if(panelId==='settings-umpires')renderUmpires();
 }
-const APP_VERSION='3.52';
+const APP_VERSION='3.53';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
