@@ -451,19 +451,29 @@ ipcMain.handle('xlsx:import', async () => {
     // Encontrar linha do cabecalho (pode nao ser a primeira se tiver titulo/merge)
     let headerIdx = 0;
     const findHeader = (row) => row.some(h => {
+      if (h == null) return false;
       const hl = String(h).toLowerCase().replace(/\n/g,' ');
       return hl.includes('nome') && (hl.includes('completo') || hl.includes('sobrenome'));
-    }) || row.some(h => String(h).toLowerCase().includes('sexo') || String(h).toLowerCase().includes('genero'));
+    }) || row.some(h => {
+      if (h == null) return false;
+      const hs = String(h).toLowerCase();
+      return hs.includes('sexo') || hs.includes('genero');
+    });
     for (let hi = 0; hi < Math.min(rows.length, 5); hi++) {
       if (findHeader(rows[hi])) { headerIdx = hi; break; }
     }
+    // Se nao encontrou cabecalho valido, abortar
+    if (!rows[headerIdx] || !rows[headerIdx].length) return { type: 'xlsx', rows: [], fileName: path.basename(filePath) };
     // R7: normalizar header — lowercase, trim, collapse whitespace, remove acentos, remove quebras
-    const normHeader = (h) => String(h)
-      .toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/\n/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const normHeader = (h) => {
+      if (h == null) return '';
+      return String(h)
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/\n/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
     const headerRow = rows[headerIdx].map(normHeader);
     // C5: findCol aceita exclusions pra evitar que "clube" bata em "clube dupla"/"clube mista".
     const findCol = (keywords, exclusions = []) => headerRow.findIndex(h =>
