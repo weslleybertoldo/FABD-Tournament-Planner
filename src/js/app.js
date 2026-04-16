@@ -1310,15 +1310,23 @@ async function exportPlayersCSV() {
   // Gerar uma linha POR INSCRICAO (atleta pode ter varias linhas, uma por categoria)
   // v3.50+: tambem emite DOB+Clube do parceiro (dupla e mista) em colunas dedicadas
   const data = [];
+  // C8: se partner.id referenciar player inexistente (deletado, corrompido),
+  // usar snapshot salvo em insc.partnerName/Dob/Club (gravado no bind).
   const findPartnerInfo = (p, mod, cat) => {
     const insc = (p.inscriptions||[]).find(i=>i.mod===mod&&i.cat===cat);
-    if (!insc?.partner) return { name:'', dob:'', club:'' };
-    const partner = players.find(x=>x.id===insc.partner);
-    if (!partner) return { name:'', dob:'', club:'' };
+    if (!insc) return { name:'', dob:'', club:'' };
+    const partner = insc.partner ? players.find(x=>x.id===insc.partner) : null;
+    if (partner) {
+      return {
+        name: (partner.firstName+' '+partner.lastName).trim(),
+        dob: partner.dob || '',
+        club: partner.club || '',
+      };
+    }
     return {
-      name: (partner.firstName+' '+partner.lastName).trim(),
-      dob: partner.dob || '',
-      club: partner.club || '',
+      name: insc.partnerName || '',
+      dob: insc.partnerDob || '',
+      club: insc.partnerClub || '',
     };
   };
 
@@ -5109,12 +5117,23 @@ async function selectImportFile(){
       return a;
     };
 
+    // R6: coletar DOBs que chegaram preenchidos mas nao foram reconhecidos (viram '').
+    // Mostrados como warning no preview para o user corrigir a planilha.
+    const invalidDOBs = [];
+    const tryNormalizeDob = (raw, ownerName, field) => {
+      const norm = normalizeDate(raw);
+      if (!norm && raw != null && String(raw).trim() !== '') {
+        invalidDOBs.push(`${ownerName || '(sem nome)'} (${field}): ${String(raw).slice(0, 20)}`);
+      }
+      return norm;
+    };
+
     xlsxRows.forEach(r => {
       const nomeOriginal = (r.nome || '').trim();
       if (!nomeOriginal) return;
 
       const gender = normalizeGender(r.sexo || '');
-      const dob = normalizeDate(r.dob || '');
+      const dob = tryNormalizeDob(r.dob, nomeOriginal, 'DOB');
       const cat = (r.categoria || '').trim() || calculateCategory(dob) || 'Principal';
 
       const atleta = ensureAtleta(nomeOriginal, gender, dob, r.clube || '', r.telefone || '', r.email || '');
@@ -5132,12 +5151,13 @@ async function selectImportFile(){
         const key = mod + ' ' + cat;
         atleta.inscricoes.add(key);
         const pName = (r.parceiroDupla || '').trim();
-        const pDob = normalizeDate(r.parceiroDuplaDOB || '');
+        const pDob = tryNormalizeDob(r.parceiroDuplaDOB, pName, 'Nasc. Dupla');
         const pClub = (r.parceiroDuplaClube || '').trim();
         atleta.duplas[key] = { name: pName, dob: pDob, club: pClub };
 
-        // Se DOB do parceiro foi fornecido, cria entrada dele no mapa e ja refleta a dupla
-        if (pName && pDob) {
+        // C7: cria parceiro no mapa MESMO sem DOB — o bind de fase 2 decide
+        // se e inequivoco (1 match por nome) ou ambiguo (>1 homonimo).
+        if (pName) {
           const partner = ensureAtleta(pName, gender, pDob, pClub, '', '');
           if (partner) {
             partner.inscricoes.add(key);
@@ -5151,12 +5171,12 @@ async function selectImportFile(){
         const key = 'DX ' + cat;
         atleta.inscricoes.add(key);
         const pName = (r.parceiroMista || '').trim();
-        const pDob = normalizeDate(r.parceiroMistaDOB || '');
+        const pDob = tryNormalizeDob(r.parceiroMistaDOB, pName, 'Nasc. Mista');
         const pClub = (r.parceiroMistaClube || '').trim();
         atleta.duplas[key] = { name: pName, dob: pDob, club: pClub };
 
-        if (pName && pDob) {
-          const partnerGender = gender === 'M' ? 'F' : 'M';
+        if (pName) {
+          const partnerGender = gender === 'M' ? 'F' : gender === 'F' ? 'M' : '';
           const partner = ensureAtleta(pName, partnerGender, pDob, pClub, '', '');
           if (partner) {
             partner.inscricoes.add(key);
@@ -5214,7 +5234,14 @@ async function selectImportFile(){
       tb += '<tr style="' + (r.valid ? '' : 'background:#FEE2E2') + '"><td>' + (i+1) + '</td><td>' + esc(r.firstName) + '</td><td>' + esc(r.lastName) + '</td><td>' + esc(r.gender) + '</td><td>' + esc(r.dob) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.club) + '</td><td>' + inscs + '</td><td>' + (r.valid ? '<span class="tag tag-green">OK</span>' : '<span class="tag tag-red">' + esc(r.error) + '</span>') + '</td></tr>';
     });
     document.getElementById('import-preview-body').innerHTML = tb;
-    document.getElementById('import-summary').innerHTML = '<strong>' + vc + '</strong> atleta(s) valido(s) | <strong>' + totalInscs + '</strong> inscricao(oes)' + (ic ? '<br><span style="color:var(--fabd-red)">' + ic + ' com erro</span>' : '');
+    // R6: exibir DOBs nao-reconhecidos no summary (ate 5)
+    let dobWarnHTML = '';
+    if (invalidDOBs.length) {
+      const sample = invalidDOBs.slice(0, 5).map(esc).join('<br>');
+      const extra = invalidDOBs.length > 5 ? ('<br>...e mais ' + (invalidDOBs.length - 5)) : '';
+      dobWarnHTML = '<br><span style="color:var(--fabd-red,#C41E2A)">' + invalidDOBs.length + ' data(s) de nascimento nao reconhecida(s):<br>' + sample + extra + '</span>';
+    }
+    document.getElementById('import-summary').innerHTML = '<strong>' + vc + '</strong> atleta(s) valido(s) | <strong>' + totalInscs + '</strong> inscricao(oes)' + (ic ? '<br><span style="color:var(--fabd-red)">' + ic + ' com erro</span>' : '') + dobWarnHTML;
     document.getElementById('import-step-1').style.display='none';
     document.getElementById('import-step-2').style.display='';
     document.getElementById('import-btn-confirm').style.display=vc?'':'none';
@@ -5225,8 +5252,48 @@ function parseCSVLine(line,sep){const r=[];let c='',q=false;for(let i=0;i<line.l
 function mapColumns(h){const m={firstName:-1,lastName:-1,gender:-1,dob:-1,club:-1,state:-1,ranking:-1,phone:-1,email:-1,inscricoes:-1,duplaDM:-1,duplaDF:-1,duplaDX:-1};const a={firstName:['nome','firstname','first name'],lastName:['sobrenome','lastname','last name'],gender:['genero','gender','sexo'],dob:['data nascimento','datanascimento','dob','date of birth','data nasc','dt nascimento'],club:['clube','club'],state:['estado','state','uf'],ranking:['ranking','classificacao','rank'],phone:['telefone','phone','tel','celular','mobile'],email:['email','e-mail','mail'],inscricoes:['inscricoes','inscricao','categories','categorias'],duplaDM:['dupla_dm','dupladm','parceiro_dm'],duplaDF:['dupla_df','dupladf','parceira_df'],duplaDX:['dupla_dx','duladx','parceiro_dx','parceira_dx']};h.forEach((x,i)=>{const l=x.toLowerCase().replace(/[^a-z0-9_ ]/g,'').trim();Object.keys(a).forEach(k=>{if(a[k].some(al=>l===al||l.includes(al))&&m[k]===-1)m[k]=i;});});if(m.firstName===-1)m.firstName=0;if(m.lastName===-1)m.lastName=1;if(m.gender===-1)m.gender=2;if(m.dob===-1)m.dob=3;if(m.club===-1)m.club=4;if(m.state===-1)m.state=5;if(m.ranking===-1)m.ranking=6;if(m.phone===-1)m.phone=7;if(m.email===-1)m.email=8;if(m.inscricoes===-1)m.inscricoes=9;if(m.duplaDM===-1)m.duplaDM=10;if(m.duplaDF===-1)m.duplaDF=11;if(m.duplaDX===-1)m.duplaDX=12;return m;}
 function getCol(c,i){return i>=0&&i<c.length?c[i].replace(/^["']|["']$/g,'').trim():'';}
 function normalizeName(s){return(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
-function normalizeGender(g){if(!g)return'';const v=g.toUpperCase().trim();if('M MASCULINO MASC MALE'.includes(v))return'M';if('F FEMININO FEM FEMALE'.includes(v))return'F';return v;}
-function normalizeDate(d){if(!d)return'';const m=d.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);if(m)return`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;return d;}
+// C6: normalizeGender — so retorna 'M' ou 'F' (ou '' se invalido/vazio).
+// Antes retornava valor nao-reconhecido como-estava, quebrando modalidade DM/DF/DX.
+function normalizeGender(g){
+  if(!g)return'';
+  const v=String(g).toUpperCase().trim();
+  if(['M','MASCULINO','MASC','MALE','H','HOMEM'].includes(v))return'M';
+  if(['F','FEMININO','FEM','FEMALE','MULHER'].includes(v))return'F';
+  return ''; // invalido -> vazio (validacao posterior marca linha invalida)
+}
+// R5+R6: normalizeDate aceita Date object, serial Excel (numero/string numerica),
+// strings DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, ISO YYYY-MM-DD. Retorna '' para invalido
+// (nao mais o valor original). Caller deve checar '' para detectar DOBs nao-reconhecidos.
+function normalizeDate(d){
+  if(d==null||d==='')return'';
+  // Date object
+  if(d instanceof Date){
+    if(isNaN(d.getTime()))return'';
+    const y=d.getUTCFullYear(),m=d.getUTCMonth()+1,day=d.getUTCDate();
+    return `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  }
+  // Serial Excel (numero) — dias desde 1899-12-30 (epoch Excel).
+  // Faixa razoavel: 1 (1900-01-01) a 73000 (~2099).
+  if(typeof d==='number'&&d>0&&d<100000){
+    const dt=new Date(Date.UTC(1899,11,30)+d*86400000);
+    if(!isNaN(dt.getTime())){
+      const y=dt.getUTCFullYear(),m=dt.getUTCMonth()+1,day=dt.getUTCDate();
+      return `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    }
+    return'';
+  }
+  const s=String(d).trim();
+  if(!s)return'';
+  // DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+  let m=s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+  if(m)return`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  // ISO YYYY-MM-DD (com ou sem tempo)
+  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m)return`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  // String puramente numerica (serial Excel que veio como string)
+  if(/^\d+(\.\d+)?$/.test(s))return normalizeDate(parseFloat(s));
+  return ''; // nao reconhecido
+}
 async function confirmImport(){
   try{
     const vr=importedRows.filter(r=>r.valid);
@@ -5277,6 +5344,8 @@ async function confirmImport(){
 
     // Segunda passada: vincular duplas (por chave especifica: "DM Sub 19" -> parceiro)
     // v3.50+: duplaMap carrega {name,dob,club}. Match prioriza nome+DOB (anti-homonimo);
+    // ambiguidades (>1 match por nome sem DOB) nao sao bindadas — warn mostrado ao final.
+    const ambiguous = []; // lista de "Nome (mod cat)" onde bind foi ambiguo
     // cai de volta pra nome apenas se DOB nao foi fornecido.
     for(const p of players){
       let changed=false;
@@ -5308,10 +5377,26 @@ async function confirmImport(){
             && normalizeDate(x.dob||'')===normalizeDate(parcDob));
         }
         if (!partner) {
-          // Fallback: match por nome apenas
-          partner = players.find(x=>x.id!==p.id && normalizeName(x.firstName+' '+x.lastName)===dn);
+          // Fallback: match por nome apenas — MAS apenas se for inequivoco
+          const nameMatches = players.filter(x=>x.id!==p.id && normalizeName(x.firstName+' '+x.lastName)===dn);
+          if (nameMatches.length === 1) {
+            partner = nameMatches[0];
+          } else if (nameMatches.length > 1) {
+            // C7: homonimo sem DOB para diferenciar — nao binda, sinaliza.
+            ambiguous.push(`${p.firstName} ${p.lastName} (${insc.key}): ${nameMatches.length} "${parcName}" homonimos`);
+          }
         }
-        if(partner){insc.partner=partner.id;changed=true;}
+        if(partner){
+          insc.partner=partner.id;
+          // C8: snapshot pra resistir a deletion/corrupcao do partner.id
+          insc.partnerName=(partner.firstName+' '+partner.lastName).trim();
+          insc.partnerDob=partner.dob||'';
+          insc.partnerClub=partner.club||'';
+          changed=true;
+        } else if (parcName) {
+          // sem bind — ainda salva nome/dob/club do dado crua pra export nao perder
+          if (!insc.partnerName) { insc.partnerName=parcName; insc.partnerDob=parcDob||''; insc.partnerClub=parcObj?.club||''; changed=true; }
+        }
       });
 
       // Limpar campos temporarios
@@ -5336,7 +5421,9 @@ async function confirmImport(){
     closeModal('modal-import');
     renderPlayers();
     let msg=`${added} adicionado(s), ${updated} atualizado(s), inscricoes e duplas importadas!`;
-    if(unlinked.length){msg+=`\n\nAtencao: ${unlinked.length} dupla(s) sem parceiro vinculado (nome nao encontrado):\n${unlinked.slice(0,5).join('\n')}${unlinked.length>5?'\n...e mais '+(unlinked.length-5):''}`;showToast(msg,'warning');}
+    if(unlinked.length){msg+=`\n\nAtencao: ${unlinked.length} dupla(s) sem parceiro vinculado (nome nao encontrado):\n${unlinked.slice(0,5).join('\n')}${unlinked.length>5?'\n...e mais '+(unlinked.length-5):''}`;}
+    if(ambiguous.length){msg+=`\n\nAtencao: ${ambiguous.length} dupla(s) com parceiro ambiguo (homonimos sem DOB):\n${ambiguous.slice(0,5).join('\n')}${ambiguous.length>5?'\n...e mais '+(ambiguous.length-5):''}\n\nAdicione coluna "Nasc. Dupla"/"Nasc. Mista" na planilha para diferenciar.`;}
+    if(unlinked.length||ambiguous.length)showToast(msg,'warning');
     else{showToast(msg);}
   }catch(e){console.error(e);showToast('Erro: '+e.message,'error');}
 }

@@ -441,7 +441,9 @@ ipcMain.handle('xlsx:import', async () => {
       return { type: 'csv', content: fs.readFileSync(filePath, 'utf-8'), fileName: path.basename(filePath) };
     }
 
-    const wb = XLSX.readFile(filePath);
+    // cellDates:true -> datas voltam como Date objects (em vez de serial Excel).
+    // R5: normalizeDate no renderer tambem trata serial como fallback.
+    const wb = XLSX.readFile(filePath, { cellDates: true });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
     if (rows.length < 2) return { type: 'xlsx', rows: [], fileName: path.basename(filePath) };
@@ -455,16 +457,24 @@ ipcMain.handle('xlsx:import', async () => {
     for (let hi = 0; hi < Math.min(rows.length, 5); hi++) {
       if (findHeader(rows[hi])) { headerIdx = hi; break; }
     }
-    const headerRow = rows[headerIdx].map(h => String(h).toLowerCase().trim().replace(/\n/g,' '));
-    const findCol = (keywords) => headerRow.findIndex(h => keywords.some(k => h.includes(k)));
-    // v3.50+: colunas estendidas (Nasc./Clube do parceiro) sao lidas se existirem, senao fallback
-    // IMPORTANTE: findCol usa .includes(), entao para "Clube" nao retornar "Clube Dupla"/"Clube Mista",
-    // procuramos primeiro as variantes mais especificas. findIndex retorna o PRIMEIRO match.
+    // R7: normalizar header — lowercase, trim, collapse whitespace, remove acentos, remove quebras
+    const normHeader = (h) => String(h)
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\n/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const headerRow = rows[headerIdx].map(normHeader);
+    // C5: findCol aceita exclusions pra evitar que "clube" bata em "clube dupla"/"clube mista".
+    const findCol = (keywords, exclusions = []) => headerRow.findIndex(h =>
+      keywords.some(k => h.includes(k)) && !exclusions.some(ex => h.includes(ex))
+    );
+    // v3.50+: colunas estendidas (Nasc./Clube do parceiro).
     const colMap = {
-      nome: findCol(['nome completo','nome']),
+      nome: findCol(['nome completo','nome'], ['parceiro']),
       sexo: findCol(['sexo','genero']),
-      dob: findCol(['data de nascimento','data nascimento','data de','nascimento']),
-      clube: findCol(['clube']),
+      dob: findCol(['data de nascimento','data nascimento','data de','nascimento'], ['dupla','mista','parceiro']),
+      clube: findCol(['clube'], ['dupla','mista','parceiro']),
       categoria: findCol(['categoria']),
       telefone: findCol(['telefone','fone','celular']),
       email: findCol(['email','e-mail']),
@@ -478,12 +488,12 @@ ipcMain.handle('xlsx:import', async () => {
       parceiroMistaDOB: findCol(['nasc. mista','nasc mista','nascimento mista']),
       parceiroMistaClube: findCol(['clube mista']),
     };
-    // Fallback se 'dupla' nao foi achada com marcador: tentar generico sem confundir com parceiro/clube
+    // Fallback se 'dupla'/'mista' nao foi achada com marcador: tentar generico excluindo variantes.
     if (colMap.dupla < 0) {
-      colMap.dupla = headerRow.findIndex(h => h === 'dupla' || h.startsWith('dupla ') && !h.includes('parceiro') && !h.includes('clube') && !h.includes('nasc'));
+      colMap.dupla = headerRow.findIndex(h => (h === 'dupla' || h.startsWith('dupla ')) && !h.includes('parceiro') && !h.includes('clube') && !h.includes('nasc'));
     }
     if (colMap.mista < 0) {
-      colMap.mista = headerRow.findIndex(h => h === 'mista' || h.startsWith('mista ') && !h.includes('parceiro') && !h.includes('clube') && !h.includes('nasc'));
+      colMap.mista = headerRow.findIndex(h => (h === 'mista' || h.startsWith('mista ')) && !h.includes('parceiro') && !h.includes('clube') && !h.includes('nasc'));
     }
 
     const players = [];
@@ -491,12 +501,20 @@ ipcMain.handle('xlsx:import', async () => {
       const r = rows[i];
       if (!r || !r.length) continue;
       const get = (col) => col >= 0 && r[col] != null ? String(r[col]).trim() : '';
+      // getDate: se celula vier como Date object (cellDates:true), emite ISO YYYY-MM-DD.
+      // Strings (DD/MM/YYYY, serial numerico) sao normalizadas no renderer pelo normalizeDate.
+      const getDate = (col) => {
+        if (col < 0 || r[col] == null || r[col] === '') return '';
+        const v = r[col];
+        if (v instanceof Date && !isNaN(v)) return v.toISOString().slice(0, 10);
+        return String(v).trim();
+      };
       const nome = get(colMap.nome);
       if (!nome || nome.toLowerCase().includes('exemplo') || nome.toLowerCase().includes('preencha') || nome.toLowerCase().includes('ficha de')) continue;
       players.push({
         nome: nome,
         sexo: get(colMap.sexo).toUpperCase(),
-        dob: get(colMap.dob),
+        dob: getDate(colMap.dob),
         clube: get(colMap.clube),
         categoria: get(colMap.categoria),
         telefone: get(colMap.telefone),
@@ -504,11 +522,11 @@ ipcMain.handle('xlsx:import', async () => {
         simples: get(colMap.simples).toUpperCase() === 'X',
         dupla: get(colMap.dupla).toUpperCase() === 'X',
         parceiroDupla: get(colMap.parceiroDupla),
-        parceiroDuplaDOB: get(colMap.parceiroDuplaDOB),
+        parceiroDuplaDOB: getDate(colMap.parceiroDuplaDOB),
         parceiroDuplaClube: get(colMap.parceiroDuplaClube),
         mista: get(colMap.mista).toUpperCase() === 'X',
         parceiroMista: get(colMap.parceiroMista),
-        parceiroMistaDOB: get(colMap.parceiroMistaDOB),
+        parceiroMistaDOB: getDate(colMap.parceiroMistaDOB),
         parceiroMistaClube: get(colMap.parceiroMistaClube),
       });
     }
