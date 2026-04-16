@@ -3785,7 +3785,7 @@ function renderMatches() {
       tournament.daySchedule.forEach((day,idx)=>{
         const d=new Date(day.date+'T00:00:00');
         const label=`Dia ${idx+1} - ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
-        dayFilter.innerHTML+=`<option value="${day.date}">${label}</option>`;
+        dayFilter.innerHTML+=`<option value="${esc(day.date)}">${esc(label)}</option>`;
       });
     }
     dayFilter.value=prevVal||'';
@@ -5587,7 +5587,7 @@ function printReport(type){
 
   const w=window.open('','_blank','width=900,height=700');
   if(!w){showToast('Popup bloqueado. Permita popups para imprimir.','warning');return;}
-  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${tName} - Relatorio</title>${reportStyles}</head><body>${reportHeader}${printBtn}${body}${printBtn}</body></html>`);
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${esc(tName)} - Relatorio</title>${reportStyles}</head><body>${esc(reportHeader)}${printBtn}${esc(body)}${printBtn}</body></html>`);
   w.document.close();
 }
 
