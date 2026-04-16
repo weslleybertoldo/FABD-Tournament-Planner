@@ -4097,58 +4097,58 @@ function renderCourtsPanel() {
 async function handleRealtimeScoreUpdate(data){
   try {
     if(!data||!data.match_id||!tournament?.matches?.length)return;
-  const matchId=data.match_id||'';
-  // Buscar match pelo ID estavel (drawName + players) ou fallback por match_num
-  let m=null;
-  // Tentar encontrar pelo match_id que contem drawName e players
-  for(const mx of tournament.matches){
-    const draw=(mx.drawName||'').replace(/[^a-zA-Z0-9]/g,'');
-    const p1=(mx.player1||'').replace(/[^a-zA-Z0-9]/g,'').substring(0,20);
-    const p2=(mx.player2||'').replace(/[^a-zA-Z0-9]/g,'').substring(0,20);
-    const stableId=`${tournament.id}_${draw}_${p1}_${p2}`;
-    if(matchId===stableId){m=mx;break;}
-  }
-  // Fallback: por match_num (para compatibilidade com dados antigos)
-  if(!m){
-    const parts=matchId.split('_');
-    const matchNum=parseInt(parts[parts.length-1]);
-    if(matchNum)m=tournament.matches.find(x=>x.num===matchNum);
-  }
-  if(!m)return;
-  // Deduplicacao: ignorar updates com timestamp igual ou anterior ao ultimo processado
-  const updateKey = data.match_id;
-  const updateTs = data.updated_at;
-  if (lastScoreUpdateTimestamp[updateKey] && lastScoreUpdateTimestamp[updateKey] >= updateTs) return;
-  lastScoreUpdateTimestamp[updateKey] = updateTs;
-  // Se jogo ja foi finalizado localmente, ignorar
-  if(m.status==='Finalizada'||m.status==='WO')return;
-  // Se o jogo nao esta em quadra, ignorar
-  if(m.status!=='Em Quadra')return;
+    const matchId=data.match_id||'';
+    // Buscar match pelo ID estavel (drawName + players) ou fallback por match_num
+    let m=null;
+    // Tentar encontrar pelo match_id que contem drawName e players
+    for(const mx of tournament.matches){
+      const draw=(mx.drawName||'').replace(/[^a-zA-Z0-9]/g,'');
+      const p1=(mx.player1||'').replace(/[^a-zA-Z0-9]/g,'').substring(0,20);
+      const p2=(mx.player2||'').replace(/[^a-zA-Z0-9]/g,'').substring(0,20);
+      const stableId=`${tournament.id}_${draw}_${p1}_${p2}`;
+      if(matchId===stableId){m=mx;break;}
+    }
+    // Fallback: por match_num (para compatibilidade com dados antigos)
+    if(!m){
+      const parts=matchId.split('_');
+      const matchNum=parseInt(parts[parts.length-1]);
+      if(matchNum)m=tournament.matches.find(x=>x.num===matchNum);
+    }
+    if(!m)return;
+    // Deduplicacao: ignorar updates com timestamp igual ou anterior ao ultimo processado
+    const updateKey = data.match_id;
+    const updateTs = data.updated_at;
+    if (lastScoreUpdateTimestamp[updateKey] && lastScoreUpdateTimestamp[updateKey] >= updateTs) return;
+    lastScoreUpdateTimestamp[updateKey] = updateTs;
+    // Se jogo ja foi finalizado localmente, ignorar
+    if(m.status==='Finalizada'||m.status==='WO')return;
+    // Se o jogo nao esta em quadra, ignorar
+    if(m.status!=='Em Quadra')return;
 
-  // Atualizar placar ao vivo para exibicao
-  const s1=data.score_p1||0, s2=data.score_p2||0, set=data.current_set||1;
-  m.liveScore=`${s1} - ${s2} (Set ${set})`;
-  // Sets anteriores para exibicao
-  const setsP1=data.sets_p1||[],setsP2=data.sets_p2||[];
-  m.liveSets=setsP1.map((v,i)=>v+'-'+(setsP2[i]||0));
-  // Atualizar arbitro em tempo real
-  if(data.umpire_name)m.umpire=data.umpire_name;
+    // Atualizar placar ao vivo para exibicao
+    const s1=data.score_p1||0, s2=data.score_p2||0, set=data.current_set||1;
+    m.liveScore=`${s1} - ${s2} (Set ${set})`;
+    // Sets anteriores para exibicao
+    const setsP1=data.sets_p1||[],setsP2=data.sets_p2||[];
+    m.liveSets=setsP1.map((v,i)=>v+'-'+(setsP2[i]||0));
+    // Atualizar arbitro em tempo real
+    if(data.umpire_name)m.umpire=data.umpire_name;
 
-  // Se arbitro finalizou o jogo (winner definido)
-  if(data.winner&&data.final_score){
-    m.score=data.final_score;
-    m.status='Finalizada';
-    m.winner=data.winner;
-    m.finishedAt=new Date().toISOString();
-    m.liveScore='';
-    try{propagateResultToDraws(m);}catch(e){console.warn('Erro ao propagar resultado:',e);showToast('Aviso: resultado recebido mas propagacao na chave falhou','warning');}
-    await window.api.saveTournament(tournament);
-    prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
-    showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
-  }
+    // Se arbitro finalizou o jogo (winner definido)
+    if(data.winner&&data.final_score){
+      m.score=data.final_score;
+      m.status='Finalizada';
+      m.winner=data.winner;
+      m.finishedAt=new Date().toISOString();
+      m.liveScore='';
+      try{propagateResultToDraws(m);}catch(e){console.warn('Erro ao propagar resultado:',e);showToast('Aviso: resultado recebido mas propagacao na chave falhou','warning');}
+      await window.api.saveTournament(tournament);
+      prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
+      showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
+    }
 
-  renderCourtsPanel();
-  renderMatches();
+    renderCourtsPanel();
+    renderMatches();
   } catch(e) { console.error('[RealtimeScoreUpdate] Error:', e.message); }
 }
 
