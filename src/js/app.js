@@ -27,16 +27,27 @@ const MODALITIES = [
 
 // === INIT ===
 document.addEventListener('DOMContentLoaded', async () => {
-  // Gate de autenticacao: bloqueia o app ate o organizador estar logado
-  const authOk = await ensureAuthenticated();
-  if (!authOk) return; // Login overlay esta visivel; app nao prossegue
+  try {
+    console.log('[INIT] Starting app...');
+    // Gate de autenticacao: bloqueia o app ate o organizador estar logado
+    const authOk = await ensureAuthenticated();
+    console.log('[INIT] Auth result:', authOk);
+    if (!authOk) return; // Login overlay esta visivel; app nao prossegue
 
-  await loadData();
-  setupNavigation();
-  setupValidation();
-  updateOverview();
-  const verEl=document.getElementById('current-version');
-  if(verEl)verEl.textContent=`Versao atual: v${APP_VERSION}`;
+    await loadData();
+    console.log('[INIT] Data loaded');
+    setupNavigation();
+    console.log('[INIT] Navigation set up');
+    setupValidation();
+    updateOverview();
+    console.log('[INIT] Overview updated');
+    const verEl=document.getElementById('current-version');
+    if(verEl)verEl.textContent=`Versao atual: v${APP_VERSION}`;
+    console.log('[INIT] Done!');
+  } catch(e) {
+    console.error('[INIT] ERROR:', e.message, e.stack);
+    alert('Erro ao iniciar: ' + e.message);
+  }
 });
 
 // === AUTH (login OTP por email) ===
