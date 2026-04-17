@@ -1,4 +1,4 @@
-const CACHE='fabd-referee-v7';
+const CACHE='fabd-referee-v8';
 
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll([
@@ -7,24 +7,55 @@ self.addEventListener('install',e=>{
     './icon-192.png',
     './icon-512.png'
   ])));
+  // ATUALIZAÇÃO AUTOMÁTICA: ativa imediatamente sem esperar
   self.skipWaiting();
 });
 
 self.addEventListener('activate',e=>{
-  e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
-  self.clients.claim();
+  e.waitUntil(
+    caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k))))
+    // PEGA CONTROLE DAS PÁGINAS ABERTAS IMEDIATAMENTE
+    .then(()=>self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch',e=>{
-  // Network only for API and auth
-  if(e.request.url.includes('supabase.co')||e.request.url.includes('googleapis.com')||e.request.url.includes('cdn.jsdelivr.net')||e.request.url.includes('iconify.design')||e.request.url.includes('simplesvg.com')||e.request.url.includes('unisvg.com')){
+  const url=e.request.url;
+  const isAppFile=url.includes('/referee/');
+  const isApi=url.includes('supabase.co')||url.includes('googleapis.com')||url.includes('google.com');
+  const isCdn=url.includes('cdn.jsdelivr.net')||url.includes('iconify.design')||url.includes('simplesvg.com')||url.includes('unisvg.com');
+
+  // API e CDN = SEMPRE buscar da rede
+  if(isApi||isCdn){
     e.respondWith(fetch(e.request));
     return;
   }
-  // Network first, fallback to cache
-  e.respondWith(fetch(e.request).then(r=>{
-    const c=r.clone();
-    caches.open(CACHE).then(cache=>cache.put(e.request,c));
-    return r;
-  }).catch(()=>caches.match(e.request)));
+
+  // Arquivos do app = NETWORK FIRST, fallback cache
+  if(isAppFile){
+    e.respondWith(
+      fetch(e.request)
+        .then(r=>{
+          if(r.ok){
+            const c=r.clone();
+            caches.open(CACHE).then(cache=>cache.put(e.request,c));
+          }
+          return r;
+        })
+        .catch(()=>caches.match(e.request))
+    );
+    return;
+  }
+
+  // Outros assets = CACHE FIRST, fallback rede
+  e.respondWith(
+    caches.match(e.request)
+      .then(r=>r||fetch(e.request).then(res=>{
+        if(res.ok){
+          const c=res.clone();
+          caches.open(CACHE).then(cache=>cache.put(e.request,c));
+        }
+        return res;
+      }))
+  );
 });
