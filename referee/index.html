@@ -167,6 +167,7 @@
       <div class="ref-tab active" onclick="setRefTab('jogos')">Jogos</div>
       <div class="ref-tab" onclick="setRefTab('historico')">Historico</div>
       <div class="ref-tab" onclick="setRefTab('arbitros')">Arbitros</div>
+      <div class="ref-tab" onclick="setRefTab('config')">Config</div>
     </div>
     <div id="ref-tab-jogos" class="matches-list">
       <div class="empty"><div style="font-size:48px">&#9203;</div><p>Nenhum jogo em quadra.<br>Aguarde o organizador.</p></div>
@@ -177,6 +178,40 @@
     </div>
     <div id="ref-tab-arbitros" class="matches-list" style="display:none">
       <div id="arb-list"></div>
+    </div>
+    <div id="ref-tab-config" class="matches-list" style="display:none">
+      <div style="padding:16px">
+        <div style="background:#1E293B;border-radius:12px;padding:16px;margin-bottom:12px">
+          <h3 style="color:#F59E0B;margin-bottom:12px;font-size:14px">CONFIGURACAO DO JOGO</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:left">
+            <div style="background:#0F172A;padding:10px;border-radius:8px">
+              <div style="font-size:11px;color:#64748B">Total de Pontos</div>
+              <div style="font-size:18px;font-weight:700;color:#fff" id="cfg-points">21</div>
+            </div>
+            <div style="background:#0F172A;padding:10px;border-radius:8px">
+              <div style="font-size:11px;color:#64748B">Maximo por Set</div>
+              <div style="font-size:18px;font-weight:700;color:#fff" id="cfg-max">30</div>
+            </div>
+            <div style="background:#0F172A;padding:10px;border-radius:8px">
+              <div style="font-size:11px;color:#64748B">Sets para Vencer</div>
+              <div style="font-size:18px;font-weight:700;color:#fff" id="cfg-sets">3</div>
+            </div>
+            <div style="background:#0F172A;padding:10px;border-radius:8px">
+              <div style="font-size:11px;color:#64748B">Intervalo</div>
+              <div style="font-size:18px;font-weight:700;color:#fff" id="cfg-interval">11</div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#64748B;margin-top:12px">Valores definidos no Planner pelo organizador</p>
+        </div>
+        <div style="background:#1E293B;border-radius:12px;padding:16px">
+          <h3 style="color:#F59E0B;margin-bottom:12px;font-size:14px">INFO</h3>
+          <div style="font-size:12px;color:#94A3B8;text-align:left">
+            <p style="margin-bottom:8px"><strong>Torneio:</strong> <span id="cfg-tournament">-</span></p>
+            <p style="margin-bottom:8px"><strong>Federacao:</strong> <span id="cfg-federation">-</span></p>
+            <p style="margin-bottom:8px"><strong>Arbitro:</strong> <span id="cfg-referee">-</span></p>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="install-bar" id="install-bar" style="display:block">
       <button id="install-btn" onclick="installPWA()">&#128229; Instalar App no Dispositivo</button>
@@ -475,12 +510,25 @@
 
     // === TABS ===
     function setRefTab(tab){
-      document.querySelectorAll('.ref-tab').forEach((t,i)=>t.classList.toggle('active',['jogos','historico','arbitros'][i]===tab));
+      document.querySelectorAll('.ref-tab').forEach((t,i)=>t.classList.toggle('active',['jogos','historico','arbitros','config'][i]===tab));
       document.getElementById('ref-tab-jogos').style.display=tab==='jogos'?'block':'none';
       document.getElementById('ref-tab-historico').style.display=tab==='historico'?'block':'none';
       document.getElementById('ref-tab-arbitros').style.display=tab==='arbitros'?'block':'none';
+      document.getElementById('ref-tab-config').style.display=tab==='config'?'block':'none';
       if(tab==='historico')loadHistory();
       if(tab==='arbitros')loadArbitros();
+      if(tab==='config')updateConfigTab();
+    }
+
+    // === CONFIG TAB ===
+    function updateConfigTab(){
+      document.getElementById('cfg-points').textContent=PTS;
+      document.getElementById('cfg-max').textContent=MAX;
+      document.getElementById('cfg-sets').textContent=BEST;
+      document.getElementById('cfg-interval').textContent=intervalAt;
+      document.getElementById('cfg-tournament').textContent=document.getElementById('tournament-name').textContent||'-';
+      document.getElementById('cfg-federation').textContent=currentUser?.federation_name||'-';
+      document.getElementById('cfg-referee').textContent=currentUser?.name||'-';
     }
 
     let historyData=[];
