@@ -375,7 +375,13 @@
     let canSwapInner=true;
 
     // === PWA SERVICE WORKER ===
-    if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('./sw.js').catch(()=>{});
+      // Notifica quando nova versao esta pronta
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        if(confirm('Nova versao do app disponivel! Atualizar agora?'))location.reload();
+      });
+    }
 
     // === PWA INSTALL ===
     window.addEventListener('beforeinstallprompt',e=>{
