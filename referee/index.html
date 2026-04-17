@@ -187,7 +187,7 @@
   <!-- SCORER -->
   <div id="page-scorer" class="scorer-page">
     <div class="scorer-top">
-      <button class="back" onclick="exitScorer()">&#8592; Voltar</button>
+      <button class="back" onclick="requestExitScorer()">&#8592; Voltar</button>
       <span id="scorer-info"></span>
       <span id="scorer-court" style="color:#60A5FA"></span>
       <span id="sync-status" style="width:8px;height:8px;border-radius:50%;background:#10B981;display:inline-block"></span>
@@ -268,6 +268,18 @@
     </div>
   </div>
 
+  <!-- MODAL SAIR DO JOGO -->
+  <div class="modal-overlay" id="modal-exit">
+    <div class="modal">
+      <h3>&#8592; Sair do Jogo</h3>
+      <p style="color:#94A3B8;margin-bottom:20px">Ao sair, o jogo ficará disponível para outro árbitro.</p>
+      <div class="actions">
+        <button class="btn btn-danger" onclick="closeExitModal()">Cancelar</button>
+        <button class="btn btn-success" onclick="confirmExit()">Sair</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL INTERVALO -->
   <div class="interval-overlay" id="modal-interval">
     <div class="interval-box">
@@ -278,11 +290,11 @@
     </div>
   </div>
 
-  <!-- MODAL PERGUNTAR INTERVALO (11 pontos) -->
+  <!-- MODAL PERGUNTAR INTERVALO (pontos dinamicos) -->
   <div class="modal-overlay" id="modal-ask-interval">
     <div class="modal">
       <h3>&#9200; Intervalo</h3>
-      <p style="color:#94A3B8;margin-bottom:20px">Primeiro jogador atingiu 11 pontos.<br>Deseja descansar?</p>
+      <p style="color:#94A3B8;margin-bottom:20px" id="interval-modal-text">Primeiro jogador atingiu <span id="interval-pts">11</span> pontos.<br>Deseja descansar?</p>
       <div class="actions">
         <button class="btn btn-danger" onclick="declineInterval()">Não</button>
         <button class="btn btn-success" onclick="acceptInterval()">Sim (1 min)</button>
@@ -304,9 +316,13 @@
     // Sides: quem esta em qual lado da tela
     let leftPlayer=1,rightPlayer=2; // 1=player1, 2=player2
     let state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
-    const PTS=21,MAX=30,BEST=3;
+    // Scoring dinamico - vem do Supabase (configurado no Planner)
+    let PTS=21,MAX=30,BEST=3;
+    let intervalAt=11; // ponto de descanso/troca de lado (auto: floor(points/2)+1)
     let intervalTimer=null,intervalSeconds=0;
-    let interval11Asked=false;
+    let intervalAsked=false;
+    let currentTournamentId=null;
+    let currentScoring=null; // {sets, points, maxPoints}
 
     // === DUPLAS ===
     let isDoubles=false;
@@ -434,12 +450,19 @@
     async function loadMatches(){
       try{
         if(!currentUser?.federation_id){return;}
-        // Pega o torneio mais recente DA FEDERACAO do arbitro
-        const{data:ts}=await sb.from('tournaments').select('id,name,federations(short_name,primary_color)').eq('federation_id',currentUser.federation_id).order('updated_at',{ascending:false}).limit(1);
+        // Pega o torneio mais recente DA FEDERACAO do arbitro (inclui scoring)
+        const{data:ts}=await sb.from('tournaments').select('id,name,data,federations(short_name,primary_color)').eq('federation_id',currentUser.federation_id).order('updated_at',{ascending:false}).limit(1);
         if(!ts?.length){document.getElementById('ref-tab-jogos').innerHTML='<div class="empty"><div style="font-size:48px">&#128580;</div><p>Nenhum torneio ativo na sua federacao</p></div>';return;}
         currentTournamentId=ts[0].id;
         const fed=ts[0].federations;
         document.getElementById('tournament-name').textContent=ts[0].name;
+        // Carrega scoring do tournament (default 21/30/3 se nao definido)
+        const tData=ts[0].data||{};
+        currentScoring=tData.scoring||{sets:3,points:21,maxPoints:30};
+        PTS=currentScoring.points||21;
+        MAX=currentScoring.maxPoints||(PTS===15?20:PTS===11?15:30);
+        BEST=currentScoring.sets||3;
+        intervalAt=Math.floor(PTS/2)+1; // BWF: 21->11, 15->8, 11->6
         // Aplica cor da federacao no header
         if(fed?.primary_color){document.querySelector('.matches-page .header').style.background=fed.primary_color;}
         // Jogos em quadra DESTA federacao + tournament
@@ -548,14 +571,21 @@
         const{data:match}=await sb.from('live_matches').select('*').eq('id',matchId).single();
         if(!match){alert('Jogo nao encontrado');return;}
         currentMatch=match;
-        // Carregar clubes dos jogadores (para exibir nos cantos da quadra)
+        // Carregar clubes E scoring do tournament (para exibir nos cantos da quadra e configurar pontuacao)
         try{
           const{data:td}=await sb.from('tournaments').select('data').eq('id',match.tournament_id).single();
-          clubMap=new Map(((td?.data?.players)||[]).map(p=>[(p.name||'').trim(),p.club||'']));
+          const tData=td?.data||{};
+          clubMap=new Map(((tData.players)||[]).map(p=>[(p.name||'').trim(),p.club||'']));
+          // Atualizar scoring dinamico
+          const sc=tData.scoring||{sets:3,points:21,maxPoints:30};
+          PTS=sc.points||21;
+          MAX=sc.maxPoints||(PTS===15?20:PTS===11?15:30);
+          BEST=sc.sets||3;
+          intervalAt=Math.floor(PTS/2)+1; // BWF: 21->11, 15->8, 11->6
         }catch(e){clubMap=new Map();}
         leftPlayer=1;rightPlayer=2;
         state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
-        interval11Asked=false;
+        intervalAsked=false;
 
         // Detectar duplas: primeiro verifica "/" nos nomes, se não encontrar verifica draw_name
         isDoubles=false;
@@ -588,10 +618,10 @@
 
         // Verificar se este árbitro já está em outro jogo ativo (não finalizado)
         isReadOnly=false;
+        const lockTimeout=5*60*1000; // 5 minutos de timeout
         {
           const{data:activeGames}=await sb.from('live_scores').select('match_id,umpire_name,updated_at,winner').eq('umpire_name',currentUser?.name||'').is('winner',null);
-          const fiveMin=5*60*1000;
-          const otherActive=activeGames?.find(g=>g.match_id!==matchId&&(Date.now()-new Date(g.updated_at||0).getTime())<fiveMin);
+          const otherActive=activeGames?.find(g=>g.match_id!==matchId&&(Date.now()-new Date(g.updated_at||0).getTime())<lockTimeout);
           if(otherActive){
             alert('Você já está arbitrando outro jogo. Saia do jogo atual antes de abrir outro.');
             return;
@@ -601,10 +631,10 @@
         // Verificar se outro árbitro já está marcando este jogo
         if(sc&&sc.umpire_name&&sc.umpire_name!==currentUser?.name){
           const lastUpdate=new Date(sc.updated_at||0).getTime();
-          const fiveMin=5*60*1000;
-          if(Date.now()-lastUpdate<fiveMin){
+          if(Date.now()-lastUpdate<lockTimeout){
             // Outro árbitro ativo (atualizou nos últimos 5 min) → somente visualização
             isReadOnly=true;
+            console.log('Modo somente leitura: outro árbitro', sc.umpire_name, 'está neste jogo');
           }
           // Se passou 5 min sem atualização, assume que saiu sem clicar Voltar → libera
         }
@@ -617,6 +647,12 @@
 
         hideAll();document.getElementById('page-scorer').style.display='flex';
         if(pollInterval)clearInterval(pollInterval);
+        // Heartbeat: manter lock ativo enquanto está no jogo
+        pollInterval=setInterval(async()=>{
+          if(!isReadOnly&&currentMatch&&currentUser?.name){
+            await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,federation_id:currentMatch.federation_id,umpire_name:currentUser.name,updated_at:new Date().toISOString()},{onConflict:'match_id'}).then(()=>{},()=>{});
+          }
+        },30000); // a cada 30 segundos
         lockLandscape();
         updateDisplay();
         updateReadOnlyUI();
@@ -669,7 +705,7 @@
         set:state.set,p1:state.p1,p2:state.p2,server:state.server,
         setsP1:[...state.setsP1],setsP2:[...state.setsP2],
         setsWonP1:state.setsWonP1,setsWonP2:state.setsWonP2,
-        leftPlayer,rightPlayer,interval11Asked,
+        leftPlayer,rightPlayer,intervalAsked,
         // Salvar estado de duplas para undo
         doublesServer,doublesReceiver,
         leftTopPlayer,leftBottomPlayer,rightTopPlayer,rightBottomPlayer,
@@ -730,7 +766,7 @@
       state.setsP1=prev.setsP1;state.setsP2=prev.setsP2;
       state.setsWonP1=prev.setsWonP1;state.setsWonP2=prev.setsWonP2;
       leftPlayer=prev.leftPlayer;rightPlayer=prev.rightPlayer;
-      interval11Asked=prev.interval11Asked||false;
+      intervalAsked=prev.intervalAsked||false;
       if(isDoubles){
         doublesServer=prev.doublesServer||doublesServer;
         doublesReceiver=prev.doublesReceiver||doublesReceiver;
@@ -792,7 +828,7 @@
         state.set++;state.p1=0;state.p2=0;
         const tmp=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp;
         state.server=setWinner;
-        interval11Asked=false;
+        intervalAsked=false;
         if(isDoubles){
           // Swap diagonal — quadra espelhada (vista de cima)
           const tmpLT=leftTopPlayer,tmpLB=leftBottomPlayer;
@@ -813,10 +849,10 @@
         startInterval(120,'Intervalo entre Sets','Próximo set em:');
         return;
       }
-      // Intervalo no 11 pontos: perguntar se quer descansar
-      if(!interval11Asked&&((p1===11&&p2<11)||(p2===11&&p1<11))){
-        interval11Asked=true;
-        // No 3o set nos 11: trocar de lado (regra BWF)
+      // Intervalo no ponto medio: perguntar se quer descansar (BWF: 21->11, 15->8, 11->6)
+      if(!intervalAsked&&((p1===intervalAt&&p2<intervalAt)||(p2===intervalAt&&p1<intervalAt))){
+        intervalAsked=true;
+        // Trocar de lado no ponto médio (regra BWF)
         // - Quem sacava continua sacando (doublesServer não muda)
         // - Quadra espelhada: ao caminhar pro outro lado, posições invertem diagonalmente
         //   Left-Top ↔ Right-Bottom, Left-Bottom ↔ Right-Top
@@ -835,6 +871,7 @@
           }
           // state.server NÃO muda — quem sacava continua sacando
         }
+        document.getElementById('interval-pts').textContent=intervalAt;
         document.getElementById('modal-ask-interval').classList.add('active');
       }
     }
@@ -842,7 +879,7 @@
     // === INTERVALO / DESCANSO ===
     function acceptInterval(){
       document.getElementById('modal-ask-interval').classList.remove('active');
-      startInterval(60,'Intervalo - 11 pontos','');
+      startInterval(60,'Intervalo - '+intervalAt+' pontos','');
     }
     function declineInterval(){
       document.getElementById('modal-ask-interval').classList.remove('active');
@@ -1091,7 +1128,21 @@
       }
     }
 
-    async function exitScorer(){
+    function requestExitScorer(){
+      // Mostrar confirmação antes de sair
+      document.getElementById('modal-exit').classList.add('active');
+    }
+
+    function closeExitModal(){
+      document.getElementById('modal-exit').classList.remove('active');
+    }
+
+    async function confirmExit(){
+      document.getElementById('modal-exit').classList.remove('active');
+      await doExitScorer();
+    }
+
+    async function doExitScorer(){
       // Limpar árbitro do jogo se não estava em modo leitura e jogo não finalizado
       if(currentMatch&&!isReadOnly&&sb){
         try{

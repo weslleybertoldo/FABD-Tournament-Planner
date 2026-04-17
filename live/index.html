@@ -463,6 +463,7 @@
 
         // Matches em quadra
         const{data:matches}=await sb.from('live_matches').select('*').eq('tournament_id',t.id).eq('status','Em Quadra').order('court');
+        console.log('[Live] Found', matches?.length || 0, 'matches in court for tournament', t.id);
         if(!matches?.length){
           document.getElementById('live-content').innerHTML='<div class="empty"><div class="icon">&#9203;</div><h3>Nenhum jogo em andamento</h3><p style="color:#64748B">Aguarde o inicio das partidas.</p></div>';
         } else {

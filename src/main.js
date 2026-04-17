@@ -705,7 +705,13 @@ ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tourna
         players: (tournamentData.players || []).map(p => ({
           name: ((p.firstName || '') + ' ' + (p.lastName || '')).trim() || p.name || '',
           club: p.club || ''
-        }))
+        })),
+        // Scoring config para o App Referee
+        scoring: tournamentData.scoring ? {
+          sets: tournamentData.scoring.sets || 3,
+          points: tournamentData.scoring.points || 21,
+          maxPoints: tournamentData.scoring.maxPoints || (tournamentData.scoring.points === 15 ? 20 : tournamentData.scoring.points === 11 ? 15 : 30)
+        } : { sets: 3, points: 21, maxPoints: 30 }
       };
     }
     // Debounce: agendar envio em 500ms (agrupa chamadas rapidas).
@@ -765,8 +771,20 @@ ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
 ipcMain.handle('supabase:removeFromCourt', async (_, tournamentId, matchData) => {
   try {
     const id = typeof matchData === 'object' ? stableMatchId(tournamentId, matchData) : `${tournamentId}_${matchData}`;
-    await supabase.from('live_scores').delete().eq('match_id', id);
-    await supabase.from('live_matches').delete().eq('id', id);
+    log('INFO', 'Removing match from court:', id, '| tournamentId:', tournamentId);
+    // Verificar se existe antes de deletar
+    const { data: existing } = await supabase.from('live_matches').select('id,status').eq('id', id).maybeSingle();
+    if (existing) {
+      log('INFO', 'Found existing match, deleting...', existing);
+    } else {
+      log('WARN', 'Match not found in Supabase, may have been already deleted');
+    }
+    // Deletar scores primeiro
+    const { error: scoreErr } = await supabase.from('live_scores').delete().eq('match_id', id);
+    if (scoreErr) log('ERROR', 'Error deleting scores:', scoreErr.message);
+    // Deletar match
+    const { error: matchErr } = await supabase.from('live_matches').delete().eq('id', id);
+    if (matchErr) log('ERROR', 'Error deleting match:', matchErr.message);
     log('INFO', 'Supabase match removed:', id);
     return true;
   } catch(e) { log('ERROR', 'Supabase removeFromCourt:', e.message); return false; }
