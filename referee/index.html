@@ -1032,8 +1032,6 @@
         }
         // R3: .select('match_id') detecta RLS silent-deny (arbitro nao
         // autorizado ou federation_id mismatch -> 0 rows sem erro).
-        console.log('[DEBUG] federation_id:', currentMatch.federation_id);
-        console.log('[DEBUG] currentMatch:', JSON.stringify(currentMatch));
         const {data,error}=await sb.from('live_scores').upsert({
           match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,
           federation_id:currentMatch.federation_id,
