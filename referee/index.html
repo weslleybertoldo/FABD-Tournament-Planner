@@ -410,10 +410,26 @@
       errEl.style.display='none';
       try{
         errEl.textContent='Redirecionando...';errEl.style.display='block';errEl.style.color='#60A5FA';
-        const{data,error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.href.split('#')[0].split('?')[0]}});
-        if(error){errEl.style.color='#EF4444';errEl.textContent='Erro: '+error.message;}
-        else if(data?.url)location.href=data.url;
-      }catch(e){errEl.style.color='#EF4444';errEl.textContent='Erro: '+e.message;}
+        const redirectUrl=location.href.split('#')[0].split('?')[0];
+        console.log('[Login] Redirect URL:',redirectUrl);
+        const{data,error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:redirectUrl}});
+        if(error){
+          errEl.style.color='#EF4444';
+          errEl.textContent='Erro: '+error.message+' ('+error.status+')';
+          console.error('[Login Google Error]',error);
+        }
+        else if(data?.url){
+          console.log('[Login] OAuth URL:',data.url);
+          location.href=data.url;
+        }else{
+          errEl.style.color='#EF4444';
+          errEl.textContent='Erro: URL de redirecionamento nao recebida';
+        }
+      }catch(e){
+        errEl.style.color='#EF4444';
+        errEl.textContent='Erro: '+e.message;
+        console.error('[Login Google Exception]',e);
+      }
     }
     function logout(){currentUser=null;sb?.auth.signOut();hideAll();document.getElementById('page-login').style.display='flex';if(pollInterval)clearInterval(pollInterval);}
     function hideAll(){['page-login','page-federation','page-pending','page-matches','page-scorer'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
