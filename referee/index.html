@@ -445,8 +445,6 @@
     // === MATCHES ===
     function showMatches(){hideAll();const p=document.getElementById('page-matches');p.style.display='flex';document.getElementById('user-name').textContent=currentUser.name;loadMatches();if(pollInterval)clearInterval(pollInterval);pollInterval=setInterval(loadMatches,5000);}
 
-    let currentTournamentId=null;
-
     async function loadMatches(){
       try{
         if(!currentUser?.federation_id){return;}
