@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#1E3A8A">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="screen-orientation" content="landscape">
   <title>FABD - Arbitro</title>
   <link rel="manifest" href="manifest.webmanifest">
@@ -323,6 +323,7 @@
     let intervalAsked=false;
     let currentTournamentId=null;
     let currentScoring=null; // {sets, points, maxPoints}
+    let isReadOnly=false; // true quando outro árbitro já está marcando
 
     // === DUPLAS ===
     let isDoubles=false;
@@ -467,7 +468,7 @@
         const{data:ms}=await sb.from('live_matches').select('*').eq('federation_id',currentUser.federation_id).eq('tournament_id',ts[0].id).eq('status','Em Quadra').order('court');
         const list=document.getElementById('ref-tab-jogos');
         if(!ms?.length){list.innerHTML='<div class="empty"><div style="font-size:48px">&#9203;</div><p>Nenhum jogo em quadra.<br>Aguarde o organizador.</p></div>';return;}
-        let h='';ms.forEach(m=>{h+=`<div class="match-card" onclick="openScorer('${m.id}')"><div class="court">${esc(m.court)}</div><div class="players">${esc(m.player1)} vs ${esc(m.player2)}</div><div class="draw">${esc(m.draw_name)} - ${esc(m.round_name||'')}</div></div>`;});
+        let h='';ms.forEach(m=>{h+=`<div class="match-card" onclick="openScorer('${esc(m.id)}')"><div class="court">${esc(m.court)}</div><div class="players">${esc(m.player1)} vs ${esc(m.player2)}</div><div class="draw">${esc(m.draw_name)} - ${esc(m.round_name||'')}</div></div>`;});
         list.innerHTML=h;
       }catch(e){console.error(e);}
     }
@@ -1047,7 +1048,6 @@
       }
     }
 
-    let isReadOnly=false; // true quando outro árbitro já está marcando
     let lastUmpireCheck=0; // timestamp da última verificação de umpire
 
     async function syncScore(){
@@ -1102,11 +1102,11 @@
       try{
         // Verificar se o jogo ainda esta Em Quadra antes de finalizar
         const {data:matchCheck}=await sb.from('live_matches').select('status').eq('id',currentMatch.id).single();
-        if(!matchCheck||matchCheck.status!=='Em Quadra'){alert('Este jogo nao esta mais em quadra. Saindo do placar.');closeModal();exitScorer();return;}
+        if(!matchCheck||matchCheck.status!=='Em Quadra'){alert('Este jogo nao esta mais em quadra. Saindo do placar.');closeModal();doExitScorer();return;}
         const r1=await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,federation_id:currentMatch.federation_id,current_set:state.set,score_p1:state.p1,score_p2:state.p2,sets_p1:state.setsP1,sets_p2:state.setsP2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,winner,final_score:finalScore,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'});
         const r2=await sb.from('live_matches').update({status:'Finalizada',umpire:currentUser?.name||''}).eq('id',currentMatch.id);
         if(r1.error||r2.error){alert('Erro ao finalizar: '+(r1.error?.message||r2.error?.message));return;}
-        closeModal();alert('Placar registrado!');exitScorer();
+        closeModal();alert('Placar registrado!');doExitScorer();
       }catch(e){alert('Erro: '+e.message);}
     }
 
