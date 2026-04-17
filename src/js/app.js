@@ -4143,7 +4143,7 @@ async function handleRealtimeScoreUpdate(data){
       m.liveScore='';
       try{propagateResultToDraws(m);}catch(e){console.warn('Erro ao propagar resultado:',e);showToast('Aviso: resultado recebido mas propagacao na chave falhou','warning');}
       await window.api.saveTournament(tournament);
-      prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
+      // Supabase ja sincronizado acima, apenas log
       showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
     }
 
@@ -5205,8 +5205,18 @@ async function selectImportFile(){
     // Fase 2: Converter pra formato que o confirmImport espera
     // v3.50+: duplaMap agora carrega objeto {name, dob, club} em vez de string.
     importedRows = [];
+    // Track which athletes have their own row in the XLSX (for correct inscription count)
+    const atletasComLinhaPropria = new Set();
+    xlsxRows.forEach(r => {
+      const nomeNorm = normalizeName(r.nome || '');
+      const dob = r.dob || '';
+      if (nomeNorm && dob) atletasComLinhaPropria.add(nomeNorm + '|' + dob);
+    });
     Object.values(atletaMap).forEach(a => {
       const inscricoesRaw = [...a.inscricoes].join('|');
+      const key = normalizeName(a.firstName + ' ' + a.lastName) + '|' + a.dob;
+      const hasLinhaPropria = atletasComLinhaPropria.has(key);
+      const totalInscricoes = hasLinhaPropria ? inscricoesRaw.split('|').filter(x=>x).length : 0;
 
       // Extrair parceiros por modalidade (primeiro encontrado como fallback + mapa completo por chave)
       let duplaDM = '', duplaDF = '', duplaDX = '';
@@ -5223,6 +5233,7 @@ async function selectImportFile(){
         firstName: a.firstName, lastName: a.lastName, gender: a.gender, dob: a.dob,
         club: a.club, state: 'AL', ranking: '', phone: a.phone, email: a.email,
         inscricoesRaw, duplaDM, duplaDF, duplaDX, _duplaMap: duplaMap,
+        _totalInscricoes: totalInscricoes,
         valid: true, error: ''
       };
 
@@ -5237,7 +5248,16 @@ async function selectImportFile(){
     // Fase 3: Mostrar preview com resumo
     const totalLinhas = xlsxRows.length;
     const totalAtletas = importedRows.length;
-    const totalInscs = importedRows.reduce((s, r) => s + (r.inscricoesRaw||'').split('|').filter(x=>x).length, 0);
+    // v3.60: contar inscricoes das LINHAS ORIGINAIS do XLSX (nao deduplicadas)
+    // Cada linha com X em simples/dupla/mista = 1 inscricao
+    // (parceiros automaticos nao tem linha propria, mas countamos a inscricao na linha principal)
+    const totalInscs = xlsxRows.reduce((s, r) => {
+      let n = 0;
+      if (r.simples) n++;
+      if (r.dupla) n++;
+      if (r.mista) n++;
+      return s + n;
+    }, 0);
     const duplicatasRemovidas = totalLinhas - totalAtletas;
 
     document.getElementById('import-file-name').textContent = xlsxResult.fileName;

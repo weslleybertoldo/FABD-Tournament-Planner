@@ -742,6 +742,9 @@ ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
       return false;
     }
     const id = stableMatchId(tournamentId, matchData);
+    // v3.60: score atualiza apenas pelo App Referee
+    // O upsertMatch do Planner NAO deve sobrescrever score (referee é quem marca pontos)
+    // Apenas atualizar dados do jogo (status, court, players) sem mexer em score
     const row = {
       id, tournament_id: tournamentId, federation_id: currentFederation.id,
       match_num: matchData.num,
@@ -753,9 +756,8 @@ ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
     };
     const { error } = await supabase.from('live_matches').upsert(row, { onConflict: 'id' });
     if (error) throw error;
-    const { error: scoreError } = await supabase.from('live_scores').upsert({ match_id: id, tournament_id: tournamentId, federation_id: currentFederation.id }, { onConflict: 'match_id' });
-    if (scoreError) { log('ERROR', 'Supabase score upsert:', scoreError.message); return false; }
-    log('INFO', 'Supabase match upserted:', id);
+    // v3.60: NAO atualizar live_scores aqui - App Referee é quem atualiza score
+    log('INFO', 'Supabase match upserted (sem score):', id);
     return true;
   } catch(e) { log('ERROR', 'Supabase upsertMatch:', e.message); return false; }
 });
