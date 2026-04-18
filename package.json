@@ -60,6 +60,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",
+    "isomorphic-dompurify": "^3.9.0",
     "ws": "^8.20.0",
     "xlsx": "^0.20.3"
   }

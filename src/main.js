@@ -243,13 +243,14 @@ function createWindow() {
       saveDatabaseSync(db);
     }
   });
-
-  log('INFO', 'App iniciado');
 }
 
 app.whenReady().then(async () => {
+  // Restaurar sessao ANTES de criar window para evitar race condition
   await restoreAuthSession();
   createWindow();
+  // Log bootstrap apos window criada
+  log('INFO', 'App iniciado');
 });
 app.on('window-all-closed', () => {
   if(saveTimeout)clearTimeout(saveTimeout);
@@ -284,7 +285,20 @@ ipcMain.handle('db:newTournament', (_, tournament) => {
   return tournament;
 });
 
-ipcMain.handle('app:openExternal', (_, url) => { const { shell } = require('electron'); shell.openExternal(url); });
+ipcMain.handle('app:openExternal', (_, url) => {
+  try {
+    const { shell } = require('electron');
+    // Validar URL antes de abrir (prevenir javascript: e file:)
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      log('WARN', 'openExternal: protocolo bloqueado:', parsed.protocol);
+      return;
+    }
+    shell.openExternal(url);
+  } catch(e) {
+    log('ERROR', 'openExternal: URL invalida:', url, e.message);
+  }
+});
 ipcMain.handle('app:checkUpdate', async () => {
   try {
     const resp = await fetch('https://api.github.com/repos/weslleybertoldo/FABD-Tournament-Planner/releases/latest');
@@ -589,8 +603,25 @@ ipcMain.handle('db:importTournament', async () => {
 });
 
 // === IPC: BACKUP COMPLETO (todo o banco) ===
+// Sanitiza dados sensiveis antes de exportar (nao inclui sessoes/auth)
+function sanitizeForBackup(obj) {
+  if (!obj) return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeForBackup);
+  if (typeof obj === 'object') {
+    const sanitized = {};
+    for (const [key, value] of Object.entries(obj)) {
+      // Ignorar campos de sessao e tokens
+      if (['access_token', 'refresh_token', 'session', '_supabaseSession'].includes(key)) continue;
+      sanitized[key] = sanitizeForBackup(value);
+    }
+    return sanitized;
+  }
+  return obj;
+}
+
 ipcMain.handle('db:exportFullBackup', async (_, localData) => {
-  const backupData = { _type: 'fabd-full-backup', _version: '3.0', _exportedAt: new Date().toISOString(), ...db, umpires: localData?.umpires || [], gameProfiles: localData?.gameProfiles || [] };
+  const sanitizedDb = sanitizeForBackup(db);
+  const backupData = { _type: 'fabd-full-backup', _version: '3.0', _exportedAt: new Date().toISOString(), ...sanitizedDb, umpires: localData?.umpires || [], gameProfiles: localData?.gameProfiles || [] };
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Exportar Backup Completo',
     defaultPath: `fabd-backup-${new Date().toISOString().slice(0,10)}.json`,
@@ -1164,6 +1195,7 @@ ipcMain.handle('supabase:unsubscribe', async () => {
   if (realtimeChannel) { supabase.removeChannel(realtimeChannel); realtimeChannel = null; }
   if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
   if (realtimeRetryInterval) { clearInterval(realtimeRetryInterval); realtimeRetryInterval = null; }
+  lastPollData = {};
   return true;
 });
 
@@ -1203,9 +1235,10 @@ ipcMain.handle('supabase:updateRefereeStatus', async (_, id, status) => {
   } catch(e) { log('ERROR', 'updateRefereeStatus:', e.message); return false; }
 });
 
-ipcMain.handle('supabase:getRefereeByName', async (_, id) => {
+ipcMain.handle('supabase:getRefereeByName', async (_, refereeId) => {
   try {
-    const { data } = await supabase.from('referees').select('name').eq('id', id).single();
+    if (!refereeId) return null;
+    const { data } = await supabase.from('referees').select('name').eq('id', refereeId).single();
     return data?.name || null;
   } catch(e) { return null; }
 });

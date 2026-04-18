@@ -4919,8 +4919,15 @@ async function loadGameProfiles(){
     const settings=await window.api.getSettings();
     if(settings?.gameProfiles?.length){gameProfiles=settings.gameProfiles;}
     else{
-      // Fallback: tentar localStorage (migracao)
-      try{gameProfiles=JSON.parse(localStorage.getItem('fabd-game-profiles')||'[]');}catch{gameProfiles=[];}
+      // Fallback: tentar localStorage (migracao) com validacao de estrutura
+      try{
+        const raw=localStorage.getItem('fabd-game-profiles')||'[]';
+        const parsed=JSON.parse(raw);
+        if(Array.isArray(parsed)){
+          // Validar estrutura de cada perfil
+          gameProfiles=parsed.filter(p=>p&&typeof p==='object'&&typeof p.id==='string'&&typeof p.name==='string').slice(0,50);
+        } else {gameProfiles=[];}
+      }catch{gameProfiles=[];}
     }
   }catch{gameProfiles=[];}
   if(!gameProfiles.length){
@@ -5002,7 +5009,15 @@ function calcIdealGroupCount(n) {
 
 // === UMPIRES ===
 function loadUmpires(){
-  try{return JSON.parse(localStorage.getItem('fabd-umpires')||'[]');}catch{return[];}
+  try{
+    const raw=localStorage.getItem('fabd-umpires')||'[]';
+    const parsed=JSON.parse(raw);
+    // Validar estrutura: array de objetos com id e name
+    if(Array.isArray(parsed)){
+      return parsed.filter(u=>u&&typeof u==='object'&&typeof u.id==='string'&&typeof u.name==='string').slice(0,100);
+    }
+    return[];
+  }catch{return[];}
 }
 function saveUmpires(l){
   localStorage.setItem('fabd-umpires',JSON.stringify(l));
