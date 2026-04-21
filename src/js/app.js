@@ -5721,54 +5721,81 @@ function reportEntries(){
   if(!entries.length)return'<p>Nenhum inscrito.</p>';
   const groups={};
   entries.forEach(e=>{if(!groups[e.key])groups[e.key]=[];groups[e.key].push(e);});
-  // Ordenar grupos: por categoria (Sub 11, Sub 13...), depois modalidades (SM, SF, DM, DF, DX)
-  const MOD_ORDER=['SM','SF','DM','DF','DX'];
   const CAT_ORDER=['Sub 11','Sub 13','Sub 15','Sub 17','Sub 19','Sub 23','Principal','Senior','Master I','Master II'];
   const getCatIdx=n=>{for(let i=0;i<CAT_ORDER.length;i++)if(n.includes(CAT_ORDER[i]))return i;return 999;};
-  const getModIdx=n=>{const mi=MOD_ORDER.findIndex(m=>n.startsWith(m));return mi>=0?mi:999;};
-  const sortedKeys=Object.keys(groups).sort((a,b)=>{
+
+  // Separar emSIMPLES (SM, SF) e DUPLAS (DM, DF, DX)
+  const SIMPLES_MOD=['SM','SF'];
+  const DUPLAS_MOD=['DM','DF','DX'];
+  const isSimples=k=>SIMPLES_MOD.some(m=>k.startsWith(m));
+  const isDupla=k=>DUPLAS_MOD.some(m=>k.startsWith(m));
+
+  const simpleKeys=Object.keys(groups).filter(isSimples).sort((a,b)=>{
     const ca=getCatIdx(a),cb=getCatIdx(b);
     if(ca<cb)return-1;if(ca>cb)return 1;
-    const ia=getModIdx(a),ib=getModIdx(b);
-    if(ia<ib)return-1;if(ia>ib)return 1;
+    // SM antes de SF
+    const aSM=a.startsWith('SM')?0:1;
+    const bSM=b.startsWith('SM')?0:1;
+    if(aSM<bSM)return-1;if(aSM>bSM)return 1;
+    return a.localeCompare(b);
+  });
+  const doubleKeys=Object.keys(groups).filter(isDupla).sort((a,b)=>{
+    const ca=getCatIdx(a),cb=getCatIdx(b);
+    if(ca<cb)return-1;if(ca>cb)return 1;
+    // DM, DF, DX order
+    const order={'DM':0,'DF':1,'DX':2};
+    const oa=order[a.slice(0,2)]??3,ob=order[b.slice(0,2)]??3;
+    if(oa<ob)return-1;if(oa>ob)return 1;
     return a.localeCompare(b);
   });
 
   let h='<h2 style="color:#1E3A8A;margin-bottom:12px">Lista de Inscritos</h2>';
-  sortedKeys.forEach(key=>{
-    const list=groups[key];
-    // Identificar duplas unicas (por partnerId para nao duplicar linhas)
-    const seenPartners=new Set();
-    const uniquePairs=[];
-    list.forEach(e=>{
-      if(e.partner){
-        // Para duplas, usar o menor ID primeiro pra evitar duplicatas
-        const [p1,p2]=[e.id,e.partner].sort();
-        const key2=`${p1}-${p2}`;
-        if(!seenPartners.has(key2)){
-          seenPartners.add(key2);
-          const p1Data=list.find(x=>x.id===p1);
-          const p2Data=list.find(x=>x.id===p2);
-          if(p1Data&&p2Data){
-            uniquePairs.push([p1Data,p2Data]);
+
+  // SECAO SIMPLES
+  if(simpleKeys.length){
+    h+='<div class="cat-title" style="background:#1E3A8A;color:#fff;padding:8px 12px;border-radius:4px;margin-top:8px">Inscritos Simples</div>';
+    simpleKeys.forEach(key=>{
+      const list=groups[key].filter(e=>!e.partner);
+      if(!list.length)return;
+      h+=`<div class="cat-title">${esc(key)} (${list.length})</div>`;
+      h+='<table><thead><tr><th>#</th><th>Jogador</th><th>Clube</th></tr></thead><tbody>';
+      list.forEach((e,i)=>{
+        h+=`<tr><td>${i+1}</td><td>${esc(e.playerName||'')}</td><td>${esc(e.club||'-')}</td></tr>`;
+      });
+      h+='</tbody></table>';
+    });
+  }
+
+  // SECAO DUPLAS
+  if(doubleKeys.length){
+    h+='<div class="cat-title" style="background:#C41E2A;color:#fff;padding:8px 12px;border-radius:4px;margin-top:16px">Inscritos Duplas</div>';
+    doubleKeys.forEach(key=>{
+      const list=groups[key];
+      // Deduplicar duplas
+      const seenPartners=new Set();
+      const uniquePairs=[];
+      list.forEach(e=>{
+        if(e.partner){
+          const [p1,p2]=[e.id,e.partner].sort();
+          const k=`${p1}-${p2}`;
+          if(!seenPartners.has(k)){
+            seenPartners.add(k);
+            const d1=list.find(x=>x.id===p1);
+            const d2=list.find(x=>x.id===p2);
+            if(d1&&d2)uniquePairs.push([d1,d2]);
           }
         }
-      } else {
-        // Simples: nao tem parceiro
-        uniquePairs.push([e,null]);
-      }
+      });
+      if(!uniquePairs.length)return;
+      h+=`<div class="cat-title">${esc(key)} (${list.length})</div>`;
+      h+='<table><thead><tr><th>#</th><th>Jogador</th><th>Clube</th><th>Dupla</th><th>Clube Dupla</th></tr></thead><tbody>';
+      uniquePairs.forEach((pair,idx)=>{
+        const [e1,e2]=pair;
+        h+=`<tr><td>${idx+1}</td><td>${esc(e1.playerName||'')}</td><td>${esc(e1.club||'-')}</td><td>${esc(e2?.playerName||'-')}</td><td>${esc(e2?.club||'-')}</td></tr>`;
+      });
+      h+='</tbody></table>';
     });
-
-    h+=`<div class="cat-title">${esc(key)} (${list.length} inscritos)</div>`;
-    h+='<table><thead><tr><th>#</th><th>Jogador</th><th>Clube</th><th>Dupla</th><th>Clube Dupla</th></tr></thead><tbody>';
-    uniquePairs.forEach((pair,idx)=>{
-      const [e1,e2]=pair;
-      const partnerName=e2?`${e2.playerName||''}`.trim():'-';
-      const partnerClub=e2?(e2.club||'S/ Clube'):'-';
-      h+=`<tr><td>${idx+1}</td><td>${esc(e1.playerName||'')}</td><td>${esc(e1.club||'-')}</td><td>${esc(partnerName)}</td><td>${esc(partnerClub)}</td></tr>`;
-    });
-    h+='</tbody></table>';
-  });
+  }
   return h;
 }
 
