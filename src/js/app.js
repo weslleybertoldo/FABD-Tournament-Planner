@@ -1559,11 +1559,20 @@ async function updateEntryStatus(idx, status) {
 const MOD_ORDER=['SM','SF','DM','DF','DX'];
 const CAT_ORDER=['Sub 11','Sub 13','Sub 15','Sub 17','Sub 19','Sub 23','Principal','Senior','Master I','Master II'];
 function getCatIdx(name){for(let i=0;i<CAT_ORDER.length;i++)if(name.includes(CAT_ORDER[i]))return i;return 999;}
+const SIMPLES_MOD=['SM','SF'];
+const DUPLAS_MOD=['DM','DF','DX'];
+function isSimplesMod(n){return SIMPLES_MOD.some(m=>n.startsWith(m));}
+function isDuplaMod(n){return DUPLAS_MOD.some(m=>n.startsWith(m));}
 function sortDraws(draws) {
   return [...draws].sort((a,b)=>{
     const pa=a.name||'',pb=b.name||'';
+    // Primeiro: TODOS os Simples antes de TODAS as Duplas
+    const aS=isSimplesMod(pa),bS=isSimplesMod(pb);
+    if(aS&&!bS)return-1;if(!aS&&bS)return 1;
+    // Depois: ordenar por categoria
     const ca=getCatIdx(pa),cb=getCatIdx(pb);
     if(ca<cb)return-1;if(ca>cb)return 1;
+    // Por fim: SM antes de SF (simples) ou DM/DF/DX (duplas)
     const ma=MOD_ORDER.findIndex(m=>pa.startsWith(m));
     const mb=MOD_ORDER.findIndex(m=>pb.startsWith(m));
     const ia=ma>=0?ma:999,ib=mb>=0?mb:999;
@@ -4753,9 +4762,10 @@ async function wizFinish() {
 function setSettingsTab(el, panelId) {
   document.querySelectorAll('#settings-tabs .tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['settings-general','settings-game','settings-umpires'].forEach(id=>{document.getElementById(id).style.display=id===panelId?'':'none';});
+  ['settings-general','settings-game','settings-umpires','settings-categories'].forEach(id=>{document.getElementById(id).style.display=id===panelId?'':'none';});
   if(panelId==='settings-game')renderGameProfiles();
   if(panelId==='settings-umpires')renderUmpires();
+  if(panelId==='settings-categories')renderCategoriesInfo();
 }
 const APP_VERSION='3.76';
 
@@ -5089,6 +5099,49 @@ function saveUmpires(l){
   localStorage.setItem('fabd-umpires',JSON.stringify(l));
   // Salvar no banco tambem para persistir
   window.api.getSettings().then(s=>{s=s||{};s.umpires=l;window.api.saveSettings(s);}).catch(()=>{});
+}
+function renderCategoriesInfo(){
+  const container=document.getElementById('settings-categories-content');
+  if(!container)return;
+  const year=new Date().getFullYear();
+  const modalities=[
+    {code:'SM',name:'Simples Masculino',color:'#EFF6FF',border:'#BFDBFE',text:'#1E40AF'},
+    {code:'SF',name:'Simples Feminino',color:'#FDF4FF',border:'#F5D0FE',text:'#86198F'},
+    {code:'DM',name:'Duplas Masculinas',color:'#EFF6FF',border:'#BFDBFE',text:'#1E40AF'},
+    {code:'DF',name:'Duplas Femininas',color:'#FDF4FF',border:'#F5D0FE',text:'#86198F'},
+    {code:'DX',name:'Duplas Mistas',color:'#F0FDF4',border:'#BBF7D0',text:'#166534'}
+  ];
+  const categories=[
+    {code:'Sub 11',minAge:0,maxAge:10,desc:`ate ${year-10} (faz ${year-10} anos esse ano)`},
+    {code:'Sub 13',minAge:11,maxAge:12,desc:`${year-13} a ${year-12} (faz 11-12 anos)`},
+    {code:'Sub 15',minAge:13,maxAge:14,desc:`${year-15} a ${year-14} (faz 13-14 anos)`},
+    {code:'Sub 17',minAge:15,maxAge:16,desc:`${year-17} a ${year-16} (faz 15-16 anos)`},
+    {code:'Sub 19',minAge:17,maxAge:18,desc:`${year-19} a ${year-18} (faz 17-18 anos)`},
+    {code:'Sub 23',minAge:19,maxAge:22,desc:`${year-23} a ${year-22} (faz 19-22 anos)`},
+    {code:'Principal',minAge:23,maxAge:34,desc:`${year-34} a ${year-23} (faz 23-34 anos)`},
+    {code:'Senior',minAge:35,maxAge:44,desc:`${year-44} a ${year-35} (35+ anos)`},
+    {code:'Master I',minAge:45,maxAge:54,desc:`${year-54} a ${year-45} (45+ anos)`},
+    {code:'Master II',minAge:55,maxAge:999,desc:`ate ${year-55} (55+ anos)`}
+  ];
+  const modCards=modalities.map(m=>`<div style="background:${m.color};padding:12px;border-radius:8px;border:1px solid ${m.border}"><div style="font-weight:600;color:${m.text};font-size:14px">${m.code} - ${m.name}</div></div>`).join('');
+  const catTable=categories.map(c=>`<tr><td style="font-weight:600;padding:8px;border-bottom:1px solid #e5e7eb">${c.code}</td><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#475569">${c.desc}</td></tr>`).join('');
+  container.innerHTML=`
+    <div class="card-header"><h3>Categorias Oficiais</h3></div>
+    <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
+      Regras de idade para cada categoria. O sistema valida automaticamente na inscricao.
+    </p>
+    <div style="margin-bottom:20px">
+      <h4 style="margin-bottom:12px;color:var(--fabd-gray-700)">Modalidades</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">${modCards}</div>
+    </div>
+    <div>
+      <h4 style="margin-bottom:12px;color:var(--fabd-gray-700)">Faixas Etarias (ano de nascimento)</h4>
+      <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden">
+        <thead><tr style="background:#f8fafc"><th style="padding:10px;text-align:left;font-weight:600">Categoria</th><th style="padding:10px;text-align:left;font-weight:600">Faixa de nascimento</th></tr></thead>
+        <tbody>${catTable}</tbody>
+      </table>
+    </div>
+  `;
 }
 function renderUmpires(){
   const u=loadUmpires(),tb=document.getElementById('umpires-table-body');
