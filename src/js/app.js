@@ -5700,7 +5700,7 @@ function printReport(type){
 
   const w=window.open('','_blank','width=900,height=700');
   if(!w){showToast('Popup bloqueado. Permita popups para imprimir.','warning');return;}
-  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${esc(tName)} - Relatorio</title>${reportStyles}</head><body>${esc(reportHeader)}${printBtn}${esc(body)}${printBtn}</body></html>`);
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${esc(tName)} - Relatorio</title>${reportStyles}</head><body>${reportHeader}${printBtn}${body}${printBtn}</body></html>`);
   w.document.close();
 }
 
