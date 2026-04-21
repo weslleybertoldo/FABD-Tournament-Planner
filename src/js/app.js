@@ -5112,16 +5112,16 @@ function renderCategoriesInfo(){
     {code:'DX',name:'Duplas Mistas',color:'#F0FDF4',border:'#BBF7D0',text:'#166534'}
   ];
   const categories=[
-    {code:'Sub 11',minAge:0,maxAge:10,desc:`ate ${year-10} (faz ${year-10} anos esse ano)`},
-    {code:'Sub 13',minAge:11,maxAge:12,desc:`${year-13} a ${year-12} (faz 11-12 anos)`},
-    {code:'Sub 15',minAge:13,maxAge:14,desc:`${year-15} a ${year-14} (faz 13-14 anos)`},
-    {code:'Sub 17',minAge:15,maxAge:16,desc:`${year-17} a ${year-16} (faz 15-16 anos)`},
-    {code:'Sub 19',minAge:17,maxAge:18,desc:`${year-19} a ${year-18} (faz 17-18 anos)`},
-    {code:'Sub 23',minAge:19,maxAge:22,desc:`${year-23} a ${year-22} (faz 19-22 anos)`},
-    {code:'Principal',minAge:23,maxAge:34,desc:`${year-34} a ${year-23} (faz 23-34 anos)`},
-    {code:'Senior',minAge:35,maxAge:44,desc:`${year-44} a ${year-35} (35+ anos)`},
-    {code:'Master I',minAge:45,maxAge:54,desc:`${year-54} a ${year-45} (45+ anos)`},
-    {code:'Master II',minAge:55,maxAge:999,desc:`ate ${year-55} (55+ anos)`}
+    {code:'Sub 11',desc:`ate ${year-10} (faz 10 anos)`},
+    {code:'Sub 13',desc:`${year-12} a ${year-11} (faz 12 anos)`},
+    {code:'Sub 15',desc:`${year-14} a ${year-13} (faz 14 anos)`},
+    {code:'Sub 17',desc:`${year-16} a ${year-15} (faz 16 anos)`},
+    {code:'Sub 19',desc:`${year-18} a ${year-17} (faz 18 anos)`},
+    {code:'Sub 23',desc:`${year-22} a ${year-19} (faz 19-22 anos)`},
+    {code:'Principal',desc:`${year-34} a ${year-24} (faz 24-34 anos)`},
+    {code:'Senior',desc:`${year-44} a ${year-35} (35+ anos)`},
+    {code:'Master I',desc:`${year-54} a ${year-45} (45+ anos)`},
+    {code:'Master II',desc:`ate ${year-55} (55+ anos)`}
   ];
   const modCards=modalities.map(m=>`<div style="background:${m.color};padding:12px;border-radius:8px;border:1px solid ${m.border}"><div style="font-weight:600;color:${m.text};font-size:14px">${m.code} - ${m.name}</div></div>`).join('');
   const catTable=categories.map(c=>`<tr><td style="font-weight:600;padding:8px;border-bottom:1px solid #e5e7eb">${c.code}</td><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#475569">${c.desc}</td></tr>`).join('');
