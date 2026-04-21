@@ -1343,6 +1343,18 @@ function filterRoster() {
   clearTimeout(_filterRosterTimer);
   _filterRosterTimer=setTimeout(()=>filterTable('search-roster','roster-table-body'),150);
 }
+function filterTable(searchId, tableBodyId) {
+  const input = document.getElementById(searchId);
+  if (!input) return;
+  const term = input.value.toLowerCase().trim();
+  const tbody = document.getElementById(tableBodyId);
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach(row => {
+    const text = row.textContent || '';
+    row.style.display = text.toLowerCase().includes(term) ? '' : 'none';
+  });
+}
 
 async function exportPlayersCSV() {
   if (!players.length) { showToast('Nenhum jogador','warning'); return; }
@@ -1587,8 +1599,8 @@ function renderDraws() {
     const realMatches=has?(d.matches||[]).filter(m=>!m.isBye&&m.player1&&m.player2&&m.player2!=='BYE'&&m.player1!=='BYE'):[];
     const allFinished=realMatches.length>0&&realMatches.every(m=>m.winner!==undefined&&m.winner!==null);
     const st = d.awarded ? '<span class="tag" style="background:#D1FAE5;color:#065F46;border:1px solid #10B981">&#127942; Premiado</span>' : allFinished ? '<span class="tag" style="background:#DBEAFE;color:#1E3A8A;border:1px solid #2563EB">JOGOS FINALIZADOS</span>' : has ? '<span class="tag tag-green">Sorteado</span>' : '<span class="tag tag-yellow">Pendente</span>';
-    const isActive=origIdx===selectedDrawIdx||(selectedDrawIdx<0&&i===0);
-    lh += `<div class="draws-list-item${isActive?' active':''}" onclick="selectDraw(${origIdx})">
+    const isActive=(selectedDrawIdx<0&&i===0)?origIdx===allDraws.indexOf(sorted[0]):origIdx===selectedDrawIdx;
+    lh += `<div class="draws-list-item${isActive?' active':''}" data-idx="${origIdx}" onclick="selectDraw(${origIdx})">
       <div class="draw-item-name">${esc(d.name)}</div>
       <div class="draw-item-info">${esc(d.type)} - ${d.players?.length||0} jogadores - ${has?(d.type==='Eliminatoria'?(d.players?.length||0)-1:((d.players?.length||0)*((d.players?.length||0)-1)/2)):0} jogos ${st}</div>
     </div>`;
@@ -1606,7 +1618,7 @@ function filterDraws(){
 
 function selectDraw(idx) {
   selectedDrawIdx = idx;
-  document.querySelectorAll('.draws-list-item').forEach((el,i)=>el.classList.toggle('active',i===idx));
+  document.querySelectorAll('.draws-list-item').forEach(el=>el.classList.toggle('active',parseInt(el.dataset.idx)===idx));
   renderDrawDetail(idx);
 }
 
