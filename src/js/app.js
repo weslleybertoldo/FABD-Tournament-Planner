@@ -1453,7 +1453,8 @@ function renderRoster() {
     if (filterMod && !e.events.includes(filterMod)) return;
     if (filterCat && e.category !== filterCat) return;
     count++;
-    const partnerName = e.partner ? (players.find(p=>p.id===e.partner)?.firstName + ' ' + players.find(p=>p.id===e.partner)?.lastName) : '';
+    const partner = e.partner ? players.find(p=>p.id===e.partner) : null;
+    const partnerName = partner ? `${partner.firstName} ${partner.lastName}` : '';
     const st = { inscrito:'tag-gray', confirmado:'tag-green', presente:'tag-blue', ausente:'tag-red' };
     h += `<tr>
       <td>${count}</td>
@@ -5774,14 +5775,6 @@ function reportEntries(){
   if(!entries.length)return'<p>Nenhum inscrito.</p>';
   const groups={};
   entries.forEach(e=>{if(!groups[e.key])groups[e.key]=[];groups[e.key].push(e);});
-  const CAT_ORDER=['Sub 11','Sub 13','Sub 15','Sub 17','Sub 19','Sub 23','Principal','Senior','Master I','Master II'];
-  const getCatIdx=n=>{for(let i=0;i<CAT_ORDER.length;i++)if(n.includes(CAT_ORDER[i]))return i;return 999;};
-
-  // Separar emSIMPLES (SM, SF) e DUPLAS (DM, DF, DX)
-  const SIMPLES_MOD=['SM','SF'];
-  const DUPLAS_MOD=['DM','DF','DX'];
-  const isSimples=k=>SIMPLES_MOD.some(m=>k.startsWith(m));
-  const isDupla=k=>DUPLAS_MOD.some(m=>k.startsWith(m));
 
   const simpleKeys=Object.keys(groups).filter(isSimples).sort((a,b)=>{
     const ca=getCatIdx(a),cb=getCatIdx(b);
@@ -5829,12 +5822,12 @@ function reportEntries(){
       const uniquePairs=[];
       list.forEach(e=>{
         if(e.partner){
-          const [p1,p2]=[e.playerId||e.id,e.partner].sort();
+          const [p1,p2]=[e.playerId,e.partner].sort();
           const k=`${p1}-${p2}`;
           if(!seenPartners.has(k)){
             seenPartners.add(k);
-            const d1=list.find(x=>(x.playerId||x.id)===p1);
-            const d2=list.find(x=>(x.playerId||x.id)===p2);
+            const d1=list.find(x=>x.playerId===p1);
+            const d2=list.find(x=>x.playerId===p2);
             if(d1&&d2)uniquePairs.push([d1,d2]);
           }
         }
