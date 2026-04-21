@@ -5829,12 +5829,12 @@ function reportEntries(){
       const uniquePairs=[];
       list.forEach(e=>{
         if(e.partner){
-          const [p1,p2]=[e.id,e.partner].sort();
+          const [p1,p2]=[e.playerId||e.id,e.partner].sort();
           const k=`${p1}-${p2}`;
           if(!seenPartners.has(k)){
             seenPartners.add(k);
-            const d1=list.find(x=>x.id===p1);
-            const d2=list.find(x=>x.id===p2);
+            const d1=list.find(x=>(x.playerId||x.id)===p1);
+            const d2=list.find(x=>(x.playerId||x.id)===p2);
             if(d1&&d2)uniquePairs.push([d1,d2]);
           }
         }
