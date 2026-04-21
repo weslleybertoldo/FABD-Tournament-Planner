@@ -489,6 +489,24 @@ function showTournamentPages() {
   });
 }
 
+// === NORMALIZE CATEGORY ===
+// Converte variações de nome de categoria para o padrão oficial
+const MOD_CODES={SM:['SM','SIMPLES MASCULINO','SIMPLES M','S M','MASCULINO','MALE'],SF:['SF','SIMPLES FEMININO','SIMPLES F','S F','FEMININO','FEMALE','F'],DM:['DM','DUPLA MASCULINA','DUPLAS MASCULINAS','DUPLA M','D M','MASCULINAS','M'],DF:['DF','DUPLA FEMININA','DUPLAS FEMININAS','DUPLA F','D F','FEMININAS','FEM'],DX:['DX','DUPLA MISTA','DUPLAS MISTAS','DUPLA MIST','D MIST','MISTA','MIXED','MIX']};
+const CAT_CODES={'SUB 11':['SUB 11','SUB-11','SUB11','UNDER 11','U11'],'SUB 13':['SUB 13','SUB-13','SUB13','UNDER 13','U13'],'SUB 15':['SUB 15','SUB-15','SUB15','UNDER 15','U15'],'SUB 17':['SUB 17','SUB-17','SUB17','UNDER 17','U17'],'SUB 19':['SUB 19','SUB-19','SUB19','UNDER 19','U19'],'SUB 23':['SUB 23','SUB-23','SUB23','UNDER 23','U23','ADULTO'],'PRINCIPAL':['PRINCIPAL','OPEN','ABSOLUTO','SENIOR A'],'SENIOR':['SENIOR','SENIOR A','35+','35 PLUS'],'MASTER I':['MASTER I','MASTER 1','MI','MASTER'],'MASTER II':['MASTER II','MASTER 2','MII','MASTER II']};
+function normalizeCategory(catStr){
+  if(!catStr)return'';
+  const s=String(catStr).toUpperCase().replace(/[^A-Z0-9 \-\_]/g,' ').replace(/\s+/g,' ').trim();
+  // Extrair modalidade
+  for(const[code,variants]of Object.entries(MOD_CODES)){
+    if(variants.some(v=>s===v||s.startsWith(v+' ')||s.includes(' '+v+' ')||s.endsWith(' '+v)))return code;
+  }
+  // Extrair categoria de idade
+  for(const[code,variants]of Object.entries(CAT_CODES)){
+    if(variants.some(v=>s===v||s.startsWith(v+' ')||s.includes(' '+v+' ')||s.endsWith(' '+v)))return code;
+  }
+  return catStr; // retorna original se não reconhecer
+}
+
 // === CATEGORY BY AGE ===
 function calculateCategory(dob) {
   if (!dob) return 'Principal';
@@ -1528,13 +1546,16 @@ async function updateEntryStatus(idx, status) {
 // === DRAWS (sorteio individual por chave) ===
 const MOD_ORDER=['SM','SF','DM','DF','DX'];
 const CAT_ORDER=['Sub 11','Sub 13','Sub 15','Sub 17','Sub 19','Sub 23','Principal','Senior','Master I','Master II'];
+function getCatIdx(name){for(let i=0;i<CAT_ORDER.length;i++)if(name.includes(CAT_ORDER[i]))return i;return 999;}
 function sortDraws(draws) {
   return [...draws].sort((a,b)=>{
     const pa=a.name||'',pb=b.name||'';
-    const ma=(MOD_ORDER.find(m=>pa.startsWith(m))||'ZZ').padEnd(3,'Z');
-    const mb=(MOD_ORDER.find(m=>pb.startsWith(m))||'ZZ').padEnd(3,'Z');
-    if(ma<mb)return-1;if(ma>mb)return 1;
-    for(const c of CAT_ORDER){if(pa.includes(c)&&!pb.includes(c))return-1;if(!pa.includes(c)&&pb.includes(c))return 1;}
+    const ca=getCatIdx(pa),cb=getCatIdx(pb);
+    if(ca<cb)return-1;if(ca>cb)return 1;
+    const ma=MOD_ORDER.findIndex(m=>pa.startsWith(m));
+    const mb=MOD_ORDER.findIndex(m=>pb.startsWith(m));
+    const ia=ma>=0?ma:999,ib=mb>=0?mb:999;
+    if(ia<ib)return-1;if(ia>ib)return 1;
     return pa.localeCompare(pb);
   });
 }

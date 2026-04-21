@@ -336,6 +336,7 @@
             <div class="tab active" onclick="setSettingsTab(this,'settings-general')">Geral</div>
             <div class="tab" onclick="setSettingsTab(this,'settings-game')">Configuracao de Jogo</div>
             <div class="tab" onclick="setSettingsTab(this,'settings-umpires')">Arbitros</div>
+            <div class="tab" onclick="setSettingsTab(this,'settings-categories')">Categorias</div>
           </div>
           <div class="card" id="settings-general">
             <div class="card-header"><h3>Configuracoes Gerais</h3></div>
@@ -473,6 +474,51 @@
                 <thead><tr><th>#</th><th>Nome</th><th>Nivel</th><th>Acoes</th></tr></thead>
                 <tbody id="umpires-table-body"></tbody>
               </table>
+            </div>
+          </div>
+
+          <!-- CATEGORIAS -->
+          <div class="card" id="settings-categories" style="display:none">
+            <div class="card-header"><h3>Categorias Oficiais</h3></div>
+            <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
+              Lista de categorias reconhecidas pelo sistema na importacao de planilhas.
+            </p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+              <div style="background:#EFF6FF;padding:12px;border-radius:8px;border:1px solid #BFDBFE">
+                <div style="font-weight:600;color:#1E40AF;font-size:14px">SM - Simples Masculino</div>
+              </div>
+              <div style="background:#FDF4FF;padding:12px;border-radius:8px;border:1px solid #F5D0FE">
+                <div style="font-weight:600;color:#86198F;font-size:14px">SF - Simples Feminino</div>
+              </div>
+              <div style="background:#EFF6FF;padding:12px;border-radius:8px;border:1px solid #BFDBFE">
+                <div style="font-weight:600;color:#1E40AF;font-size:14px">DM - Duplas Masculinas</div>
+              </div>
+              <div style="background:#FDF4FF;padding:12px;border-radius:8px;border:1px solid #F5D0FE">
+                <div style="font-weight:600;color:#86198F;font-size:14px">DF - Duplas Femininas</div>
+              </div>
+              <div style="background:#F0FDF4;padding:12px;border-radius:8px;border:1px solid #BBF7D0">
+                <div style="font-weight:600;color:#166534;font-size:14px">DX - Duplas Mistas</div>
+              </div>
+            </div>
+            <div style="margin-top:20px">
+              <h4 style="margin-bottom:8px;color:var(--fabd-gray-700)">Faixas Etarias</h4>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <span class="tag" style="background:#F1F5F9;color:#475569;font-size:12px;padding:6px 10px">Sub 11</span>
+                <span class="tag" style="background:#F1F5F9;color:#475569;font-size:12px;padding:6px 10px">Sub 13</span>
+                <span class="tag" style="background:#F1F5F9;color:#475569;font-size:12px;padding:6px 10px">Sub 15</span>
+                <span class="tag" style="background:#F1F5F9;color:#475569;font-size:12px;padding:6px 10px">Sub 17</span>
+                <span class="tag" style="background:#F1F5F9;color:#475569;font-size:12px;padding:6px 10px">Sub 19</span>
+                <span class="tag" style="background:#F1F5F9;color:#475569;font-size:12px;padding:6px 10px">Sub 23</span>
+                <span class="tag" style="background:#F1F5F9;color:#475569;font-size:12px;padding:6px 10px">Principal</span>
+                <span class="tag" style="background:#F1F5F9;color:#475569;font-size:12px;padding:6px 10px">Senior</span>
+                <span class="tag" style="background:#F1F5F9;color:#475569;font-size:12px;padding:6px 10px">Master I</span>
+                <span class="tag" style="background:#F1F5F9;color:#475569;font-size:12px;padding:6px 10px">Master II</span>
+              </div>
+            </div>
+            <div style="margin-top:20px;padding:12px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px">
+              <p style="font-size:12px;color:#92400E;margin:0">
+                <strong>Exemplo:</strong> Para Inscricao DM Sub 17, o nome da chave sera <strong>DM Sub 17</strong>
+              </p>
             </div>
           </div>
         </div>
