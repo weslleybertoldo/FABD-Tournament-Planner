@@ -2077,44 +2077,80 @@ async function generateSingleDraw(idx) {
   finally { _generatingSingleDraw = false; }
 }
 
-// Gerar chave eliminatoria com seeds e BYEs
+// Gerar chave eliminatoria com seeds e BYEs - REGRA ITF DINAMICA
+// Funciona para qualquer combinacao de jogadores e seeds
+// Seeds top recebem bye no slot vizinho (garante separacao em quadrantes)
+// Seed 1 sempre topo, Seed 2 sempre fundo - so se encontram na Final
+function gerarOrdemITF(n) {
+  if(n===1)return[1];
+  const metade=gerarOrdemITF(n/2);
+  const resultado=[];
+  for(const seed of metade){
+    resultado.push(seed);
+    resultado.push(n+1-seed);
+  }
+  return resultado;
+}
+
 function generateEliminationBracket(playerList, seeds) {
   seeds=seeds||[];
-  const allPlayers=[...seeds,...playerList];
-  const n=allPlayers.length;
+  const n=seeds.length+playerList.length;
   if(n<2)return[];
   const bracketSize=Math.pow(2,Math.ceil(Math.log2(n)));
   const numByes=bracketSize-n;
   const r1Matches=bracketSize/2;
   const totalRounds=Math.log2(bracketSize);
 
-  // Posicoes padrao dos seeds (indices no bracket de tamanho bracketSize)
-  // Usa seeding padrao de torneio: seed 1 topo, seed 2 fundo, 3 e 4 em quartas opostas
-  function getStandardSeedPositions(size){
-    if(size<=1)return[0];
-    if(size===2)return[0,1];
-    // Gerar recursivamente as posicoes de seeding padrao
-    let pos=[0,1];
-    while(pos.length<size){
-      const next=[];
-      const len=pos.length;
-      for(let i=0;i<pos.length;i++){
-        next.push(pos[i]*2);
-        next.push(len*2-1-pos[i]*2);
-      }
-      pos=next;
-    }
-    return pos.slice(0,size);
+  // 1) Ordem ITF dinamica para qualquer tamanho
+  // Para 16: [1,16,8,9,4,13,5,12,2,15,7,10,3,14,6,11]
+  // ordemITF[i] = numero do seed que deveria ocupar o slot i
+  const ordemITF=gerarOrdemITF(bracketSize);
+
+  // 2) Posicionar seeds nos slots ITF corretos
+  const slots=new Array(bracketSize).fill(null);
+  for(let i=0;i<seeds.length;i++){
+    const seedNum=i+1;
+    const slotIdx=ordemITF.indexOf(seedNum);
+    slots[slotIdx]=seeds[i];
   }
 
-  // Criar slots do bracket
-  const slots=new Array(bracketSize).fill('BYE');
-  const seedPos=getStandardSeedPositions(bracketSize);
+  // 3) Distribuir byes - VIZINHO de cada seed top recebe BYE
+  const slotsComBye=new Set();
+  let byesRestantes=numByes;
+  for(let seedNum=1;seedNum<=bracketSize&&byesRestantes>0;seedNum++){
+    const slotSeed=ordemITF.indexOf(seedNum);
+    if(slots[slotSeed]==null)continue;
+    const vizinho=slotSeed%2===0?slotSeed+1:slotSeed-1;
+    if(slots[vizinho]==null&&!slotsComBye.has(vizinho)){
+      slotsComBye.add(vizinho);
+      byesRestantes--;
+    }
+  }
 
-  // Posicionar todos os jogadores: seeds primeiro nas posicoes de seeding, depois os demais
-  // Seeds vao nas primeiras posicoes do seedPos, jogadores normais nas seguintes
-  for(let i=0;i<allPlayers.length;i++){
-    slots[seedPos[i]]=allPlayers[i];
+  // 4) Se ainda sobraram byes (mais byes que seeds), distribui usando
+  // a ordem ITF estendida: continua dando byes aos "proximos slots ideais"
+  // (slots que seriam dos seeds 1, 2, 3, 4... estendidos), garantindo
+  // que os byes fiquem espalhados de forma equilibrada pela chave.
+  if(byesRestantes>0){
+    for(let seedNum=1;seedNum<=bracketSize&&byesRestantes>0;seedNum++){
+      const slotIdeal=ordemITF.indexOf(seedNum);
+      if(slots[slotIdeal]!=null||slotsComBye.has(slotIdeal))continue;
+      const vizinho=slotIdeal%2===0?slotIdeal+1:slotIdeal-1;
+      if(slotsComBye.has(vizinho))continue; // evita double-bye
+      slotsComBye.add(slotIdeal);
+      byesRestantes--;
+    }
+  }
+
+  // 5) Marcar byes
+  slotsComBye.forEach(i=>{slots[i]='BYE';});
+
+  // 6) Distribuir non-seeds nos slots restantes
+  let playerIdx=0;
+  for(let i=0;i<bracketSize;i++){
+    if(slots[i]==null){
+      slots[i]=playerList[playerIdx++]||'BYE';
+    }
   }
 
   // Montar pares da R1
@@ -2123,16 +2159,12 @@ function generateEliminationBracket(playerList, seeds) {
     const s1=slots[i*2], s2=slots[i*2+1];
     const p1IsBye=s1==='BYE', p2IsBye=s2==='BYE';
     const doubleBye=p1IsBye&&p2IsBye;
-
     if(doubleBye){
-      // Double BYE: ninguem joga, ninguem avanca
       matches.push({round:1,slotIdx:i,player1:'BYE',player2:'BYE',score1:'',score2:'',winner:0,isBye:true,advancer:''});
     } else if(p1IsBye||p2IsBye){
-      // Single BYE: jogador real avanca
       const real=p1IsBye?s2:s1;
-      matches.push({round:1,slotIdx:i,player1:real,player2:'',score1:'',score2:'',winner:1,isBye:true,advancer:real});
+      matches.push({round:1,slotIdx:i,player1:s1,player2:s2,score1:'',score2:'',winner:p1IsBye?2:1,isBye:true,advancer:real});
     } else {
-      // Jogo real
       matches.push({round:1,slotIdx:i,player1:s1,player2:s2,score1:'',score2:'',winner:undefined,isBye:false,advancer:''});
     }
   }
@@ -2145,12 +2177,9 @@ function generateEliminationBracket(playerList, seeds) {
       const m1=prevMatches[i*2], m2=prevMatches[i*2+1];
       const p1=m1?.advancer||'';
       const p2=m2?.advancer||'';
-      // Se um lado e double-bye, o outro avanca direto
       const m1Empty=m1?.winner===0;
       const m2Empty=m2?.winner===0;
-      let advancer='';
-      let isBye=false;
-      let winner;
+      let advancer='', isBye=false, winner;
       if(m1Empty&&m2Empty){winner=0;isBye=true;advancer='';}
       else if(m1Empty&&p2){winner=2;isBye=true;advancer=p2;}
       else if(m2Empty&&p1){winner=1;isBye=true;advancer=p1;}
