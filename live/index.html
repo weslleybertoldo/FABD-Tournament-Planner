@@ -85,6 +85,7 @@
 
     /* Chaves (brackets) */
     .draw-selector{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+    .draw-group{display:flex;gap:8px;flex-wrap:wrap}
     .draw-btn{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid #334155;background:#1E293B;color:#94A3B8;transition:all 0.2s}
     .draw-btn.active{background:rgba(245,158,11,0.15);color:#F59E0B;border-color:#F59E0B}
     .bracket-container{overflow-x:auto;padding-bottom:16px}
@@ -254,7 +255,7 @@
       <!-- Secao: Chaves -->
       <div class="section" id="sec-brackets">
         <div class="container">
-          <div class="section-title"><iconify-icon icon="lucide:trophy" style="color:#F59E0B"></iconify-icon> Chaves</div>
+          <div class="section-title"><iconify-icon icon="lucide:trophy" style="color:#F59E0B"></iconify-icon> Chaves <input type="text" id="brackets-search" placeholder="Buscar chave..." oninput="filterBrackets()" style="margin-left:16px;padding:6px 12px;border-radius:8px;border:1px solid #334155;background:#1E293B;color:#fff;font-size:13px;width:180px"></div>
           <div id="brackets-content">
             <div class="empty"><div class="icon">&#127942;</div><h3>Carregando chaves...</h3></div>
           </div>
@@ -598,6 +599,16 @@
     }
 
     // === CHAVES ===
+    function getCategoryOrder(name){
+      // Ordem: Sub 11, Sub 13, Sub 15, Sub 17, Sub 19, Sub 23, Principal, Senior, Master I, Master II
+      const catOrder={'Sub 11':1,'Sub 13':2,'Sub 15':3,'Sub 17':4,'Sub 19':5,'Sub 23':6,'Principal':7,'Senior':8,'Master I':9,'Master II':10};
+      const modOrder={'SM':1,'SF':2,'DM':1,'DX':2,'DF':3};
+      const parts=name.split(' ');
+      const mod=parts[0]||'';
+      const cat=parts.slice(1).join(' ');
+      return (catOrder[cat]||99)*100+(modOrder[mod]||99);
+    }
+
     function renderBrackets(){
       if(!tournamentData?.draws?.length){
         document.getElementById('brackets-content').innerHTML='<div class="empty"><div class="icon">&#127942;</div><h3>Chaves indisponiveis</h3><p style="color:#64748B">As chaves aparecerao quando forem geradas no torneio.</p></div>';
@@ -605,25 +616,62 @@
       }
 
       const draws=tournamentData.draws;
-      if(selectedDraw>=draws.length)selectedDraw=0;
 
-      // Seletor de chave
-      let h='<div class="draw-selector">';
-      draws.forEach((d,i)=>{
-        h+=`<div class="draw-btn ${i===selectedDraw?'active':''}" onclick="selectDraw(${i})">${esc(d.name)}</div>`;
+      // Separar em categorias Simples (SM, SF) e Duplas (DM, DF, DX)
+      const simples=draws.filter(d=>d.name.startsWith('SM ')||d.name.startsWith('SF ')).sort((a,b)=>getCategoryOrder(a.name)-getCategoryOrder(b.name));
+      const duplas=draws.filter(d=>d.name.startsWith('DM ')||d.name.startsWith('DF ')||d.name.startsWith('DX ')).sort((a,b)=>getCategoryOrder(a.name)-getCategoryOrder(b.name));
+
+      let h='';
+
+      // Categorias Simples
+      if(simples.length){
+        h+=`<div id="draws-simples">`;
+        h+=`<div style="color:#94A3B8;font-size:12px;font-weight:700;margin-bottom:8px">CATEGORIAS SIMPLES (${simples.length})</div>`;
+        h+=`<div class="draw-group">`;
+        simples.forEach((d,i)=>{
+          const globalIdx=draws.indexOf(d);
+          h+=`<div class="draw-btn ${globalIdx===selectedDraw?'active':''}" onclick="selectDraw(${globalIdx})" data-idx="${i}">${esc(d.name)}</div>`;
+        });
+        h+=`</div></div>`;
+      }
+
+      // Categorias Duplas
+      if(duplas.length){
+        h+=`<div id="draws-duplas" style="margin-top:16px">`;
+        h+=`<div style="color:#94A3B8;font-size:12px;font-weight:700;margin-bottom:8px">CATEGORIAS DUPLAS (${duplas.length})</div>`;
+        h+=`<div class="draw-group">`;
+        duplas.forEach((d,i)=>{
+          const globalIdx=draws.indexOf(d);
+          h+=`<div class="draw-btn ${globalIdx===selectedDraw?'active':''}" onclick="selectDraw(${globalIdx})" data-idx="${i}">${esc(d.name)}</div>`;
+        });
+        h+=`</div></div>`;
+      }
+
+      h+=`<div id="draw-detail"></div>`;
+
+      document.getElementById('brackets-content').innerHTML=h;
+      renderDrawDetail();
+    }
+
+    function filterBrackets(){
+      const term=document.getElementById('brackets-search').value.toLowerCase();
+      document.querySelectorAll('.draw-btn').forEach(btn=>{
+        const name=btn.textContent.toLowerCase();
+        btn.style.display=name.includes(term)?'':'none';
       });
-      h+=`</div>`;
+    }
 
+    function renderDrawDetail(){
+      const draws=tournamentData.draws;
+      if(selectedDraw>=draws.length)selectedDraw=0;
       const draw=draws[selectedDraw];
 
-      // Info da chave
-      h+=`<div style="margin-bottom:16px;font-size:13px;color:#94A3B8">`;
+      let h=`<div style="margin:16px 0;font-size:13px;color:#94A3B8">`;
       h+=`<strong style="color:#fff">${esc(draw.name)}</strong>`;
       h+=` &mdash; ${esc(draw.type||'Eliminatoria')}`;
       h+=` &mdash; ${draw.players?.length||0} jogadores`;
       h+=`</div>`;
 
-      // Renderizar conforme o tipo
       if(draw.type==='Grupos + Eliminatoria'&&draw.groupsData){
         h+=renderGroups(draw);
         if(draw.groupsData.eliminationMatches?.length){
@@ -634,15 +682,18 @@
         h+=renderEliminationBracket(draw.matches||[],draw.players?.length||8);
       }
 
-      // Classificacao / Ranking
       h+=renderRanking(draw);
 
-      document.getElementById('brackets-content').innerHTML=h;
+      document.getElementById('draw-detail').innerHTML=h;
     }
 
     function selectDraw(i){
       selectedDraw=i;
-      renderBrackets();
+      const selectedDrawName=tournamentData.draws[i]?.name;
+      document.querySelectorAll('.draw-btn').forEach(btn=>{
+        btn.classList.toggle('active',btn.textContent.trim()===selectedDrawName);
+      });
+      renderDrawDetail();
     }
 
     // Renderizar fase de grupos
