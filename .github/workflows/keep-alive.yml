@@ -1,0 +1,21 @@
+name: Keep Supabase Active
+
+on:
+  schedule:
+    - cron: '0 9 */5 * *'
+  workflow_dispatch:
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send health ping
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_PAT }}" \
+            "https://api.supabase.com/v1/projects/zwjgjtrmsqtyyjtuotuo")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          echo "Project status: HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "FABD Tournament Planner is healthy"
+          fi
