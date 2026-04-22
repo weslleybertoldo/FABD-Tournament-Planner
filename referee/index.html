@@ -347,6 +347,70 @@
     const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
 
     let currentUser=null,currentMatch=null,pollInterval=null,deferredPrompt=null;
+
+    // ═══════════════════════════════════════════════════════════
+    //  REALTIME + FALLBACK POLLING (mesmo padrão do Planner)
+    //  Polling continua rodando como fallback (30s).
+    //  Realtime dispara callback imediatamente quando há mudança.
+    //  Se Realtime cair, a cada 30s tenta reconectar.
+    // ═══════════════════════════════════════════════════════════
+    let realtimeListChannel=null,realtimeListRetry=null,realtimeListActive=false;
+    let realtimeScoreChannel=null,realtimeScoreRetry=null;
+
+    function setupRealtimeForList(callback){
+      if(!sb)return;
+      // Limpar channel anterior
+      if(realtimeListChannel){try{sb.removeChannel(realtimeListChannel);}catch(e){}realtimeListChannel=null;}
+      if(realtimeListRetry){clearInterval(realtimeListRetry);realtimeListRetry=null;}
+
+      realtimeListChannel=sb.channel('ref_list_'+Date.now())
+        .on('postgres_changes',{event:'*',schema:'public',table:'live_matches'},()=>{try{callback();}catch(e){}})
+        .on('postgres_changes',{event:'*',schema:'public',table:'referees'},()=>{try{callback();}catch(e){}})
+        .subscribe((status)=>{
+          console.log('[Referee] Realtime list status:',status);
+          if(status==='SUBSCRIBED'){
+            realtimeListActive=true;
+            if(realtimeListRetry){clearInterval(realtimeListRetry);realtimeListRetry=null;}
+          }
+          if(status==='TIMED_OUT'||status==='CHANNEL_ERROR'||status==='CLOSED'){
+            realtimeListActive=false;
+            // Reagendar reconexão
+            if(!realtimeListRetry){
+              realtimeListRetry=setInterval(()=>{
+                console.log('[Referee] Tentando reconectar Realtime list...');
+                setupRealtimeForList(callback);
+              },30000);
+            }
+          }
+        });
+    }
+
+    function setupRealtimeForScore(matchId,callback){
+      if(!sb||!matchId)return;
+      if(realtimeScoreChannel){try{sb.removeChannel(realtimeScoreChannel);}catch(e){}realtimeScoreChannel=null;}
+      if(realtimeScoreRetry){clearInterval(realtimeScoreRetry);realtimeScoreRetry=null;}
+
+      realtimeScoreChannel=sb.channel('ref_score_'+matchId+'_'+Date.now())
+        .on('postgres_changes',{event:'*',schema:'public',table:'live_scores',filter:'match_id=eq.'+matchId},(payload)=>{try{callback(payload?.new);}catch(e){}})
+        .subscribe((status)=>{
+          console.log('[Referee] Realtime score status:',status);
+          if(status==='TIMED_OUT'||status==='CHANNEL_ERROR'||status==='CLOSED'){
+            if(!realtimeScoreRetry){
+              realtimeScoreRetry=setInterval(()=>{
+                console.log('[Referee] Tentando reconectar Realtime score...');
+                setupRealtimeForScore(matchId,callback);
+              },30000);
+            }
+          }
+        });
+    }
+
+    function teardownRealtimeAll(){
+      if(realtimeListChannel){try{sb.removeChannel(realtimeListChannel);}catch(e){}realtimeListChannel=null;}
+      if(realtimeScoreChannel){try{sb.removeChannel(realtimeScoreChannel);}catch(e){}realtimeScoreChannel=null;}
+      if(realtimeListRetry){clearInterval(realtimeListRetry);realtimeListRetry=null;}
+      if(realtimeScoreRetry){clearInterval(realtimeScoreRetry);realtimeScoreRetry=null;}
+    }
     let clubMap=new Map(); // mapeia nome completo -> clube do jogador
     // Sides: quem esta em qual lado da tela
     let leftPlayer=1,rightPlayer=2; // 1=player1, 2=player2
@@ -474,7 +538,17 @@
       if(rec.status==='autorizado')showMatches();
       else showPending();
     }
-    function showPending(){hideAll();document.getElementById('page-pending').style.display='flex';if(pollInterval)clearInterval(pollInterval);pollInterval=setInterval(async()=>{if(await checkStatus()==='autorizado')showMatches();},5000);}
+    function showPending(){
+      hideAll();
+      document.getElementById('page-pending').style.display='flex';
+      if(pollInterval)clearInterval(pollInterval);
+      // Polling como fallback (30s em vez de 5s — Realtime cuida do tempo real)
+      pollInterval=setInterval(async()=>{if(await checkStatus()==='autorizado')showMatches();},30000);
+      // Realtime: atualizar imediatamente quando o status do referee muda
+      setupRealtimeForList(async()=>{
+        if(await checkStatus()==='autorizado')showMatches();
+      });
+    }
 
     async function checkAuth(){
       if(!sb){document.getElementById('page-login').style.display='flex';return;}
@@ -485,7 +559,18 @@
     }
 
     // === MATCHES ===
-    function showMatches(){hideAll();const p=document.getElementById('page-matches');p.style.display='flex';document.getElementById('user-name').textContent=currentUser.name;loadMatches();if(pollInterval)clearInterval(pollInterval);pollInterval=setInterval(loadMatches,5000);}
+    function showMatches(){
+      hideAll();
+      const p=document.getElementById('page-matches');
+      p.style.display='flex';
+      document.getElementById('user-name').textContent=currentUser.name;
+      loadMatches();
+      if(pollInterval)clearInterval(pollInterval);
+      // Polling como fallback (30s em vez de 5s — Realtime cuida do tempo real)
+      pollInterval=setInterval(loadMatches,30000);
+      // Realtime: recarregar lista quando jogos mudarem (entrar/sair de quadra, finalizar, etc.)
+      setupRealtimeForList(loadMatches);
+    }
 
     async function loadMatches(){
       try{

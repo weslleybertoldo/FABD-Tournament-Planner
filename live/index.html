@@ -871,7 +871,18 @@
       }
     });
 
-    setInterval(()=>{
+    // ═══════════════════════════════════════════════════════════
+    //  REALTIME + FALLBACK POLLING (mesmo padrão do Planner)
+    //  1. Tenta Realtime primeiro
+    //  2. Se SUBSCRIBED → para polling
+    //  3. Se TIMED_OUT/CHANNEL_ERROR → ativa polling 3s
+    //  4. A cada 30s tenta reconectar Realtime
+    // ═══════════════════════════════════════════════════════════
+    let realtimeChannelMatches=null,realtimeChannelScores=null;
+    let pollingInterval=null,realtimeRetryInterval=null;
+    let realtimeActive=false;
+
+    function refreshCurrent(){
       if(isLoading)return;
       isLoading=true;
       const done=()=>{isLoading=false;};
@@ -881,9 +892,69 @@
         getTournament(true).then(()=>{
           if(currentSection==='schedule')renderSchedule();
           if(currentSection==='brackets')renderBrackets();
-        }).finally(done);
+        }).catch(()=>{}).finally(done);
       } else {done();}
-    },3000);
+    }
+
+    function startPolling(){
+      if(pollingInterval)return;
+      console.log('[Live] Polling ativo (3s)');
+      pollingInterval=setInterval(refreshCurrent,3000);
+    }
+
+    function stopPolling(){
+      if(pollingInterval){
+        clearInterval(pollingInterval);
+        pollingInterval=null;
+        console.log('[Live] Polling parado (Realtime ativo)');
+      }
+    }
+
+    function setupRealtime(){
+      if(!sb)return startPolling();
+      // Limpar channels anteriores
+      if(realtimeChannelMatches){sb.removeChannel(realtimeChannelMatches);realtimeChannelMatches=null;}
+      if(realtimeChannelScores){sb.removeChannel(realtimeChannelScores);realtimeChannelScores=null;}
+
+      const onChange=()=>{refreshCurrent();};
+
+      // Channel para live_scores (placares em tempo real)
+      realtimeChannelScores=sb.channel('live_scores_'+Date.now())
+        .on('postgres_changes',{event:'*',schema:'public',table:'live_scores'},onChange)
+        .subscribe((status)=>{
+          console.log('[Live] Realtime scores status:',status);
+          if(status==='SUBSCRIBED'){
+            realtimeActive=true;
+            stopPolling();
+            if(realtimeRetryInterval){clearInterval(realtimeRetryInterval);realtimeRetryInterval=null;}
+            // Refresh imediato pra pegar estado atual
+            refreshCurrent();
+          }
+          if(status==='TIMED_OUT'||status==='CHANNEL_ERROR'||status==='CLOSED'){
+            realtimeActive=false;
+            startPolling();
+            scheduleRealtimeRetry();
+          }
+        });
+
+      // Channel para live_matches (jogos entrando/saindo de quadra)
+      realtimeChannelMatches=sb.channel('live_matches_'+Date.now())
+        .on('postgres_changes',{event:'*',schema:'public',table:'live_matches'},onChange)
+        .subscribe((status)=>{
+          console.log('[Live] Realtime matches status:',status);
+        });
+    }
+
+    function scheduleRealtimeRetry(){
+      if(realtimeRetryInterval)return;
+      realtimeRetryInterval=setInterval(()=>{
+        console.log('[Live] Tentando reconectar Realtime...');
+        setupRealtime();
+      },30000);
+    }
+
+    // Iniciar
+    setupRealtime();
   </script>
 </body>
 </html>
