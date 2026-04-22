@@ -4991,7 +4991,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='3.84';
+const APP_VERSION='3.85';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
