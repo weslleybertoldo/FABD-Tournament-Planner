@@ -557,6 +557,19 @@ function checkAloneInCategory(playerInscriptions) {
   return alone;
 }
 
+function checkDuplaSemParceiro(playerInscriptions) {
+  if (!playerInscriptions?.length) return [];
+  const semParceiro = [];
+  playerInscriptions.forEach(insc => {
+    const mod = insc.mod;
+    const isDupla = ['DM','DF','DX'].includes(mod);
+    if (isDupla && !insc.partner) {
+      semParceiro.push(insc.key);
+    }
+  });
+  return semParceiro;
+}
+
 function checkCategoryConflict(dob, inscriptions){
   if(!dob||!inscriptions?.length)return false;
   const birth=new Date(dob+'T00:00:00');
@@ -782,11 +795,17 @@ function renderPlayers() {
     const hasConflict = checkCategoryConflict(p.dob, p.inscriptions);
     const aloneKeys = checkAloneInCategory(p.inscriptions);
     const hasAlone = aloneKeys.length > 0;
-    const nameStyle = hasConflict ? 'color:#DC2626' : hasAlone ? 'color:#D97706' : '';
+    const duplaSemParceiroKeys = checkDuplaSemParceiro(p.inscriptions);
+    const hasDuplaSemParceiro = duplaSemParceiroKeys.length > 0;
+    const nameStyle = hasConflict ? 'color:#DC2626' : (hasAlone || hasDuplaSemParceiro) ? 'color:#D97706' : '';
     const conflictIcon = hasConflict ? '<span title="Atleta inscrito em categoria incompativel com a idade" style="color:#DC2626;cursor:help;margin-left:4px">&#9888;</span>' : '';
     const aloneIcon = hasAlone ? '<span title="Sozinho em: '+aloneKeys.join(', ')+' (precisa de mais inscritos)" style="color:#D97706;cursor:help;margin-left:4px">&#9888;</span>' : '';
+    const duplaIcon = hasDuplaSemParceiro ? '<span title="Dupla sem parceiro: '+duplaSemParceiroKeys.join(', ')+'" style="color:#D97706;cursor:help;margin-left:4px">&#9888;</span>' : '';
+    const subLine = [];
+    if(hasAlone) subLine.push('Sozinho: '+aloneKeys.map(k=>'<strong>'+esc(k)+'</strong>').join(', '));
+    if(hasDuplaSemParceiro) subLine.push('Sem dupla: '+duplaSemParceiroKeys.map(k=>'<strong>'+esc(k)+'</strong>').join(', '));
     h += `<tr>
-      <td><strong style="${nameStyle}">${esc(p.firstName)} ${esc(p.lastName)}${conflictIcon}${aloneIcon}</strong>${hasAlone?'<div style="font-size:10px;color:#D97706;margin-top:2px">Sozinho em: '+aloneKeys.map(k=>'<strong>'+esc(k)+'</strong>').join(', ')+'</div>':''}</td>
+      <td><strong style="${nameStyle}">${esc(p.firstName)} ${esc(p.lastName)}${conflictIcon}${aloneIcon}${duplaIcon}</strong>${subLine.length?'<div style="font-size:10px;color:#D97706;margin-top:2px">'+subLine.join(' | ')+'</div>':''}</td>
       <td>${p.gender==='M'?'Masc':p.gender==='F'?'Fem':'-'}</td>
       <td>${fmtDate(p.dob)}</td>
       <td><span class="tag tag-blue">${esc(autoCat)}</span></td>
@@ -891,6 +910,9 @@ function renderPlayerCategories(player) {
         <option value="">Selecionar dupla...</option>
         ${buildPartnerOpts(player?.id,gender,mod.code,key,insc?.partner||'')}
       </select>`;
+      if(!insc?.partner){
+        h+=`<span style="color:#D97706;font-size:10px;font-weight:500;white-space:nowrap">Atleta sem ${mod.code} marcada</span>`;
+      }
     }
     h+='</div>';
   });
