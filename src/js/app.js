@@ -2054,7 +2054,18 @@ async function generateSingleDraw(idx) {
   if (_generatingSingleDraw) { showToast('Sorteio em andamento, aguarde...', 'warning'); return; }
   const d = tournament.draws[idx];
   if (!d) return;
-  if (d.matches?.length && !confirm('Esta chave ja foi sorteada. Deseja sortear novamente?')) return;
+  // Reforço v3.88: bloqueia re-sorteio durante o torneio em andamento — proteção contra
+  // perda acidental de resultado. Em quadra = bloqueio total. Finalizada = aviso forte.
+  if (d.matches?.length) {
+    const inProgress = (tournament.matches || []).filter(m => m.drawName === d.name && m.status === 'Em Quadra').length;
+    const finished = (tournament.matches || []).filter(m => m.drawName === d.name && (m.status === 'Finalizada' || m.status === 'WO' || m.status === 'Desistencia' || m.status === 'Desqualificacao')).length;
+    if (inProgress > 0) { showToast(`Não pode re-sortear "${d.name}": ${inProgress} jogo(s) em quadra agora.`, 'error'); return; }
+    if (finished > 0) {
+      if (!confirm(`ATENÇÃO: a chave "${d.name}" tem ${finished} jogo(s) finalizado(s).\n\nRe-sortear vai PERDER esses resultados.\n\nConfirmar mesmo assim?`)) return;
+    } else {
+      if (!confirm('Esta chave ja foi sorteada. Deseja sortear novamente?')) return;
+    }
+  }
   _generatingSingleDraw = true;
   try {
 
@@ -3496,11 +3507,17 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
   }
 
   // 3. Mapear slots existentes desta chave (preservar horarios de jogos que continuam)
-  const existingSlots = new Map(); // drawMatchIdx -> { time, status, score, winner, ... }
+  // Indexa por drawMatchIdx (preferido) E por par player1+player2 (fallback —
+  // garante que mesma dupla mantém o mesmo horario mesmo se o re-sorteio mudou
+  // a posição na bracket). Reforço v3.88.
+  const existingSlots = new Map();
+  const existingByPlayers = new Map();
+  function _pairKey(p1, p2) { if (!p1 || !p2) return null; return [p1, p2].sort().join('||'); }
   drawMatches.forEach(m => {
-    if (m.drawMatchIdx != null) {
-      existingSlots.set(m.drawMatchIdx, { time: m.time, court: m.court, umpire: m.umpire, status: m.status, score: m.score, winner: m.winner, startedAt: m.startedAt, finishedAt: m.finishedAt });
-    }
+    const data = { time: m.time, court: m.court, umpire: m.umpire, status: m.status, score: m.score, winner: m.winner, startedAt: m.startedAt, finishedAt: m.finishedAt };
+    if (m.drawMatchIdx != null) existingSlots.set(m.drawMatchIdx, data);
+    const pk = _pairKey(m.player1, m.player2);
+    if (pk) existingByPlayers.set(pk, data);
   });
 
   // 4. Construir novos matches desta chave, reutilizando slots quando possivel
@@ -3508,7 +3525,12 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
   const preservedStatuses = ['Finalizada', 'WO', 'Em Quadra', 'Desistencia', 'Desqualificacao'];
 
   shouldExist.forEach(s => {
-    const existing = existingSlots.get(s.drawMatchIdx);
+    // Prefere drawMatchIdx; fallback pelo par de jogadores (mesma dupla = mesmo horario)
+    let existing = existingSlots.get(s.drawMatchIdx);
+    if (!existing) {
+      const pk = _pairKey(s.player1, s.player2);
+      if (pk) existing = existingByPlayers.get(pk);
+    }
     const def = !!(s.player1 && s.player2);
     let rn = s.roundName || '';
     if (!rn) {
@@ -5005,7 +5027,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='3.88';
+const APP_VERSION='3.89';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
