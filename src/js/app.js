@@ -3358,7 +3358,9 @@ async function syncMatchesWithDraws() {
       // Pular BYE implicito: R1 com apenas 1 jogador
       if (m.round === 1 && ((m.player1 && !m.player2) || (!m.player1 && m.player2))) return;
       const p1 = m.player1 || '', p2 = m.player2 || '';
-      if (!p1 && !p2) return;
+      // R1 com ambos vazios = chave criada mas nao sorteada (ignorar);
+      // R>1 com ambos vazios = placeholder normal de bracket — gera "Venc. jogo X"
+      if (m.round === 1 && !p1 && !p2) return;
       let d1 = p1, d2 = p2;
       if ((!p1 || !p2) && m.round > 1) {
         const prevAll = matchesByRound[m.round - 1] || [];
@@ -3479,7 +3481,8 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
       if (m.player2 === 'BYE' || m.player1 === 'BYE') return;
       if (m.round === 1 && ((m.player1 && !m.player2) || (!m.player1 && m.player2))) return;
       const p1 = m.player1 || '', p2 = m.player2 || '';
-      if (!p1 && !p2) return;
+      // R1 vazio = chave nao sorteada (ignorar). R>1 vazio = placeholder de bracket — gera "Venc. jogo X"
+      if (m.round === 1 && !p1 && !p2) return;
       let d1 = p1, d2 = p2;
       if ((!p1 || !p2) && m.round > 1) {
         const prevAll = matchesByRound[m.round - 1] || [];
@@ -5002,7 +5005,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='3.86';
+const APP_VERSION='3.87';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
