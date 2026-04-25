@@ -4548,7 +4548,7 @@ async function saveScore() {
   try{
     const m=tournament.matches[scoringMatchIdx];if(!m)return;
     const status=document.getElementById('score-status').value,winner=document.getElementById('score-winner').value;
-    if(status==='WO'||status==='Desqualificacao'){if(!winner){alert('Selecione vencedor');return;}m.score=status==='WO'?'W.O.':'DSQ';m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();propagateResultToDraws(m);await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);if(!(tournament.matches||[]).some(x=>x.status==='Em Quadra')){window.api.supabaseUnsubscribe();console.log('Realtime desativado');}closeModal('modal-score');renderMatches();showToast('Resultado registrado');return;}
+    if(status==='WO'||status==='Desqualificacao'){if(!winner){alert('Selecione vencedor');return;}m.score=status==='WO'?'W.O.':'DSQ';m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();propagateResultToDraws(m);await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);try{await window.api.supabaseFinalizeMatch(tournament.id,m,{winner:m.winner,final_score:m.score,umpire_name:m.umpire||''});}catch(e){console.warn('finalizeMatch:',e);}if(!(tournament.matches||[]).some(x=>x.status==='Em Quadra')){window.api.supabaseUnsubscribe();console.log('Realtime desativado');}closeModal('modal-score');renderMatches();showToast('Resultado registrado');return;}
     if(!winner){alert('Selecione vencedor');return;}
     const numSets=tournament?.scoring?.sets||3,pts=tournament?.scoring?.points||21,maxP=tournament?.scoring?.maxPoints||30;
     let scores=[];
@@ -4557,6 +4557,17 @@ async function saveScore() {
     m.score=scores.join(' / ')||(status==='Desistencia'?'RET':'');m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();
     propagateResultToDraws(m);
     await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
+    // Sincroniza Supabase: live_matches.status='Finalizada' + live_scores.winner — site Ao Vivo e Referee param de mostrar
+    try {
+      const setsP1=[],setsP2=[];let setsWonP1=0,setsWonP2=0;
+      for(const sc of scores){const [a,b]=sc.split('-').map(n=>parseInt(n));setsP1.push(isNaN(a)?0:a);setsP2.push(isNaN(b)?0:b);if(!isNaN(a)&&!isNaN(b)){if(a>b)setsWonP1++;else if(b>a)setsWonP2++;}}
+      const last=scores.length?scores[scores.length-1].split('-').map(n=>parseInt(n)):[0,0];
+      await window.api.supabaseFinalizeMatch(tournament.id,m,{
+        winner:m.winner,final_score:m.score,umpire_name:m.umpire||'',
+        current_set:scores.length||1,score_p1:last[0]||0,score_p2:last[1]||0,
+        sets_p1:setsP1,sets_p2:setsP2,sets_won_p1:setsWonP1,sets_won_p2:setsWonP2,
+      });
+    } catch(e) { console.warn('finalizeMatch:',e); }
     // Desativar Realtime se nao tem mais jogos em quadra
     if(!(tournament.matches||[]).some(x=>x.status==='Em Quadra')){window.api.supabaseUnsubscribe();console.log('Realtime desativado (nenhum jogo em quadra)');}
     closeModal('modal-score');renderMatches();showToast('Placar salvo!');

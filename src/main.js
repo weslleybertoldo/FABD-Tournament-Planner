@@ -799,6 +799,54 @@ ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
   } catch(e) { log('ERROR', 'Supabase upsertMatch:', e.message); return false; }
 });
 
+// Finaliza match pelo Planner: replica o fluxo que o Referee faz ao confirmar vencedor
+// (UPDATE live_matches.status='Finalizada' + UPSERT live_scores com winner/final_score),
+// pra que o site Ao Vivo e o Referee parem de mostrar o jogo, e ele entre no histórico
+// "Partidas Finalizadas" do site.
+ipcMain.handle('supabase:finalizeMatch', async (_, tournamentId, matchData, scoreData) => {
+  try {
+    if (!currentFederation?.id) {
+      log('ERROR', 'finalizeMatch: sem federacao ativa (login pendente?)');
+      return false;
+    }
+    const id = stableMatchId(tournamentId, matchData);
+    log('INFO', 'Finalizing match (planner):', id);
+
+    // 1. UPSERT live_scores com winner + final_score (mesmo shape que o Referee usa)
+    const scoreRow = {
+      match_id: id,
+      tournament_id: tournamentId,
+      federation_id: currentFederation.id,
+      current_set: scoreData?.current_set ?? 1,
+      score_p1: scoreData?.score_p1 ?? 0,
+      score_p2: scoreData?.score_p2 ?? 0,
+      sets_p1: scoreData?.sets_p1 || [],
+      sets_p2: scoreData?.sets_p2 || [],
+      sets_won_p1: scoreData?.sets_won_p1 ?? 0,
+      sets_won_p2: scoreData?.sets_won_p2 ?? 0,
+      winner: scoreData?.winner ?? null,
+      final_score: scoreData?.final_score || '',
+      umpire_name: matchData.umpire || '',
+      updated_at: new Date().toISOString(),
+    };
+    const { error: scoreErr } = await supabase.from('live_scores').upsert(scoreRow, { onConflict: 'match_id' });
+    if (scoreErr) log('ERROR', 'finalizeMatch live_scores:', scoreErr.message);
+
+    // 2. UPDATE live_matches.status='Finalizada' (só se já existe — WO/DSQ podem
+    //    finalizar um match que nunca foi pra quadra; nesse caso não criamos registro)
+    const { data: existing } = await supabase.from('live_matches').select('id').eq('id', id).maybeSingle();
+    if (existing) {
+      const { error: matchErr } = await supabase.from('live_matches')
+        .update({ status: 'Finalizada', umpire: matchData.umpire || '', updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (matchErr) log('ERROR', 'finalizeMatch live_matches:', matchErr.message);
+    } else {
+      log('INFO', 'finalizeMatch: live_matches inexistente, skip (jogo não passou por quadra)');
+    }
+    return true;
+  } catch(e) { log('ERROR', 'Supabase finalizeMatch:', e.message); return false; }
+});
+
 ipcMain.handle('supabase:removeFromCourt', async (_, tournamentId, matchData) => {
   try {
     const id = typeof matchData === 'object' ? stableMatchId(tournamentId, matchData) : `${tournamentId}_${matchData}`;
