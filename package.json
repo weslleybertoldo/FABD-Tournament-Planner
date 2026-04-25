@@ -1,6 +1,6 @@
 {
   "name": "fabd-tournament-planner",
-  "version": "3.85.0",
+  "version": "3.86.0",
   "description": "Planejador de Torneios - Federacao Alagoana de Badminton",
   "main": "src/main.js",
   "scripts": {
