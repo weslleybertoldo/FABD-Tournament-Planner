@@ -4474,8 +4474,11 @@ async function handleRealtimeScoreUpdate(data){
     lastScoreUpdateTimestamp[updateKey] = updateTs;
     // Se jogo ja foi finalizado localmente, ignorar
     if(m.status==='Finalizada'||m.status==='WO')return;
-    // Se o jogo nao esta em quadra, ignorar
-    if(m.status!=='Em Quadra')return;
+    // Se arbitro finalizou (winner+final_score), aceita independente do status local —
+    // cobre caso onde organizador nao marcou "Em Quadra" no Planner mas o referee
+    // pegou e finalizou direto. Antes desse fix, finalizacao ficava presa local.
+    const _isFinalUpdate = !!(data.winner && data.final_score);
+    if(m.status!=='Em Quadra' && !_isFinalUpdate)return;
 
     // Atualizar placar ao vivo para exibicao
     const s1=data.score_p1||0, s2=data.score_p2||0, set=data.current_set||1;
@@ -5055,7 +5058,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='3.92';
+const APP_VERSION='3.93';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');

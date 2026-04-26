@@ -552,9 +552,28 @@
 
     async function checkAuth(){
       if(!sb){document.getElementById('page-login').style.display='flex';return;}
+      // Listener de auth — sempre registrado, ANTES do early return.
+      // Captura SIGNED_IN (login novo), TOKEN_REFRESHED (refresh silencioso —
+      // atualiza dados do usuario sem deslogar), SIGNED_OUT (token revogado/refresh falhou
+      // → mostra login). Antes era registrado SO quando nao havia sessao, entao
+      // refresh falho passava despercebido e o usuario "deslogava" sem aviso.
+      sb.auth.onAuthStateChange(async(ev,ses)=>{
+        if((ev==='SIGNED_IN'||ev==='TOKEN_REFRESHED'||ev==='USER_UPDATED')&&ses?.user){
+          // Em TOKEN_REFRESHED com sessao ativa, so atualiza currentUser sem reabrir login
+          if(currentUser&&ev==='TOKEN_REFRESHED'){
+            currentUser.id=ses.user.id;currentUser.email=ses.user.email;
+            return;
+          }
+          await handleLogin({name:ses.user.user_metadata?.full_name||ses.user.email,id:ses.user.id,email:ses.user.email,photo:ses.user.user_metadata?.avatar_url});
+        } else if(ev==='SIGNED_OUT'){
+          currentUser=null;
+          if(pollInterval)clearInterval(pollInterval);
+          hideAll();
+          document.getElementById('page-login').style.display='flex';
+        }
+      });
       const{data:{session}}=await sb.auth.getSession();
       if(session?.user){await handleLogin({name:session.user.user_metadata?.full_name||session.user.email,id:session.user.id,email:session.user.email,photo:session.user.user_metadata?.avatar_url});return;}
-      sb.auth.onAuthStateChange(async(ev,ses)=>{if(ev==='SIGNED_IN'&&ses?.user)await handleLogin({name:ses.user.user_metadata?.full_name||ses.user.email,id:ses.user.id,email:ses.user.email,photo:ses.user.user_metadata?.avatar_url});});
       document.getElementById('page-login').style.display='flex';
     }
 
@@ -813,6 +832,14 @@
 
     function getClub(name){
       return clubMap.get((name||'').trim())||'';
+    }
+
+    // Retorna até as 2 primeiras palavras do nome (ex.: "Pedro Henrique das Chagas" → "Pedro Henrique").
+    // Se só tem 1 palavra, retorna ela. Pra duplas (com '/'), aplicar em cada parte separadamente.
+    function firstTwoNames(name){
+      if(!name)return '';
+      const parts=String(name).trim().split(/\s+/);
+      return parts.slice(0,2).join(' ');
     }
 
     function swapInnerLeft(){
@@ -1107,10 +1134,10 @@
         const lbName=getDoublesName(leftBottomPlayer);
         const rtName=getDoublesName(rightTopPlayer);
         const rbName=getDoublesName(rightBottomPlayer);
-        document.getElementById('d-left-top').textContent=ltName.split(' ')[0];
-        document.getElementById('d-left-bottom').textContent=lbName.split(' ')[0];
-        document.getElementById('d-right-top').textContent=rtName.split(' ')[0];
-        document.getElementById('d-right-bottom').textContent=rbName.split(' ')[0];
+        document.getElementById('d-left-top').textContent=firstTwoNames(ltName);
+        document.getElementById('d-left-bottom').textContent=firstTwoNames(lbName);
+        document.getElementById('d-right-top').textContent=firstTwoNames(rtName);
+        document.getElementById('d-right-bottom').textContent=firstTwoNames(rbName);
         // Clubes nos cantos (posicoes antigas dos nomes)
         document.getElementById('d-left-top-club').textContent=getClub(ltName);
         document.getElementById('d-left-bottom-club').textContent=getClub(lbName);
@@ -1178,7 +1205,7 @@
         document.getElementById('s-server-left').style.display=serverSide==='left'?'block':'none';
         document.getElementById('s-server-right').style.display=serverSide==='right'?'block':'none';
         const sNameEl=document.getElementById('s-server-'+serverSide);
-        sNameEl.textContent=serverName.split(' ')[0]+' ▸';
+        sNameEl.textContent=firstTwoNames(serverName)+' ▸';
         if(shuttle){
           sNameEl.style.top=shuttle.style.top;
           if(serverSide==='left'){sNameEl.style.right='48px';sNameEl.style.left='auto';}
@@ -1200,7 +1227,7 @@
           if(check&&check.umpire_name&&check.umpire_name!==currentUser?.name){
             isReadOnly=true;
             updateReadOnlyUI();
-            alert('Outro árbitro assumiu este jogo ('+(check.umpire_name.split(' ')[0])+').\nSeu placar está em modo visualização.');
+            alert('Outro árbitro assumiu este jogo ('+firstTwoNames(check.umpire_name)+').\nSeu placar está em modo visualização.');
             return;
           }
         }
@@ -1251,7 +1278,7 @@
 
     function updateReadOnlyUI(){
       const umpName=currentUser?.name||'';
-      document.getElementById('scorer-umpire').textContent=umpName?'Árbitro: '+umpName.split(' ')[0]:'';
+      document.getElementById('scorer-umpire').textContent=umpName?'Árbitro: '+firstTwoNames(umpName):'';
       if(isReadOnly){
         document.getElementById('readonly-badge').style.display='inline';
         document.getElementById('btn-undo').style.display='none';
