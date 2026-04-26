@@ -3107,9 +3107,10 @@ function rebuildMatchList() {
   });
   // Incluir todos os jogos (definidos e a definir) na lista
   // Separar definidos e "A definir"
-  const dist = distributeMatches(allM.filter(m => m.isDefinida));
+  // Ordem BTP: R1 inteira (Sub 11 → Master II, M → F → X, simples → duplas) antes de R2 etc.
+  const dist = sortMatchesByBTPOrder(allM.filter(m => m.isDefinida));
   const adefs = allM.filter(m => !m.isDefinida);
-  // Atribuir horarios aos definidos
+  // Atribuir horarios aos definidos (assignAutoTimes percorre na ordem recebida)
   assignAutoTimes(dist);
   // Jogos "A definir": atribuir horario APOS o ultimo jogo de GRUPO da mesma categoria
   // Ordenar adefs: semifinais antes de finais (por round)
@@ -3146,6 +3147,33 @@ function rebuildMatchList() {
     }
   });
   tournament.matches = [...dist, ...adefs].map((m, i) => ({ ...m, id: (i + 1).toString(), num: i + 1 }));
+}
+
+// Ordem BTP (BWF Tournament Planner): R1 inteira primeiro (Sub 11 → Master II,
+// masculino → feminino → mista, simples → duplas), depois R2 inteira, etc.
+// Usado em rebuildMatchList ao gerar/regenerar todas as chaves.
+const EVENT_ORDER_BTP = ['SM', 'DM', 'SF', 'DF', 'DX'];
+
+function sortMatchesByBTPOrder(matches) {
+  return [...matches].sort((a, b) => {
+    // 1. Round (R1 antes de R2)
+    const ra = a.round || 1, rb = b.round || 1;
+    if (ra !== rb) return ra - rb;
+    // 2. Categoria (Sub 11 → Master II)
+    const cIdxA = getCatIdx(a.drawName || '');
+    const cIdxB = getCatIdx(b.drawName || '');
+    if (cIdxA !== cIdxB) return cIdxA - cIdxB;
+    // 3. Modalidade/sexo (M → F → X, simples antes duplas)
+    const eA = a.event || (a.drawName || '').split(' ')[0] || '';
+    const eB = b.event || (b.drawName || '').split(' ')[0] || '';
+    const eIdxA = EVENT_ORDER_BTP.indexOf(eA);
+    const eIdxB = EVENT_ORDER_BTP.indexOf(eB);
+    const ea = eIdxA >= 0 ? eIdxA : 99;
+    const eb = eIdxB >= 0 ? eIdxB : 99;
+    if (ea !== eb) return ea - eb;
+    // 4. Tiebreak: drawMatchIdx (estabilidade)
+    return (a.drawMatchIdx || 0) - (b.drawMatchIdx || 0);
+  });
 }
 
 function distributeMatches(matches) {
@@ -5027,7 +5055,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='3.90';
+const APP_VERSION='3.91';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
