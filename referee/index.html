@@ -145,7 +145,7 @@
     </div>
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
     <p id="login-info" style="color:#10B981;font-size:12px;margin-top:12px;display:none"></p>
-    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.33.1</p>
+    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.34.0</p>
     <details style="margin-top:8px;font-size:10px;color:#64748B;text-align:left;max-width:320px;width:90%;cursor:pointer">
       <summary>Diagnóstico (toque pra abrir)</summary>
       <pre id="diag-info" style="background:#0F172A;padding:8px;border-radius:6px;font-size:9px;overflow:auto;white-space:pre-wrap;margin-top:6px;color:#CBD5E1">carregando...</pre>
@@ -584,6 +584,8 @@
     function logout(){
       // v4.5: marca como intencional pro listener saber que pode limpar state
       _intentionalLogout=true;
+      // v4.34: limpa cache do referee record (proximo login revalida)
+      try { if (currentUser?.id) localStorage.removeItem(`fabd-ref-cache-${currentUser.id}`); } catch(e) {}
       currentUser=null;sb?.auth.signOut();hideAll();
       document.getElementById('page-login').style.display='flex';
       if(pollInterval)clearInterval(pollInterval);
@@ -646,7 +648,9 @@
         const{error}=await sb.from('referees').update({federation_id:fid,updated_at:new Date().toISOString()}).eq('id',currentUser.id);
         if(error)throw error;
         currentUser.federation_id=fid;
-        const st=await checkStatus();
+        const fresh = await getMyRefereeRecord();
+        if (fresh) _saveRefereeCache(currentUser.id, fresh);
+        const st = fresh?.status || await checkStatus();
         if(st==='autorizado')showMatches();
         else showPending();
       }catch(e){
@@ -654,23 +658,70 @@
       }
     }
 
+    // v4.34: cache do referee record em localStorage. Resolve 2 problemas:
+    //   (a) Se queries do Supabase pendurarem/falharem (timeout 6s), tinhamos que
+    //       assumir "primeiro login" e mostrar federation picker — incorreto pra
+    //       quem ja escolheu federacao antes.
+    //   (b) UX: cada login fazia 1-2s de query antes de mostrar tela. Cache leitura
+    //       sync = navegacao instantanea.
+    // Padrao stale-while-revalidate: usa cache pra navegar JA, em background atualiza
+    // e reage a mudancas (admin autorizou/revogou, federation mudou).
+    const _refereeCacheKey = (uid) => `fabd-ref-cache-${uid}`;
+    function _saveRefereeCache(uid, rec) {
+      try { localStorage.setItem(_refereeCacheKey(uid), JSON.stringify({rec, ts: Date.now()})); } catch(e) {}
+    }
+    function _loadRefereeCache(uid) {
+      try {
+        const raw = localStorage.getItem(_refereeCacheKey(uid));
+        if (!raw) return null;
+        const {rec, ts} = JSON.parse(raw);
+        // Cache valido por 30 dias (status mudancas raras + Realtime/polling pega mudancas online)
+        if (Date.now() - ts > 30*24*3600*1000) return null;
+        return rec;
+      } catch(e) { return null; }
+    }
+    function _navigateForRec(rec) {
+      if (!rec?.federation_id) { showFederationPicker(); return 'picker'; }
+      currentUser.federation_id = rec.federation_id;
+      if (rec.status === 'autorizado') { showMatches(); return 'matches'; }
+      else { showPending(); return 'pending'; }
+    }
+
     async function handleLogin(u){
       console.log('[Auth] handleLogin start:', u?.email);
       currentUser=u;
-      await registerReferee(u);
-      console.log('[Auth] registerReferee OK');
-      const rec=await getMyRefereeRecord();
-      console.log('[Auth] getMyRefereeRecord:', rec);
-      if(!rec?.federation_id){
-        console.log('[Auth] sem federation_id, mostrando picker');
-        // Sem federacao definida -> mostra picker
-        showFederationPicker();
+
+      // 1. Cache hit → navega INSTANTANEAMENTE (zero query)
+      const cached = _loadRefereeCache(u.id);
+      if (cached) {
+        console.log('[Auth] cache hit:', cached);
+        const navTo = _navigateForRec(cached);
+        console.log('[Auth] navegou via cache para:', navTo);
+        // Background revalidate (nao bloqueia UI)
+        (async () => {
+          try {
+            await registerReferee(u);
+            const fresh = await getMyRefereeRecord();
+            if (!fresh) return; // query falhou — mantem cache
+            _saveRefereeCache(u.id, fresh);
+            // Se mudou status/federation, reage
+            if (fresh.status !== cached.status || fresh.federation_id !== cached.federation_id) {
+              console.log('[Auth] cache divergente do servidor, re-navegando:', fresh);
+              _navigateForRec(fresh);
+            }
+          } catch(e) { console.warn('[Auth] revalidate falhou:', e.message); }
+        })();
         return;
       }
-      currentUser.federation_id=rec.federation_id;
-      console.log('[Auth] status:', rec.status, '- abrindo', rec.status==='autorizado'?'matches':'pending');
-      if(rec.status==='autorizado')showMatches();
-      else showPending();
+
+      // 2. Cache miss (1o login ou cache expirado) — fluxo classico com queries
+      console.log('[Auth] cache miss, consultando servidor');
+      await registerReferee(u);
+      console.log('[Auth] registerReferee OK');
+      const rec = await getMyRefereeRecord();
+      console.log('[Auth] getMyRefereeRecord:', rec);
+      if (rec) _saveRefereeCache(u.id, rec);
+      _navigateForRec(rec || {});
     }
     function showPending(){
       hideAll();
