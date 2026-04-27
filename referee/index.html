@@ -145,7 +145,7 @@
     </div>
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
     <p id="login-info" style="color:#10B981;font-size:12px;margin-top:12px;display:none"></p>
-    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.31</p>
+    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.32.1</p>
     <details style="margin-top:8px;font-size:10px;color:#64748B;text-align:left;max-width:320px;width:90%;cursor:pointer">
       <summary>Diagnóstico (toque pra abrir)</summary>
       <pre id="diag-info" style="background:#0F172A;padding:8px;border-radius:6px;font-size:9px;overflow:auto;white-space:pre-wrap;margin-top:6px;color:#CBD5E1">carregando...</pre>
@@ -588,7 +588,7 @@
       document.getElementById('page-login').style.display='flex';
       if(pollInterval)clearInterval(pollInterval);
     }
-    function hideAll(){['page-login','page-federation','page-pending','page-matches','page-scorer'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
+    function hideAll(){['page-login','page-federation','page-pending','page-matches','page-scorer','page-loading'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
 
     async function registerReferee(u){try{await sb.from('referees').upsert({id:u.id,name:u.name,email:u.email||'',photo:u.photo||'',updated_at:new Date().toISOString()},{onConflict:'id'});}catch(e){}}
     async function getMyRefereeRecord(){if(!currentUser)return null;try{const{data}=await sb.from('referees').select('id,name,status,federation_id').eq('id',currentUser.id).single();return data||null;}catch(e){return null;}}
@@ -729,25 +729,42 @@
       // listener antes de desistir. Se sessao chega via listener, handleLogin
       // troca a tela para matches/pending — user nem ve a tela de login.
 
-      const _hideLoading = () => { const el=document.getElementById('page-loading'); if(el) el.style.display='none'; };
+      // v4.31.1: loading fica visivel ATE uma pagina-fim aparecer (showMatches/showPending/
+      // showFederationPicker) ou ate handleLogin falhar/timeoutar. Antes, _hideLoading rodava
+      // no resolve, e se handleLogin pendurasse em query Supabase, tela ficava em branco.
+      window._hideLoading = () => { const el=document.getElementById('page-loading'); if(el) el.style.display='none'; };
+      const _showLoadingMsg = (txt) => { const p=document.querySelector('#page-loading p'); if(p) p.textContent=txt; };
       let _resolved = false;
       const _resolveWithSession = async (source, ses) => {
         if (_resolved) return;
         _resolved = true;
         console.log('[Auth] resolved via '+source+': '+ses.user.email);
-        _hideLoading();
-        await handleLogin({
-          name: ses.user.user_metadata?.full_name || ses.user.email,
-          id: ses.user.id,
-          email: ses.user.email,
-          photo: ses.user.user_metadata?.avatar_url
-        });
+        _showLoadingMsg('Carregando seus jogos...');
+        // Safety timeout: se handleLogin nao terminar em 20s, mostra login com erro
+        const timeoutId = setTimeout(() => {
+          console.warn('[Auth] handleLogin timeout 20s — mostrando login');
+          window._hideLoading();
+          const errEl = document.getElementById('login-error');
+          if (errEl) { errEl.style.color='#EF4444'; errEl.textContent='Tempo esgotado ao carregar. Verifique sua conexao e tente novamente.'; errEl.style.display='block'; }
+          document.getElementById('page-login').style.display='flex';
+          _renderDiagInfo();
+        }, 20000);
+        try {
+          await handleLogin({
+            name: ses.user.user_metadata?.full_name || ses.user.email,
+            id: ses.user.id,
+            email: ses.user.email,
+            photo: ses.user.user_metadata?.avatar_url
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
       };
       const _resolveNoSession = (source) => {
         if (_resolved) return;
         _resolved = true;
         console.log('[Auth] resolved no-session via '+source+', mostrando login');
-        _hideLoading();
+        window._hideLoading();
         document.getElementById('page-login').style.display='flex';
         _renderDiagInfo();
       };
