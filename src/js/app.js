@@ -53,6 +53,50 @@ document.addEventListener('DOMContentLoaded', async () => {
 // === AUTH (login OTP por email) ===
 let _authState = { email: '' };
 
+// v3.97: registra listener pra logout vindo do main process (refresh falhou,
+// user forcou logout em outra janela, etc.). Mostra alerta antes que queries
+// silently falhem por sessao expirada.
+if (window.api?.onAuthSignedOut) {
+  window.api.onAuthSignedOut(() => {
+    showToast('Sessao expirada — faca login novamente', 'error');
+    setTimeout(() => location.reload(), 1500);
+  });
+}
+
+// v3.97: helper pra calcular ID estavel local (mesma funcao do main.js stableMatchId)
+function _stableMatchId(tournamentId, m) {
+  const draw = (m.drawName || '').replace(/[^a-zA-Z0-9]/g, '');
+  const p1 = (m.player1 || '').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+  const p2 = (m.player2 || '').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+  return `${tournamentId}_${draw}_${p1}_${p2}`;
+}
+
+// Envia pro main process a lista atual de matches Em Quadra. O main usa pra
+// reconciliar a cada 30s — detecta divergencia (upsert falhou silently, RLS, etc.).
+function _registerEmQuadraIds() {
+  if (!tournament || !window.api?.supabaseRegisterEmQuadra) return;
+  const ids = (tournament.matches || [])
+    .filter(m => m.status === 'Em Quadra')
+    .map(m => _stableMatchId(tournament.id, m));
+  window.api.supabaseRegisterEmQuadra(tournament.id, ids).catch(() => {});
+}
+
+// Reconciliacao: main detectou divergencia e nos pede pra re-sincronizar
+if (window.api?.onReconcileNeeded) {
+  window.api.onReconcileNeeded(async ({ missing, wrongStatus }) => {
+    if (!tournament) return;
+    const fix = [...(missing || []), ...(wrongStatus || [])];
+    if (!fix.length) return;
+    console.warn('[reconcile] re-sincronizando', fix.length, 'jogo(s)');
+    for (const id of fix) {
+      const m = (tournament.matches || []).find(x => _stableMatchId(tournament.id, x) === id);
+      if (m && m.status === 'Em Quadra') {
+        try { await window.api.supabaseUpsertMatch(tournament.id, m); } catch {}
+      }
+    }
+  });
+}
+
 async function ensureAuthenticated() {
   try {
     console.log('[AUTH] Calling authStatus...');
@@ -1628,9 +1672,13 @@ function _attachBlurFlush() {
   active.addEventListener('blur', _renderBlurListener, { once: true });
 }
 
-function scheduleRender(name, fn) {
+// opts.deferWhenTyping (default true): se há input em foco, espera o blur.
+// Para filtros onde o próprio input em foco é a FONTE do render (ex: search-draws),
+// passar { deferWhenTyping: false } — coalesce via rAF mas roda imediatamente.
+function scheduleRender(name, fn, opts) {
   _pendingRenders.set(name, fn);
-  if (_isUserTyping()) { _attachBlurFlush(); return; }
+  const defer = !opts || opts.deferWhenTyping !== false;
+  if (defer && _isUserTyping()) { _attachBlurFlush(); return; }
   if (_renderRafId == null) _renderRafId = requestAnimationFrame(_flushPendingRenders);
 }
 
@@ -1698,10 +1746,9 @@ function renderDraws() {
   if(safeIdx>=0)selectDraw(safeIdx);
 }
 
-let _filterDrawsTimer=null;
 function filterDraws(){
-  clearTimeout(_filterDrawsTimer);
-  _filterDrawsTimer=setTimeout(renderDraws,150);
+  // Coalesce via rAF (sem defer-when-typing — o input search-draws É a fonte do filtro)
+  scheduleRender('draws', renderDraws, { deferWhenTyping: false });
 }
 
 function selectDraw(idx) {
@@ -4620,7 +4667,11 @@ async function assignCourt(idx, value) {
       const ok=await window.api.supabaseUpsertMatch(tournament.id,m);
       if(!ok)showToast('Aviso: sincronizacao online falhou. O jogo pode nao aparecer no painel publico.','warning');
     }
-    else if(!value){window.api.supabaseRemoveFromCourt(tournament.id,m);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
+    else if(!value){
+      const okRemove = await window.api.supabaseRemoveFromCourt(tournament.id,m);
+      if (!okRemove) showToast('Aviso: remocao da quadra nao sincronizou (online).', 'warning');
+      prepareRankingsForSync();
+      window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
       // Desativar Realtime se nao tem mais jogos em quadra
       const emQuadraCount = tournament.matches.filter(x => x.status === 'Em Quadra').length;
       if (emQuadraCount === 0) {
@@ -4629,6 +4680,7 @@ async function assignCourt(idx, value) {
       }
     }
   }catch(e){console.warn('Supabase sync:',e);showToast('Aviso: sincronizacao online falhou','warning');}
+  _registerEmQuadraIds(); // v3.97: notifica main pra reconciliacao
   renderCourtsPanel();renderMatches();
 }
 
@@ -4661,7 +4713,7 @@ async function saveScore() {
   try{
     const m=tournament.matches[scoringMatchIdx];if(!m)return;
     const status=document.getElementById('score-status').value,winner=document.getElementById('score-winner').value;
-    if(status==='WO'||status==='Desqualificacao'){if(!winner){alert('Selecione vencedor');return;}m.score=status==='WO'?'W.O.':'DSQ';m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();propagateResultToDraws(m);await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);try{await window.api.supabaseFinalizeMatch(tournament.id,m,{winner:m.winner,final_score:m.score,umpire_name:m.umpire||''});}catch(e){console.warn('finalizeMatch:',e);}if(!(tournament.matches||[]).some(x=>x.status==='Em Quadra')){window.api.supabaseUnsubscribe();console.log('Realtime desativado');}closeModal('modal-score');renderMatches();showToast('Resultado registrado');return;}
+    if(status==='WO'||status==='Desqualificacao'){if(!winner){alert('Selecione vencedor');return;}m.score=status==='WO'?'W.O.':'DSQ';m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();propagateResultToDraws(m);await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);try{await window.api.supabaseFinalizeMatch(tournament.id,m,{winner:m.winner,final_score:m.score,umpire_name:m.umpire||''});}catch(e){console.warn('finalizeMatch:',e);}_registerEmQuadraIds();if(!(tournament.matches||[]).some(x=>x.status==='Em Quadra')){window.api.supabaseUnsubscribe();console.log('Realtime desativado');}closeModal('modal-score');renderMatches();showToast('Resultado registrado');return;}
     if(!winner){alert('Selecione vencedor');return;}
     const numSets=tournament?.scoring?.sets||3,pts=tournament?.scoring?.points||21,maxP=tournament?.scoring?.maxPoints||30;
     let scores=[];
@@ -4682,6 +4734,7 @@ async function saveScore() {
       });
     } catch(e) { console.warn('finalizeMatch:',e); }
     // Desativar Realtime se nao tem mais jogos em quadra
+    _registerEmQuadraIds(); // v3.97
     if(!(tournament.matches||[]).some(x=>x.status==='Em Quadra')){window.api.supabaseUnsubscribe();console.log('Realtime desativado (nenhum jogo em quadra)');}
     closeModal('modal-score');renderMatches();showToast('Placar salvo!');
   }catch(e){console.error(e);showToast('Erro: '+e.message,'error');}
@@ -5115,7 +5168,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='3.96';
+const APP_VERSION='3.97';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');

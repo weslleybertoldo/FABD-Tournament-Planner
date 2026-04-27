@@ -44,6 +44,9 @@ contextBridge.exposeInMainWorld('api', {
   supabaseUpsertMatch: (tid, m) => ipcRenderer.invoke('supabase:upsertMatch', tid, m),
   supabaseRemoveFromCourt: (tid, matchData) => ipcRenderer.invoke('supabase:removeFromCourt', tid, matchData),
   supabaseFinalizeMatch: (tid, matchData, scoreData) => ipcRenderer.invoke('supabase:finalizeMatch', tid, matchData, scoreData),
+  onAuthSignedOut: (cb) => { ipcRenderer.removeAllListeners('auth:signed-out'); ipcRenderer.on('auth:signed-out', () => cb()); },
+  supabaseRegisterEmQuadra: (tid, ids) => ipcRenderer.invoke('supabase:registerEmQuadra', tid, ids),
+  onReconcileNeeded: (cb) => { ipcRenderer.removeAllListeners('supabase:reconcile-needed'); ipcRenderer.on('supabase:reconcile-needed', (_, data) => cb(data)); },
   supabaseCleanup: (tid) => ipcRenderer.invoke('supabase:cleanup', tid),
   supabaseIsOrganizer: () => ipcRenderer.invoke('supabase:isOrganizer'),
 

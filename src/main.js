@@ -248,6 +248,7 @@ function createWindow() {
 app.whenReady().then(async () => {
   // Restaurar sessao ANTES de criar window para evitar race condition
   await restoreAuthSession();
+  setupAuthListener(); // v3.97: captura TOKEN_REFRESHED e SIGNED_OUT
   createWindow();
   // Log bootstrap apos window criada
   log('INFO', 'App iniciado');
@@ -772,31 +773,51 @@ function stableMatchId(tournamentId, matchData) {
   return `${tournamentId}_${draw}_${p1}_${p2}`;
 }
 
+// Detecta se erro do Supabase é temporario (rede/timeout) — vale retry
+function _isTransientError(err) {
+  if (!err) return false;
+  const msg = String(err.message || err).toLowerCase();
+  return msg.includes('fetch') || msg.includes('network') || msg.includes('timeout')
+    || msg.includes('econnreset') || msg.includes('etimedout') || msg.includes('socket');
+}
+
 ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
-  try {
-    if (!currentFederation?.id) {
-      log('ERROR', 'upsertMatch: sem federacao ativa (login pendente?)');
-      return false;
+  // Retry com backoff (0s, 1s, 3s = 3 tentativas) — v3.97
+  if (!currentFederation?.id) {
+    log('ERROR', 'upsertMatch: sem federacao ativa (login pendente?)');
+    return false;
+  }
+  const id = stableMatchId(tournamentId, matchData);
+  const row = {
+    id, tournament_id: tournamentId, federation_id: currentFederation.id,
+    match_num: matchData.num,
+    draw_name: matchData.drawName || '', round: matchData.round || 1,
+    round_name: matchData.roundName || '', player1: matchData.player1 || '',
+    player2: matchData.player2 || '', court: matchData.court || '',
+    umpire: matchData.umpire || '', status: matchData.status || 'Em Quadra',
+    updated_at: new Date().toISOString()
+  };
+  const delays = [0, 1000, 3000];
+  let lastErr = null;
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    if (delays[attempt] > 0) await new Promise(r => setTimeout(r, delays[attempt]));
+    try {
+      const { error } = await supabase.from('live_matches').upsert(row, { onConflict: 'id' });
+      if (error) throw error;
+      log('INFO', 'Supabase match upserted' + (attempt > 0 ? ' (retry ' + attempt + ')' : '') + ':', id);
+      return true;
+    } catch (e) {
+      lastErr = e;
+      // Erros permanentes (RLS, schema) — falha imediato, sem retry
+      if (!_isTransientError(e)) {
+        log('ERROR', 'Supabase upsertMatch (permanente):', e.message);
+        return false;
+      }
+      log('WARN', 'Supabase upsertMatch (tentativa ' + (attempt + 1) + ' falhou, ' + (delays[attempt + 1] ? 'retry em ' + delays[attempt + 1] + 'ms' : 'desistindo') + '):', e.message);
     }
-    const id = stableMatchId(tournamentId, matchData);
-    // v3.60: score atualiza apenas pelo App Referee
-    // O upsertMatch do Planner NAO deve sobrescrever score (referee é quem marca pontos)
-    // Apenas atualizar dados do jogo (status, court, players) sem mexer em score
-    const row = {
-      id, tournament_id: tournamentId, federation_id: currentFederation.id,
-      match_num: matchData.num,
-      draw_name: matchData.drawName || '', round: matchData.round || 1,
-      round_name: matchData.roundName || '', player1: matchData.player1 || '',
-      player2: matchData.player2 || '', court: matchData.court || '',
-      umpire: matchData.umpire || '', status: matchData.status || 'Em Quadra',
-      updated_at: new Date().toISOString()
-    };
-    const { error } = await supabase.from('live_matches').upsert(row, { onConflict: 'id' });
-    if (error) throw error;
-    // v3.60: NAO atualizar live_scores aqui - App Referee é quem atualiza score
-    log('INFO', 'Supabase match upserted (sem score):', id);
-    return true;
-  } catch(e) { log('ERROR', 'Supabase upsertMatch:', e.message); return false; }
+  }
+  log('ERROR', 'Supabase upsertMatch: todas as tentativas falharam:', lastErr?.message);
+  return false;
 });
 
 // Finaliza match pelo Planner: replica o fluxo que o Referee faz ao confirmar vencedor
@@ -848,30 +869,75 @@ ipcMain.handle('supabase:finalizeMatch', async (_, tournamentId, matchData, scor
 });
 
 ipcMain.handle('supabase:removeFromCourt', async (_, tournamentId, matchData) => {
-  try {
-    const id = typeof matchData === 'object' ? stableMatchId(tournamentId, matchData) : `${tournamentId}_${matchData}`;
-    log('INFO', 'Removing match from court:', id, '| tournamentId:', tournamentId);
-    // Verificar se existe antes de deletar
-    const { data: existing } = await supabase.from('live_matches').select('id,status').eq('id', id).maybeSingle();
-    if (existing) {
-      log('INFO', 'Found existing match, deleting...', existing);
-    } else {
-      log('WARN', 'Match not found in Supabase, may have been already deleted');
+  const id = typeof matchData === 'object' ? stableMatchId(tournamentId, matchData) : `${tournamentId}_${matchData}`;
+  log('INFO', 'Removing match from court:', id);
+  const delays = [0, 1000, 3000];
+  let lastErr = null;
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    if (delays[attempt] > 0) await new Promise(r => setTimeout(r, delays[attempt]));
+    try {
+      // Deletar scores primeiro (FK)
+      const { error: scoreErr } = await supabase.from('live_scores').delete().eq('match_id', id);
+      if (scoreErr && !_isTransientError(scoreErr)) throw scoreErr;
+      // Deletar match
+      const { error: matchErr } = await supabase.from('live_matches').delete().eq('id', id);
+      if (matchErr) throw matchErr;
+      log('INFO', 'Supabase match removed' + (attempt > 0 ? ' (retry ' + attempt + ')' : '') + ':', id);
+      return true;
+    } catch (e) {
+      lastErr = e;
+      if (!_isTransientError(e)) { log('ERROR', 'Supabase removeFromCourt (permanente):', e.message); return false; }
+      log('WARN', 'Supabase removeFromCourt (tentativa ' + (attempt + 1) + ' falhou):', e.message);
     }
-    // Deletar scores primeiro
-    const { error: scoreErr } = await supabase.from('live_scores').delete().eq('match_id', id);
-    if (scoreErr) log('ERROR', 'Error deleting scores:', scoreErr.message);
-    // Deletar match
-    const { error: matchErr } = await supabase.from('live_matches').delete().eq('id', id);
-    if (matchErr) log('ERROR', 'Error deleting match:', matchErr.message);
-    log('INFO', 'Supabase match removed:', id);
-    return true;
-  } catch(e) { log('ERROR', 'Supabase removeFromCourt:', e.message); return false; }
+  }
+  log('ERROR', 'Supabase removeFromCourt: todas as tentativas falharam:', lastErr?.message);
+  return false;
 });
 
 let pollingInterval = null;
 let lastPollData = {};
 let realtimeRetryInterval = null;
+
+// === RECONCILIATION WORKER (v3.97) ===
+// A cada 30s, se ha matches Em Quadra "registrados" pelo renderer, faz SELECT
+// em live_matches por IDs especificos pra detectar divergencias (ex: jogo
+// foi colocado em quadra mas upsert falhou silenciosamente — fica fora de sync).
+// Renderer envia a lista de Em Quadra via supabase:registerEmQuadra.
+let reconcileInterval = null;
+let _emQuadraIds = new Set(); // IDs estaveis dos matches Em Quadra (do renderer)
+let _reconcileTournamentId = null;
+
+ipcMain.handle('supabase:registerEmQuadra', async (_, tournamentId, ids) => {
+  _reconcileTournamentId = tournamentId;
+  _emQuadraIds = new Set(Array.isArray(ids) ? ids : []);
+  if (!_emQuadraIds.size) {
+    if (reconcileInterval) { clearInterval(reconcileInterval); reconcileInterval = null; log('INFO', 'Reconcile parado (0 jogos em quadra)'); }
+    return true;
+  }
+  if (!reconcileInterval) {
+    log('INFO', 'Reconcile iniciado (interval 30s)');
+    reconcileInterval = setInterval(async () => {
+      if (!_emQuadraIds.size || !_reconcileTournamentId) return;
+      try {
+        const ids = [..._emQuadraIds];
+        const { data, error } = await supabase.from('live_matches')
+          .select('id,status').in('id', ids);
+        if (error) { log('WARN', 'Reconcile select falhou:', error.message); return; }
+        const found = new Map((data || []).map(r => [r.id, r.status]));
+        const missing = ids.filter(id => !found.has(id));
+        const wrongStatus = ids.filter(id => found.has(id) && found.get(id) !== 'Em Quadra');
+        if (missing.length || wrongStatus.length) {
+          log('WARN', 'Reconcile divergencia:', JSON.stringify({ missing, wrongStatus }));
+          // Notificar renderer pra re-sincronizar (re-emite supabaseUpsertMatch)
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('supabase:reconcile-needed', { missing, wrongStatus });
+          }
+        }
+      } catch (e) { log('WARN', 'Reconcile erro:', e.message); }
+    }, 30000);
+  }
+  return true;
+});
 
 // === AUTH IPC ===
 async function refreshOrganizerStatus() {
@@ -914,6 +980,32 @@ async function restoreAuthSession() {
       log('INFO', 'Sessao restaurada:', session.user.email, 'organizador:', !!currentOrganizer);
     }
   } catch (e) { log('ERROR', 'restoreAuthSession:', e.message); }
+}
+
+// Listener de auth — captura refresh silencioso e logout (v3.97).
+// TOKEN_REFRESHED: atualiza currentAuthUser sem deslogar — antes, refresh
+//   ocorria mas variaveis em memoria ficavam stale → queries falhavam apos exp.
+// SIGNED_OUT: token revogado/refresh falhou → limpa state e notifica renderer
+//   pra mostrar tela de login antes que upsertMatch comece a falhar silently.
+function setupAuthListener() {
+  if (HAS_SERVICE_ROLE) return;
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    log('INFO', 'auth event:', event, '| user:', session?.user?.email || '(none)');
+    if (event === 'TOKEN_REFRESHED' && session?.user) {
+      currentAuthUser = { id: session.user.id, email: session.user.email };
+      // currentOrganizer/Federation continuam validos (mesmo user)
+    } else if (event === 'USER_UPDATED' && session?.user) {
+      currentAuthUser = { id: session.user.id, email: session.user.email };
+      await refreshOrganizerStatus();
+    } else if (event === 'SIGNED_OUT') {
+      currentAuthUser = null;
+      currentOrganizer = null;
+      currentFederation = null;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('auth:signed-out');
+      }
+    }
+  });
 }
 
 ipcMain.handle('auth:status', async () => ({
