@@ -4950,7 +4950,8 @@ function renderSchedule() {
       let matchesAtTime=0;
       sorted.forEach((m,si)=>{
         const mTime=m.time?timeToMin(m.time):0;
-        if(!pausaRendered&&m.time&&mTime>=dayBs){
+        // v4.2: dia com noBreak NAO renderiza o badge PAUSA
+        if(!pausaRendered&&m.time&&mTime>=dayBs&&!day.noBreak){
           pausaRendered=true;
           h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${day.breakStart||bS} - ${day.breakEnd||bE})</div>`;
         }
@@ -4978,7 +4979,7 @@ function renderSchedule() {
           }
         }
       });
-      if(!pausaRendered&&dayBs<end)h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${day.breakStart||bS} - ${day.breakEnd||bE})</div>`;
+      if(!pausaRendered&&dayBs<end&&!day.noBreak)h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${day.breakStart||bS} - ${day.breakEnd||bE})</div>`;
     });
     // Matches sem dia atribuido
     const assignedDraws=new Set();tournament.daySchedule.forEach(d=>(d.draws||[]).forEach(n=>assignedDraws.add(n)));
@@ -5198,7 +5199,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='4.2';
+const APP_VERSION='4.3';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
@@ -5323,11 +5324,13 @@ function renderDaySchedule(){
     const mode=saved.mode||'todas';
     h+=`<div style="background:var(--fabd-gray-100);border-radius:8px;padding:16px;margin-bottom:12px" data-day-date="${date}">`;
     h+=`<h4 style="margin-bottom:12px;color:var(--fabd-blue)">${label}</h4>`;
+    const noBreak = !!saved.noBreak;
     h+=`<div class="form-row">`;
     h+=`<div class="form-group"><label>Inicio</label><input type="time" class="form-control ds-start" value="${st}"></div>`;
     h+=`<div class="form-group"><label>Termino</label><input type="time" class="form-control ds-end" value="${et}"></div>`;
-    h+=`<div class="form-group"><label>Pausa inicio</label><input type="time" class="form-control ds-break-start" value="${bs}"></div>`;
-    h+=`<div class="form-group"><label>Pausa fim</label><input type="time" class="form-control ds-break-end" value="${be}"></div>`;
+    h+=`<div class="form-group" style="max-width:100px"><label>Pausa inicio</label><input type="time" class="form-control ds-break-start" value="${bs}" ${noBreak?'disabled':''}></div>`;
+    h+=`<div class="form-group" style="max-width:100px"><label>Pausa fim</label><input type="time" class="form-control ds-break-end" value="${be}" ${noBreak?'disabled':''}></div>`;
+    h+=`<div class="form-group" style="display:flex;align-items:flex-end"><label style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:${noBreak?'#2563EB':'#fff'};color:${noBreak?'#fff':'#333'};border-radius:8px;border:2px solid ${noBreak?'#2563EB':'#cbd5e1'};cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap"><input type="checkbox" class="ds-no-break" ${noBreak?'checked':''} style="display:none">Sem pausa</label></div>`;
     h+=`</div>`;
     h+=`<div style="margin-top:12px"><label style="font-weight:600;font-size:13px;margin-bottom:8px;display:block">Modalidades neste dia:</label>`;
     h+=`<div style="display:flex;gap:12px;flex-wrap:wrap">`;
@@ -5344,7 +5347,13 @@ function renderDaySchedule(){
   // Listener: ao trocar radio, salvar estado atual e re-renderizar
   container.querySelectorAll('.ds-mode').forEach(r=>{
     r.addEventListener('change',()=>{
-      // Salvar estado temporario antes de re-renderizar
+      tournament.daySchedule=collectDaySchedule();
+      renderDaySchedule();
+    });
+  });
+  // Listener "Sem pausa": re-render pra disable/enable os inputs
+  container.querySelectorAll('.ds-no-break').forEach(c=>{
+    c.addEventListener('change',()=>{
       tournament.daySchedule=collectDaySchedule();
       renderDaySchedule();
     });
@@ -5361,12 +5370,15 @@ function collectDaySchedule(){
     const date=panel.dataset.dayDate;
     const startTime=panel.querySelector('.ds-start')?.value||'08:00';
     const endTime=panel.querySelector('.ds-end')?.value||'18:00';
-    const breakStart=panel.querySelector('.ds-break-start')?.value||'12:00';
-    const breakEnd=panel.querySelector('.ds-break-end')?.value||'13:30';
+    const noBreak=!!panel.querySelector('.ds-no-break')?.checked;
+    // v4.2: noBreak=true → bs=be=00:00 (janela vazia, todos os checks de pausa
+    // viram no-op naturalmente — assignAutoTimes/regenerateDrawSchedule/render).
+    const breakStart=noBreak?'00:00':(panel.querySelector('.ds-break-start')?.value||'12:00');
+    const breakEnd=noBreak?'00:00':(panel.querySelector('.ds-break-end')?.value||'13:30');
     const modeEl=panel.querySelector('.ds-mode:checked');
     const mode=modeEl?.value||'todas';
     const draws=mode==='simples'?simples:mode==='duplas'?duplas:drawNames;
-    schedule.push({date,startTime,endTime,breakStart,breakEnd,mode,draws});
+    schedule.push({date,startTime,endTime,breakStart,breakEnd,noBreak,mode,draws});
   });
   return schedule;
 }
