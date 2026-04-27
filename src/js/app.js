@@ -5207,7 +5207,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='4.12';
+const APP_VERSION='4.13';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
@@ -5535,16 +5535,35 @@ function calcIdealGroupCount(n) {
 }
 
 // === UMPIRES ===
+// v4.11+: gera id de arbitro (Electron tem crypto.randomUUID; fallback simples)
+function _newUmpireId(){
+  try{ return crypto.randomUUID(); }catch{ return 'u_'+Date.now()+'_'+Math.random().toString(36).slice(2,8); }
+}
 function loadUmpires(){
   try{
     const raw=localStorage.getItem('fabd-umpires')||'[]';
-    const parsed=JSON.parse(raw);
-    // Validar estrutura: array de objetos com id e name
-    if(Array.isArray(parsed)){
-      return parsed.filter(u=>u&&typeof u==='object'&&typeof u.id==='string'&&typeof u.name==='string').slice(0,100);
+    let parsed=JSON.parse(raw);
+    if(!Array.isArray(parsed))return[];
+    // Migracao: arbitros antigos cadastrados sem id ganham um agora.
+    // Antes loadUmpires filtrava todos sem id → lista voltava vazia mesmo com cadastros.
+    let migrated=false;
+    parsed=parsed
+      .filter(u=>u&&typeof u==='object'&&typeof u.name==='string')
+      .map(u=>{ if(typeof u.id!=='string'){u.id=_newUmpireId();migrated=true;} return u; })
+      .slice(0,100);
+    if(migrated){
+      try{ localStorage.setItem('fabd-umpires',JSON.stringify(parsed)); }catch{}
     }
-    return[];
+    return parsed;
   }catch{return[];}
+}
+
+// Puxar arbitro por id (preferido) ou por nome (fallback pra match com Referee)
+function getUmpireById(id){ return loadUmpires().find(u=>u.id===id) || null; }
+function getUmpireByName(name){
+  if(!name)return null;
+  const n=name.toLowerCase().trim();
+  return loadUmpires().find(u=>u.name.toLowerCase().trim()===n) || null;
 }
 function saveUmpires(l){
   localStorage.setItem('fabd-umpires',JSON.stringify(l));
@@ -5654,7 +5673,7 @@ async function authorizeReferee(id,status){
     renderUmpires();
   }catch(e){showToast('Erro: '+e.message,'error');}
 }
-function addUmpire(){const n=gv('umpire-name');if(!n){alert('Nome');return;}const l=document.getElementById('umpire-level').value;const u=loadUmpires();if(u.some(x=>x.name.toLowerCase()===n.toLowerCase())){alert('Ja existe');return;}u.push({name:n,level:l});saveUmpires(u);document.getElementById('umpire-name').value='';renderUmpires();showToast('Arbitro adicionado!');}
+function addUmpire(){const n=gv('umpire-name');if(!n){alert('Nome');return;}const l=document.getElementById('umpire-level').value;const u=loadUmpires();if(u.some(x=>x.name.toLowerCase()===n.toLowerCase())){alert('Ja existe');return;}u.push({id:_newUmpireId(),name:n,level:l});saveUmpires(u);document.getElementById('umpire-name').value='';renderUmpires();showToast('Arbitro adicionado!');}
 function removeUmpire(i){if(!confirm('Remover?'))return;const u=loadUmpires();u.splice(i,1);saveUmpires(u);renderUmpires();showToast('Removido');}
 
 // === IMPORT ===
