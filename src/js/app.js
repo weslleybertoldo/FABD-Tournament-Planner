@@ -1578,6 +1578,62 @@ async function updateEntryStatus(idx, status) {
   renderRoster();
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER COALESCING (v3.95 — fix "aba pisca" e "input trava ao digitar")
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Problema: cada update do Realtime / polling disparava renderMatches +
+// renderCourtsPanel imediatamente. tb.innerHTML = h descarta o input que o
+// usuario esta digitando, perde foco, "aba pisca". Em jogo ativo, arbitro
+// marca 1 ponto = 1 evento Realtime = 1 re-render = 1 piscada.
+//
+// Solucao: cada render passa por scheduleRender(name, fn) que:
+//   1. Coalesce — se varios scheduleRender chegam no mesmo frame, executa 1
+//   2. Defer-when-typing — se ha input/textarea/select em foco, ADIA o render
+//      ate o blur (instala listener once). Render nao destroi o input ativo.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const _pendingRenders = new Map(); // name -> render fn
+let _renderRafId = null;
+let _renderBlurListener = null;
+
+function _isUserTyping() {
+  const a = document.activeElement;
+  if (!a) return false;
+  const tag = a.tagName;
+  if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return false;
+  if (a.type === 'checkbox' || a.type === 'radio' || a.type === 'button' || a.type === 'submit') return false;
+  if (a.readOnly || a.disabled) return false;
+  return true;
+}
+
+function _flushPendingRenders() {
+  _renderRafId = null;
+  // Se voltou a ter input em foco entre o schedule e o flush, re-adia
+  if (_isUserTyping()) { _attachBlurFlush(); return; }
+  const fns = [..._pendingRenders.values()];
+  _pendingRenders.clear();
+  for (const fn of fns) { try { fn(); } catch (e) { console.warn('render error:', e); } }
+}
+
+function _attachBlurFlush() {
+  if (_renderBlurListener) return; // ja instalado
+  const active = document.activeElement;
+  if (!active) { _renderRafId = requestAnimationFrame(_flushPendingRenders); return; }
+  _renderBlurListener = () => {
+    active.removeEventListener('blur', _renderBlurListener);
+    _renderBlurListener = null;
+    if (_renderRafId == null) _renderRafId = requestAnimationFrame(_flushPendingRenders);
+  };
+  active.addEventListener('blur', _renderBlurListener, { once: true });
+}
+
+function scheduleRender(name, fn) {
+  _pendingRenders.set(name, fn);
+  if (_isUserTyping()) { _attachBlurFlush(); return; }
+  if (_renderRafId == null) _renderRafId = requestAnimationFrame(_flushPendingRenders);
+}
+
 // === DRAWS (sorteio individual por chave) ===
 const MOD_ORDER=['SM','SF','DM','DF','DX'];
 const CAT_ORDER=['Sub 11','Sub 13','Sub 15','Sub 17','Sub 19','Sub 23','Principal','Senior','Master I','Master II'];
@@ -4502,8 +4558,9 @@ async function handleRealtimeScoreUpdate(data){
       showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
     }
 
-    renderCourtsPanel();
-    renderMatches();
+    // Coalesce + defer-when-typing: nao re-renderiza durante digitacao
+    scheduleRender('courts', renderCourtsPanel);
+    scheduleRender('matches', renderMatches);
   } catch(e) { console.error('[RealtimeScoreUpdate] Error:', e.message); }
 }
 
@@ -5058,7 +5115,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='3.94';
+const APP_VERSION='3.95';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
