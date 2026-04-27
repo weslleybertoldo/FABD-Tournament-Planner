@@ -138,7 +138,7 @@
     </div>
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
     <p id="login-info" style="color:#10B981;font-size:12px;margin-top:12px;display:none"></p>
-    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.21</p>
+    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.23</p>
     <details style="margin-top:8px;font-size:10px;color:#64748B;text-align:left;max-width:320px;width:90%;cursor:pointer">
       <summary>Diagnóstico (toque pra abrir)</summary>
       <pre id="diag-info" style="background:#0F172A;padding:8px;border-radius:6px;font-size:9px;overflow:auto;white-space:pre-wrap;margin-top:6px;color:#CBD5E1">carregando...</pre>
@@ -621,15 +621,20 @@
     }
 
     async function handleLogin(u){
+      console.log('[Auth] handleLogin start:', u?.email);
       currentUser=u;
       await registerReferee(u);
+      console.log('[Auth] registerReferee OK');
       const rec=await getMyRefereeRecord();
+      console.log('[Auth] getMyRefereeRecord:', rec);
       if(!rec?.federation_id){
+        console.log('[Auth] sem federation_id, mostrando picker');
         // Sem federacao definida -> mostra picker
         showFederationPicker();
         return;
       }
       currentUser.federation_id=rec.federation_id;
+      console.log('[Auth] status:', rec.status, '- abrindo', rec.status==='autorizado'?'matches':'pending');
       if(rec.status==='autorizado')showMatches();
       else showPending();
     }
@@ -731,18 +736,24 @@
       });
 
       // === Recupera sessao do storage primeiro (funciona offline) ===
+      // v4.23: REMOVIDO refresh em background — autoRefreshToken:true ja cuida
+      // disso silenciosamente. Chamar refreshSession manualmente em paralelo
+      // causava race com refresh_token_rotation: o supabase-js fazia o auto
+      // refresh, e nosso refreshSession tentava com refresh_token JA ROTACIONADO,
+      // recebia 401, e disparava SIGNED_OUT que limpava o storage.
+      console.log('[Auth] checkAuth iniciando getSession');
       try {
-        const{data:{session:localSes}}=await sb.auth.getSession();
+        const{data:{session:localSes},error:sErr}=await sb.auth.getSession();
+        console.log('[Auth] getSession resultado:', sErr?'ERRO '+sErr.message:(localSes?.user?'OK '+localSes.user.email:'AUSENTE'));
         if(localSes?.user){
+          console.log('[Auth] sessao encontrada, chamando handleLogin');
           await handleLogin({name:localSes.user.user_metadata?.full_name||localSes.user.email,id:localSes.user.id,email:localSes.user.email,photo:localSes.user.user_metadata?.avatar_url});
-          // Refresh em BACKGROUND. Falha NAO desloga — storage tem token suficiente.
-          if(navigator.onLine){
-            sb.auth.refreshSession().catch(e=>console.warn('[Auth] refresh em background falhou:',e?.message));
-          }
+          console.log('[Auth] handleLogin OK, autoRefreshToken cuida do resto');
           return;
         }
       } catch(e) { console.warn('[Auth] getSession falhou:',e?.message); }
 
+      console.log('[Auth] mostrando tela de login (sem sessao)');
       document.getElementById('page-login').style.display='flex';
       _renderDiagInfo();
     }
