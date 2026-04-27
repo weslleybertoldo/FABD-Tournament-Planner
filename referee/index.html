@@ -353,12 +353,46 @@
     const SUPABASE_URL='https://zwjgjtrmsqtyyjtuotuo.supabase.co';
     const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY';
     if(!window.supabase){document.getElementById('login-error').textContent='Erro: Supabase nao carregou.';document.getElementById('login-error').style.display='block';}
+
+    // v4.7: fetch resiliente (referencia: PhysiqCalc client.ts createResilientFetch).
+    // Retry exponencial em 5xx/429/erro de rede + timeout 15s. NAO faz retry em
+    // 401/403 (auth — usuario precisa relogar). Resolve queries que falham por
+    // rede instavel sem deslogar o user.
+    function createResilientFetch(retries, timeoutMs) {
+      return async (input, init) => {
+        let lastError = null;
+        for (let attempt = 0; attempt <= retries; attempt++) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+          try {
+            const response = await fetch(input, Object.assign({}, init, { signal: controller.signal }));
+            clearTimeout(timeoutId);
+            if (response.status === 401 || response.status === 403) return response;
+            if (response.status >= 500 || response.status === 429) {
+              if (attempt < retries) {
+                const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+                await new Promise(r => setTimeout(r, delay + Math.random() * 500));
+                continue;
+              }
+            }
+            return response;
+          } catch (err) {
+            clearTimeout(timeoutId);
+            lastError = err;
+            if (attempt < retries && err && err.name !== 'AbortError') {
+              const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+              await new Promise(r => setTimeout(r, delay));
+              continue;
+            }
+          }
+        }
+        throw lastError || new Error('Fetch failed after retries');
+      };
+    }
+
     // v4.5.1: configuracao explicita de auth (referencia: PhysiqCalc useAuth.tsx).
-    // - storage:localStorage explicito (nao confia no default que pode mudar)
-    // - persistSession:true + autoRefreshToken:true
-    // - SEM flowType:'pkce' — quebra login OAuth Google (precisaria exchangeCodeForSession,
-    //   que nao chamamos). Default implicit funciona com tokens via URL hash.
     const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
+      global:{fetch:createResilientFetch(2,15000)},
       auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
     }):null;
     // Flag pra distinguir SIGNED_OUT intencional (botao Sair) de automatico (refresh
