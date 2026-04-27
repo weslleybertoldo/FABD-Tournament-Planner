@@ -4641,8 +4641,16 @@ function getCourtOptions(sel) {
 }
 
 function getUmpireOptions(sel) {
+  // v4.9: se o arbitro veio via Referee (Google login) e nao esta pre-cadastrado
+  // localmente, ainda assim mostrar o nome no select. Antes ficava "-" porque o
+  // <option value=sel> nao existia. Agora adiciona option dinamica pra preservar.
   let h='';const umps=loadUmpires();
+  const knownNames = new Set(umps.map(u => u.name));
   umps.forEach(u=>{h+=`<option value="${esc(u.name)}"${sel===u.name?' selected':''}>${esc(u.name)}</option>`;});
+  if (sel && !knownNames.has(sel)) {
+    // Arbitro vindo do Referee — adiciona como option dinamica selecionada
+    h += `<option value="${esc(sel)}" selected>${esc(sel)}</option>`;
+  }
   return h;
 }
 
@@ -5199,7 +5207,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='4.10';
+const APP_VERSION='4.11';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
