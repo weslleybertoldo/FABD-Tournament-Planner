@@ -145,7 +145,7 @@
     </div>
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
     <p id="login-info" style="color:#10B981;font-size:12px;margin-top:12px;display:none"></p>
-    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.32.1</p>
+    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.33.1</p>
     <details style="margin-top:8px;font-size:10px;color:#64748B;text-align:left;max-width:320px;width:90%;cursor:pointer">
       <summary>Diagnóstico (toque pra abrir)</summary>
       <pre id="diag-info" style="background:#0F172A;padding:8px;border-radius:6px;font-size:9px;overflow:auto;white-space:pre-wrap;margin-top:6px;color:#CBD5E1">carregando...</pre>
@@ -590,8 +590,35 @@
     }
     function hideAll(){['page-login','page-federation','page-pending','page-matches','page-scorer','page-loading'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
 
-    async function registerReferee(u){try{await sb.from('referees').upsert({id:u.id,name:u.name,email:u.email||'',photo:u.photo||'',updated_at:new Date().toISOString()},{onConflict:'id'});}catch(e){}}
-    async function getMyRefereeRecord(){if(!currentUser)return null;try{const{data}=await sb.from('referees').select('id,name,status,federation_id').eq('id',currentUser.id).single();return data||null;}catch(e){return null;}}
+    // v4.32.2: timeout interno em queries do handleLogin pra nao pendurar a UI.
+    // createResilientFetch tem retry (2x com backoff) com timeout 15s — pior caso 45s.
+    // Aqui forcamos timeout AGRESSIVO de 6s por query: se falhar, segue adiante (queries
+    // sao auxiliares — registerReferee é só pra cadastro inicial; getMyRefereeRecord
+    // pode ser re-chamado pelo polling/Realtime).
+    function _withTimeout(p, ms, label) {
+      return Promise.race([
+        p,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout '+ms+'ms: '+label)), ms))
+      ]);
+    }
+    async function registerReferee(u){
+      try{
+        await _withTimeout(
+          sb.from('referees').upsert({id:u.id,name:u.name,email:u.email||'',photo:u.photo||'',updated_at:new Date().toISOString()},{onConflict:'id'}),
+          6000, 'registerReferee'
+        );
+      }catch(e){console.warn('[Auth] registerReferee:', e.message);}
+    }
+    async function getMyRefereeRecord(){
+      if(!currentUser)return null;
+      try{
+        const{data}=await _withTimeout(
+          sb.from('referees').select('id,name,status,federation_id').eq('id',currentUser.id).single(),
+          6000, 'getMyRefereeRecord'
+        );
+        return data||null;
+      }catch(e){console.warn('[Auth] getMyRefereeRecord:', e.message); return null;}
+    }
     async function checkStatus(){const r=await getMyRefereeRecord();return r?.status||'pendente';}
 
     async function loadFederationsIntoSelect(){
