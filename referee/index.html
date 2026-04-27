@@ -138,7 +138,7 @@
     </div>
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
     <p id="login-info" style="color:#10B981;font-size:12px;margin-top:12px;display:none"></p>
-    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.27</p>
+    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.29</p>
     <details style="margin-top:8px;font-size:10px;color:#64748B;text-align:left;max-width:320px;width:90%;cursor:pointer">
       <summary>Diagnóstico (toque pra abrir)</summary>
       <pre id="diag-info" style="background:#0F172A;padding:8px;border-radius:6px;font-size:9px;overflow:auto;white-space:pre-wrap;margin-top:6px;color:#CBD5E1">carregando...</pre>
@@ -727,8 +727,12 @@
           // Senao, ignora — refresh falhou mas storage tem token, vamos tentar de novo depois
           return;
         }
-        if((ev==='SIGNED_IN'||ev==='TOKEN_REFRESHED'||ev==='USER_UPDATED')&&ses?.user){
-          // v4.25: guard contra dupla chamada — se ja logado com mesmo user,
+        // v4.29: INITIAL_SESSION incluido — supabase-js v2.99+ dispara esse
+        // evento no boot quando recupera sessao do storage. Antes ignoravamos
+        // e dependia so do checkAuth/getSession. Em algumas situacoes (timing)
+        // o listener era a unica oportunidade de pegar a sessao restaurada.
+        if((ev==='SIGNED_IN'||ev==='TOKEN_REFRESHED'||ev==='USER_UPDATED'||ev==='INITIAL_SESSION')&&ses?.user){
+          // Guard contra dupla chamada — se ja logado com mesmo user,
           // so atualiza dados sem refazer todo o flow (registerReferee, etc).
           if(currentUser&&currentUser.id===ses.user.id){
             currentUser.email=ses.user.email;

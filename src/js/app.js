@@ -4310,6 +4310,51 @@ function renderMatches() {
     if(e.status==='ausente')absentPlayers.add(e.playerName);
   });
 
+  // Coletar atletas em descanso pos-jogo (apenas Finalizada — WO/DSQ/RET nao contam)
+  // Se atleta tem mais de um jogo finalizado recente, vale o mais recente (reinicia a contagem)
+  const restingUntil=new Map();
+  const _restMs=(tournament.restMinBetweenGames||0)*60000;
+  const _nowMs=Date.now();
+  if(_restMs>0){
+    matches.forEach(m=>{
+      if(m.status!=='Finalizada')return;
+      if(!m.finishedAt)return;
+      const endsAt=new Date(m.finishedAt).getTime()+_restMs;
+      if(!(endsAt>_nowMs))return;
+      const addName=(full)=>{
+        if(!full)return;
+        full.split('/').forEach(n=>{
+          const t=n.trim();if(!t)return;
+          const prev=restingUntil.get(t)||0;
+          if(endsAt>prev)restingUntil.set(t,endsAt);
+        });
+      };
+      addName(m.player1);addName(m.player2);
+    });
+  }
+  // Ticker singleton: atualiza textos do cronometro a cada 1s; quando todos zeram, re-renderiza
+  if(!window.__fabdRestTicker){
+    window.__fabdRestTicker=setInterval(()=>{
+      const tbody=document.getElementById('matches-table-body');
+      if(!tbody)return;
+      const nodes=tbody.querySelectorAll('[data-resting-until]');
+      if(!nodes.length)return;
+      const now=Date.now();let needsRerender=false;
+      nodes.forEach(n=>{
+        const ends=parseInt(n.getAttribute('data-resting-until'),10)||0;
+        const remaining=ends-now;
+        if(remaining<=0){needsRerender=true;return;}
+        const txt=n.querySelector('.fabd-rest-text');
+        if(txt){
+          const total=Math.ceil(remaining/1000);
+          const mm=Math.floor(total/60),ss=total%60;
+          txt.textContent=mm>0?`${mm}m ${String(ss).padStart(2,'0')}s`:`${ss}s`;
+        }
+      });
+      if(needsRerender&&typeof renderMatches==='function')renderMatches();
+    },1000);
+  }
+
   // Pre-calcular filtro de dia para evitar flash ao renderizar
   const _dayVal=document.getElementById('match-day-filter')?.value||'';
   let _dayDraws=null;
@@ -4356,6 +4401,13 @@ function renderMatches() {
     const p1=esc(m.player1Display||m.player1||'A definir'),p2=esc(m.player2Display||m.player2||'A definir');
     const alertIcon='<span title="Atleta em quadra" style="color:#F59E0B;font-weight:700;cursor:help;margin-left:4px">&#9888;</span>';
     const absentIcon='<span title="Ausente" style="color:#DC2626;font-weight:700;cursor:help;margin-left:4px">&#10071;</span>';
+    const restBadge=(endsAt)=>{
+      const remaining=endsAt-Date.now();
+      const total=Math.max(0,Math.ceil(remaining/1000));
+      const mm=Math.floor(total/60),ss=total%60;
+      const txt=mm>0?`${mm}m ${String(ss).padStart(2,'0')}s`:`${ss}s`;
+      return `<span class="fabd-rest-timer" data-resting-until="${endsAt}" title="Em descanso" style="color:#2563EB;font-weight:700;cursor:help;margin-left:4px;white-space:nowrap">&#9201; <span class="fabd-rest-text">${txt}</span></span>`;
+    };
     const highlightPlayer=(nameStr,rawName)=>{
       if(!rawName)return`<span>${nameStr}</span>`;
       const parts=rawName.split('/');
@@ -4363,6 +4415,7 @@ function renderMatches() {
         const trimmed=rawName.trim();
         if(!isEQ&&inCourt.has(trimmed))return`<span style="background:#FEF3C7;padding:2px 6px;border-radius:4px">${nameStr}${alertIcon}</span>`;
         if(absentPlayers.has(trimmed))return`<span style="background:#FEE2E2;padding:2px 6px;border-radius:4px">${nameStr}${absentIcon}</span>`;
+        if(!isEQ&&restingUntil.has(trimmed))return`<span style="background:#DBEAFE;padding:2px 6px;border-radius:4px">${nameStr}${restBadge(restingUntil.get(trimmed))}</span>`;
         return`<span>${nameStr}</span>`;
       }
       const escapedParts=(m.player1Display||m.player1||'A definir')===rawName?p1.split('/'):p2.split('/');
@@ -4371,6 +4424,7 @@ function renderMatches() {
         const display=(escapedParts[idx]||esc(trimmed)).trim();
         if(!isEQ&&inCourt.has(trimmed))return`<span style="background:#FEF3C7;padding:2px 6px;border-radius:4px">${display}${alertIcon}</span>`;
         if(absentPlayers.has(trimmed))return`<span style="background:#FEE2E2;padding:2px 6px;border-radius:4px">${display}${absentIcon}</span>`;
+        if(!isEQ&&restingUntil.has(trimmed))return`<span style="background:#DBEAFE;padding:2px 6px;border-radius:4px">${display}${restBadge(restingUntil.get(trimmed))}</span>`;
         return display;
       });
       return highlighted.join(' / ');
@@ -4469,7 +4523,8 @@ function setMatchesTab(tab){
 function renderFinishedMatches(){
   const tb=document.getElementById('finished-table-body');
   if(!tournament?.matches?.length){tb.innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--fabd-gray-500);padding:40px">Sem partidas finalizadas.</td></tr>';return;}
-  const finished=tournament.matches.filter(m=>m.status==='Finalizada'||m.status==='WO'||m.status==='Desistencia'||m.status==='Desqualificacao');
+  const finished=tournament.matches.filter(m=>m.status==='Finalizada'||m.status==='WO'||m.status==='Desistencia'||m.status==='Desqualificacao')
+    .slice().sort((a,b)=>(new Date(b.finishedAt||0).getTime())-(new Date(a.finishedAt||0).getTime()));
   if(!finished.length){tb.innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--fabd-gray-500);padding:40px">Sem partidas finalizadas.</td></tr>';return;}
   let h='';
   finished.forEach(m=>{
@@ -5207,7 +5262,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='4.28';
+const APP_VERSION='4.29';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
