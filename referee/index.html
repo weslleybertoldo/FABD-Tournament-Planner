@@ -138,7 +138,7 @@
     </div>
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
     <p id="login-info" style="color:#10B981;font-size:12px;margin-top:12px;display:none"></p>
-    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.23</p>
+    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.25</p>
     <details style="margin-top:8px;font-size:10px;color:#64748B;text-align:left;max-width:320px;width:90%;cursor:pointer">
       <summary>Diagnóstico (toque pra abrir)</summary>
       <pre id="diag-info" style="background:#0F172A;padding:8px;border-radius:6px;font-size:9px;overflow:auto;white-space:pre-wrap;margin-top:6px;color:#CBD5E1">carregando...</pre>
@@ -715,6 +715,7 @@
       // SIGNED_OUT só limpa state se foi INTENCIONAL (botao Sair). Se foi
       // automatico (refresh falhou por rede), IGNORA — mantem usuario logado.
       sb.auth.onAuthStateChange(async(ev,ses)=>{
+        console.log('[Auth] onAuthStateChange ev='+ev+' user='+(ses?.user?.email||'(none)')+' intentional='+_intentionalLogout);
         if(ev==='SIGNED_OUT'){
           if(_intentionalLogout){
             _intentionalLogout=false;
@@ -727,10 +728,14 @@
           return;
         }
         if((ev==='SIGNED_IN'||ev==='TOKEN_REFRESHED'||ev==='USER_UPDATED')&&ses?.user){
-          if(currentUser&&ev==='TOKEN_REFRESHED'){
-            currentUser.id=ses.user.id;currentUser.email=ses.user.email;
+          // v4.25: guard contra dupla chamada — se ja logado com mesmo user,
+          // so atualiza dados sem refazer todo o flow (registerReferee, etc).
+          if(currentUser&&currentUser.id===ses.user.id){
+            currentUser.email=ses.user.email;
+            currentUser.name=ses.user.user_metadata?.full_name||ses.user.email;
             return;
           }
+          console.log('[Auth] onAuthStateChange '+ev+' chamando handleLogin');
           await handleLogin({name:ses.user.user_metadata?.full_name||ses.user.email,id:ses.user.id,email:ses.user.email,photo:ses.user.user_metadata?.avatar_url});
         }
       });
