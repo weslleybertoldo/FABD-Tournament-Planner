@@ -5262,7 +5262,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='4.29';
+const APP_VERSION='4.30';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
