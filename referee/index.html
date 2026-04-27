@@ -138,7 +138,7 @@
     </div>
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
     <p id="login-info" style="color:#10B981;font-size:12px;margin-top:12px;display:none"></p>
-    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.17</p>
+    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.19</p>
     <details style="margin-top:8px;font-size:10px;color:#64748B;text-align:left;max-width:320px;width:90%;cursor:pointer">
       <summary>Diagnóstico (toque pra abrir)</summary>
       <pre id="diag-info" style="background:#0F172A;padding:8px;border-radius:6px;font-size:9px;overflow:auto;white-space:pre-wrap;margin-top:6px;color:#CBD5E1">carregando...</pre>
@@ -645,9 +645,9 @@
       });
     }
 
-    // v4.15: helper de diagnostico — preenche o <pre id="diag-info"> com info pra debug
-    // de problemas de persistencia em PWA mobile.
-    async function _renderDiagInfo(extra){
+    // v4.15: helper de diagnostico — preenche o <pre id="diag-info"> com info pra debug.
+    // v4.19: render imediato (sem await) + atualiza com getSession quando completar.
+    function _renderDiagSync(extra){
       try {
         const el=document.getElementById('diag-info');if(!el)return;
         const ua=navigator.userAgent;
@@ -662,30 +662,45 @@
             const exp=t?.expires_at?new Date(t.expires_at*1000).toISOString():'?';
             const now=Math.floor(Date.now()/1000);
             const expired=t?.expires_at&&t.expires_at<now;
-            tokenInfo=`PRESENTE (user=${t?.user?.email||'?'}, exp=${exp}, expirado=${expired?'SIM':'nao'})`;
+            tokenInfo='PRESENTE (user='+(t?.user?.email||'?')+', exp='+exp+', expirado='+(expired?'SIM':'nao')+')';
           }catch{tokenInfo='PRESENTE mas malformado';}
         }
         const url=location.href;
         const hasHashToken=url.includes('#access_token=')||url.includes('#refresh_token=');
         const hasCode=url.includes('?code=')||url.includes('&code=');
-        let sessionState='nao consultada';
-        try{
-          const{data:{session}}=await sb.auth.getSession();
-          sessionState=session?.user?`PRESENTE (${session.user.email})`:'AUSENTE';
-        }catch(e){sessionState='ERRO: '+(e?.message||e);}
-        el.textContent=[
+        const lines=[
           'PWA standalone: '+(standalone?'SIM':'nao (browser tab)'),
           'Storage key: '+(sbKey||'NENHUMA chave sb-*-auth-token'),
           'Token storage: '+tokenInfo,
-          'getSession(): '+sessionState,
+          'getSession(): consultando...',
           'URL hash #access_token: '+(hasHashToken?'SIM':'nao'),
           'URL ?code: '+(hasCode?'SIM':'nao'),
           'localStorage funciona: '+(typeof Storage!=='undefined'?'sim':'NAO'),
           'localStorage keys: '+lsKeys.length,
+          'sb obj: '+(sb?'OK':'NULL'),
           'UA: '+ua.substring(0,140),
-          extra?'\\n'+extra:'',
-        ].filter(Boolean).join('\\n');
-      } catch(e){ try{document.getElementById('diag-info').textContent='diag erro: '+(e?.message||e);}catch{} }
+        ];
+        if(extra)lines.push('',extra);
+        el.textContent=lines.join('\n');
+      } catch(e){ try{document.getElementById('diag-info').textContent='diag-sync erro: '+(e?.message||e);}catch{} }
+    }
+    async function _renderDiagAsync(){
+      try{
+        const el=document.getElementById('diag-info');if(!el||!sb)return;
+        const{data:{session}}=await sb.auth.getSession();
+        const sessionState=session?.user?'PRESENTE ('+session.user.email+')':'AUSENTE';
+        const txt=el.textContent.replace('getSession(): consultando...', 'getSession(): '+sessionState);
+        el.textContent=txt;
+      } catch(e){
+        try{
+          const el=document.getElementById('diag-info');
+          if(el)el.textContent=el.textContent.replace('getSession(): consultando...', 'getSession(): ERRO '+(e?.message||e));
+        }catch{}
+      }
+    }
+    function _renderDiagInfo(extra){
+      _renderDiagSync(extra);
+      _renderDiagAsync();
     }
 
     async function checkAuth(){
@@ -1512,6 +1527,9 @@
       hideAll();currentMatch=null;isReadOnly=false;showMatches();try{screen.orientation?.unlock?.();}catch(e){}
     }
     function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
+    // v4.19: popula diagnostico imediatamente (sync) ANTES de checkAuth — assim
+    // user que clicar no <details> ja ve estado mesmo se checkAuth ainda nao rodou
+    _renderDiagInfo();
     checkAuth();
   </script>
 </body>
