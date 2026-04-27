@@ -4664,12 +4664,15 @@ async function assignCourt(idx, value) {
         console.log('Realtime ativado (primeiro jogo em quadra)');
       }
       prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
-      const ok=await window.api.supabaseUpsertMatch(tournament.id,m);
-      if(!ok)showToast('Aviso: sincronizacao online falhou. O jogo pode nao aparecer no painel publico.','warning');
+      const r=await window.api.supabaseUpsertMatch(tournament.id,m);
+      // r === 'ok' | 'network' | 'permanent' (v4.0)
+      if(r==='network')showToast('Verifique sua conexão com a internet. O jogo será sincronizado automaticamente quando voltar.','warning');
+      else if(r==='permanent'||r===false)showToast('Erro de sincronização. Verifique sua sessão (faça login novamente se necessário).','error');
     }
     else if(!value){
-      const okRemove = await window.api.supabaseRemoveFromCourt(tournament.id,m);
-      if (!okRemove) showToast('Aviso: remocao da quadra nao sincronizou (online).', 'warning');
+      const r = await window.api.supabaseRemoveFromCourt(tournament.id,m);
+      if (r==='network') showToast('Verifique sua conexão com a internet. A remoção será sincronizada automaticamente.','warning');
+      else if (r==='permanent'||r===false) showToast('Erro ao remover da quadra. Verifique sua sessão.','error');
       prepareRankingsForSync();
       window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
       // Desativar Realtime se nao tem mais jogos em quadra
@@ -5168,7 +5171,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
 }
-const APP_VERSION='3.98';
+const APP_VERSION='4.0';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');

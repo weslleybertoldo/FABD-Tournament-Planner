@@ -781,11 +781,11 @@ function _isTransientError(err) {
     || msg.includes('econnreset') || msg.includes('etimedout') || msg.includes('socket');
 }
 
+// Retorna 'ok' | 'network' | 'permanent' — caller usa pra mostrar mensagem certa
 ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
-  // Retry com backoff (0s, 1s, 3s = 3 tentativas) — v3.97
   if (!currentFederation?.id) {
     log('ERROR', 'upsertMatch: sem federacao ativa (login pendente?)');
-    return false;
+    return 'permanent';
   }
   const id = stableMatchId(tournamentId, matchData);
   const row = {
@@ -805,19 +805,15 @@ ipcMain.handle('supabase:upsertMatch', async (_, tournamentId, matchData) => {
       const { error } = await supabase.from('live_matches').upsert(row, { onConflict: 'id' });
       if (error) throw error;
       log('INFO', 'Supabase match upserted' + (attempt > 0 ? ' (retry ' + attempt + ')' : '') + ':', id);
-      return true;
+      return 'ok';
     } catch (e) {
       lastErr = e;
-      // Erros permanentes (RLS, schema) — falha imediato, sem retry
-      if (!_isTransientError(e)) {
-        log('ERROR', 'Supabase upsertMatch (permanente):', e.message);
-        return false;
-      }
-      log('WARN', 'Supabase upsertMatch (tentativa ' + (attempt + 1) + ' falhou, ' + (delays[attempt + 1] ? 'retry em ' + delays[attempt + 1] + 'ms' : 'desistindo') + '):', e.message);
+      if (!_isTransientError(e)) { log('ERROR', 'Supabase upsertMatch (permanente):', e.message); return 'permanent'; }
+      log('WARN', 'Supabase upsertMatch (tentativa ' + (attempt + 1) + ' falhou):', e.message);
     }
   }
   log('ERROR', 'Supabase upsertMatch: todas as tentativas falharam:', lastErr?.message);
-  return false;
+  return 'network';
 });
 
 // Finaliza match pelo Planner: replica o fluxo que o Referee faz ao confirmar vencedor
@@ -868,6 +864,7 @@ ipcMain.handle('supabase:finalizeMatch', async (_, tournamentId, matchData, scor
   } catch(e) { log('ERROR', 'Supabase finalizeMatch:', e.message); return false; }
 });
 
+// Retorna 'ok' | 'network' | 'permanent'
 ipcMain.handle('supabase:removeFromCourt', async (_, tournamentId, matchData) => {
   const id = typeof matchData === 'object' ? stableMatchId(tournamentId, matchData) : `${tournamentId}_${matchData}`;
   log('INFO', 'Removing match from court:', id);
@@ -876,22 +873,20 @@ ipcMain.handle('supabase:removeFromCourt', async (_, tournamentId, matchData) =>
   for (let attempt = 0; attempt < delays.length; attempt++) {
     if (delays[attempt] > 0) await new Promise(r => setTimeout(r, delays[attempt]));
     try {
-      // Deletar scores primeiro (FK)
       const { error: scoreErr } = await supabase.from('live_scores').delete().eq('match_id', id);
       if (scoreErr && !_isTransientError(scoreErr)) throw scoreErr;
-      // Deletar match
       const { error: matchErr } = await supabase.from('live_matches').delete().eq('id', id);
       if (matchErr) throw matchErr;
       log('INFO', 'Supabase match removed' + (attempt > 0 ? ' (retry ' + attempt + ')' : '') + ':', id);
-      return true;
+      return 'ok';
     } catch (e) {
       lastErr = e;
-      if (!_isTransientError(e)) { log('ERROR', 'Supabase removeFromCourt (permanente):', e.message); return false; }
+      if (!_isTransientError(e)) { log('ERROR', 'Supabase removeFromCourt (permanente):', e.message); return 'permanent'; }
       log('WARN', 'Supabase removeFromCourt (tentativa ' + (attempt + 1) + ' falhou):', e.message);
     }
   }
   log('ERROR', 'Supabase removeFromCourt: todas as tentativas falharam:', lastErr?.message);
-  return false;
+  return 'network';
 });
 
 let pollingInterval = null;
