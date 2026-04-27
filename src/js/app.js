@@ -58,6 +58,7 @@ let _authState = { email: '' };
 // silently falhem por sessao expirada.
 if (window.api?.onAuthSignedOut) {
   window.api.onAuthSignedOut(() => {
+    window.__fabdStats.authSignedOut++;
     showToast('Sessao expirada — faca login novamente', 'error');
     setTimeout(() => location.reload(), 1500);
   });
@@ -87,6 +88,7 @@ if (window.api?.onReconcileNeeded) {
     if (!tournament) return;
     const fix = [...(missing || []), ...(wrongStatus || [])];
     if (!fix.length) return;
+    window.__fabdStats.reconcileEvents++;
     console.warn('[reconcile] re-sincronizando', fix.length, 'jogo(s)');
     for (const id of fix) {
       const m = (tournament.matches || []).find(x => _stableMatchId(tournament.id, x) === id);
@@ -1623,6 +1625,26 @@ async function updateEntryStatus(idx, status) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// TELEMETRIA LEVE (v4.1 — diagnóstico passivo via DevTools)
+// ═══════════════════════════════════════════════════════════════════════════
+// No DevTools (Ctrl+Shift+I) rodar: console.table(window.__fabdStats)
+// pra ver contadores em tempo real. Útil pra depurar problemas em produção
+// sem UI extra. Telemetria zero-overhead (apenas incrementa contadores).
+window.__fabdStats = {
+  realtimeUpdates: 0,            // eventos Realtime score recebidos
+  rendersDeferred: 0,            // renders adiados por input em foco
+  rendersFlushed: 0,             // renders executados (após coalesce)
+  upsertMatchOk: 0,
+  upsertMatchNetwork: 0,         // falhou todas as 3 tentativas (rede)
+  upsertMatchPermanent: 0,       // falhou imediato (RLS, sem federacao)
+  removeFromCourtOk: 0,
+  removeFromCourtFail: 0,
+  reconcileEvents: 0,            // vezes que main detectou divergencia
+  authSignedOut: 0,
+  startedAt: new Date().toISOString(),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
 // RENDER COALESCING (v3.95 — fix "aba pisca" e "input trava ao digitar")
 // ═══════════════════════════════════════════════════════════════════════════
 //
@@ -1657,7 +1679,7 @@ function _flushPendingRenders() {
   if (_isUserTyping()) { _attachBlurFlush(); return; }
   const fns = [..._pendingRenders.values()];
   _pendingRenders.clear();
-  for (const fn of fns) { try { fn(); } catch (e) { console.warn('render error:', e); } }
+  for (const fn of fns) { try { fn(); window.__fabdStats.rendersFlushed++; } catch (e) { console.warn('render error:', e); } }
 }
 
 function _attachBlurFlush() {
@@ -1678,7 +1700,7 @@ function _attachBlurFlush() {
 function scheduleRender(name, fn, opts) {
   _pendingRenders.set(name, fn);
   const defer = !opts || opts.deferWhenTyping !== false;
-  if (defer && _isUserTyping()) { _attachBlurFlush(); return; }
+  if (defer && _isUserTyping()) { window.__fabdStats.rendersDeferred++; _attachBlurFlush(); return; }
   if (_renderRafId == null) _renderRafId = requestAnimationFrame(_flushPendingRenders);
 }
 
@@ -4551,6 +4573,7 @@ function renderCourtsPanel() {
 // Receber atualizacao de placar em tempo real do Supabase
 async function handleRealtimeScoreUpdate(data){
   try {
+    window.__fabdStats.realtimeUpdates++;
     if(!data||!data.match_id||!tournament?.matches?.length)return;
     const matchId=data.match_id||'';
     // Buscar match pelo ID estavel (drawName + players) ou fallback por match_num
@@ -4666,13 +4689,17 @@ async function assignCourt(idx, value) {
       prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
       const r=await window.api.supabaseUpsertMatch(tournament.id,m);
       // r === 'ok' | 'network' | 'permanent' (v4.0)
-      if(r==='network')showToast('Verifique sua conexão com a internet. O jogo será sincronizado automaticamente quando voltar.','warning');
-      else if(r==='permanent'||r===false)showToast('Erro de sincronização. Verifique sua sessão (faça login novamente se necessário).','error');
+      if(r==='ok')window.__fabdStats.upsertMatchOk++;
+      else if(r==='network'){window.__fabdStats.upsertMatchNetwork++;showToast('Verifique sua conexão com a internet. O jogo será sincronizado automaticamente quando voltar.','warning');}
+      else {window.__fabdStats.upsertMatchPermanent++;showToast('Erro de sincronização. Verifique sua sessão (faça login novamente se necessário).','error');}
     }
     else if(!value){
       const r = await window.api.supabaseRemoveFromCourt(tournament.id,m);
-      if (r==='network') showToast('Verifique sua conexão com a internet. A remoção será sincronizada automaticamente.','warning');
-      else if (r==='permanent'||r===false) showToast('Erro ao remover da quadra. Verifique sua sessão.','error');
+      if (r==='ok') window.__fabdStats.removeFromCourtOk++;
+      else { window.__fabdStats.removeFromCourtFail++;
+        if (r==='network') showToast('Verifique sua conexão com a internet. A remoção será sincronizada automaticamente.','warning');
+        else showToast('Erro ao remover da quadra. Verifique sua sessão.','error');
+      }
       prepareRankingsForSync();
       window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
       // Desativar Realtime se nao tem mais jogos em quadra

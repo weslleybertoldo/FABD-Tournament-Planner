@@ -103,6 +103,7 @@
     .interval-box .timer{font-size:64px;font-weight:900;margin:16px 0;font-variant-numeric:tabular-nums}
     .interval-box .timer.warning{color:#EF4444;animation:pulse 1s infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+    @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 
     /* Duplas: 2 jogadores por lado */
     .doubles-court .court-side{display:flex;flex-direction:row;padding:0}
@@ -170,7 +171,13 @@
       <div class="ref-tab" onclick="setRefTab('config')">Config</div>
     </div>
     <div id="ref-tab-jogos" class="matches-list">
-      <div class="empty"><div style="font-size:48px">&#9203;</div><p>Nenhum jogo em quadra.<br>Aguarde o organizador.</p></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px;border-bottom:1px solid #334155;background:#0F172A">
+        <span id="ref-last-update" style="font-size:11px;color:#64748B">Atualizando...</span>
+        <button onclick="refreshMatches()" style="padding:6px 12px;font-size:12px;border-radius:8px;border:none;background:#1E40AF;color:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span id="ref-refresh-icon">&#10227;</span> Atualizar</button>
+      </div>
+      <div id="ref-jogos-content">
+        <div class="empty"><div style="font-size:48px">&#9203;</div><p>Nenhum jogo em quadra.<br>Aguarde o organizador.</p></div>
+      </div>
     </div>
     <div id="ref-tab-historico" class="matches-list" style="display:none">
       <div style="padding:8px"><input type="text" id="hist-search" placeholder="Buscar por arbitro, atleta..." oninput="filterHistory()" style="width:100%;padding:10px 14px;border-radius:8px;border:2px solid #334155;background:#1E293B;color:#fff;font-size:14px"></div>
@@ -230,6 +237,7 @@
     <!-- QUADRA SIMPLES -->
     <div class="court-container" id="court-singles">
       <div class="court-side court-left" onclick="addPoint('left')">
+        <div class="player-name" id="s-left-club" style="top:8px;font-size:11px;left:12px;transform:none;text-align:left;opacity:0.75"></div>
         <div class="player-name" id="s-left-name">Jogador 1</div>
         <div class="score-big" id="s-left-score">0</div>
         <div class="sets-info" id="s-left-sets">Sets: 0</div>
@@ -243,6 +251,7 @@
         <div class="set-history" id="s-div-history"></div>
       </div>
       <div class="court-side court-right" onclick="addPoint('right')">
+        <div class="player-name" id="s-right-club" style="top:8px;font-size:11px;right:12px;left:auto;transform:none;text-align:right;opacity:0.75"></div>
         <div class="player-name" id="s-right-name">Jogador 2</div>
         <div class="score-big" id="s-right-score">0</div>
         <div class="sets-info" id="s-right-sets">Sets: 0</div>
@@ -591,12 +600,30 @@
       setupRealtimeForList(loadMatches);
     }
 
+    let _lastMatchesUpdate = 0;
+    let _lastUpdateTimer = null;
+
+    function _updateLastUpdateLabel() {
+      const el = document.getElementById('ref-last-update');
+      if (!el || !_lastMatchesUpdate) return;
+      const sec = Math.max(0, Math.floor((Date.now() - _lastMatchesUpdate) / 1000));
+      const txt = sec < 5 ? 'Atualizado agora' : sec < 60 ? `Atualizado há ${sec}s` : `Atualizado há ${Math.floor(sec/60)}min`;
+      el.textContent = txt;
+    }
+
+    async function refreshMatches(){
+      const ic = document.getElementById('ref-refresh-icon');
+      if (ic) { ic.style.display='inline-block'; ic.style.animation='spin 0.5s linear'; setTimeout(()=>{ic.style.animation='';},500); }
+      await loadMatches();
+    }
+
     async function loadMatches(){
       try{
         if(!currentUser?.federation_id){return;}
         // Pega o torneio mais recente DA FEDERACAO do arbitro (inclui scoring)
         const{data:ts}=await sb.from('tournaments').select('id,name,data,federations(short_name,primary_color)').eq('federation_id',currentUser.federation_id).order('updated_at',{ascending:false}).limit(1);
-        if(!ts?.length){document.getElementById('ref-tab-jogos').innerHTML='<div class="empty"><div style="font-size:48px">&#128580;</div><p>Nenhum torneio ativo na sua federacao</p></div>';return;}
+        const content = document.getElementById('ref-jogos-content') || document.getElementById('ref-tab-jogos');
+        if(!ts?.length){content.innerHTML='<div class="empty"><div style="font-size:48px">&#128580;</div><p>Nenhum torneio ativo na sua federacao</p></div>';return;}
         currentTournamentId=ts[0].id;
         const fed=ts[0].federations;
         document.getElementById('tournament-name').textContent=ts[0].name;
@@ -611,11 +638,13 @@
         if(fed?.primary_color){document.querySelector('.matches-page .header').style.background=fed.primary_color;}
         // Jogos em quadra DESTA federacao + tournament
         const{data:ms}=await sb.from('live_matches').select('*').eq('federation_id',currentUser.federation_id).eq('tournament_id',ts[0].id).eq('status','Em Quadra').order('court');
-        const list=document.getElementById('ref-tab-jogos');
-        if(!ms?.length){list.innerHTML='<div class="empty"><div style="font-size:48px">&#9203;</div><p>Nenhum jogo em quadra.<br>Aguarde o organizador.</p></div>';return;}
-        let h='';ms.forEach(m=>{h+=`<div class="match-card" onclick="openScorer('${esc(m.id)}')"><div class="court">${esc(m.court)}</div><div class="players">${esc(m.player1)} vs ${esc(m.player2)}</div><div class="draw">${esc(m.draw_name)} - ${esc(m.round_name||'')}</div></div>`;});
-        list.innerHTML=h;
-      }catch(e){console.error(e);}
+        if(!ms?.length){content.innerHTML='<div class="empty"><div style="font-size:48px">&#9203;</div><p>Nenhum jogo em quadra.<br>Aguarde o organizador.</p></div>';}
+        else { let h='';ms.forEach(m=>{h+=`<div class="match-card" onclick="openScorer('${esc(m.id)}')"><div class="court">${esc(m.court)}</div><div class="players">${esc(m.player1)} vs ${esc(m.player2)}</div><div class="draw">${esc(m.draw_name)} - ${esc(m.round_name||'')}</div></div>`;}); content.innerHTML=h; }
+        // v4.1: indicador de "atualizado há Xs" + auto-tick
+        _lastMatchesUpdate = Date.now();
+        _updateLastUpdateLabel();
+        if (!_lastUpdateTimer) _lastUpdateTimer = setInterval(_updateLastUpdateLabel, 5000);
+      }catch(e){console.error(e); const el=document.getElementById('ref-last-update'); if(el) el.textContent='Erro ao atualizar - tente novamente';}
     }
 
     // === TABS ===
@@ -1186,6 +1215,9 @@
         // === SIMPLES ===
         document.getElementById('s-left-name').textContent=lName;
         document.getElementById('s-right-name').textContent=rName;
+        // v4.1: clube nas laterais (igual em duplas)
+        document.getElementById('s-left-club').textContent=getClub(lName);
+        document.getElementById('s-right-club').textContent=getClub(rName);
 
         const serverSide=state.server===leftPlayer?'left':'right';
         document.getElementById('s-shuttle-left').style.display=serverSide==='left'?'block':'none';
