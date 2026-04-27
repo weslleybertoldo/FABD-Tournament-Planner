@@ -138,7 +138,7 @@
     </div>
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
     <p id="login-info" style="color:#10B981;font-size:12px;margin-top:12px;display:none"></p>
-    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.25</p>
+    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.27</p>
     <details style="margin-top:8px;font-size:10px;color:#64748B;text-align:left;max-width:320px;width:90%;cursor:pointer">
       <summary>Diagnóstico (toque pra abrir)</summary>
       <pre id="diag-info" style="background:#0F172A;padding:8px;border-radius:6px;font-size:9px;overflow:auto;white-space:pre-wrap;margin-top:6px;color:#CBD5E1">carregando...</pre>
@@ -741,22 +741,51 @@
       });
 
       // === Recupera sessao do storage primeiro (funciona offline) ===
-      // v4.23: REMOVIDO refresh em background — autoRefreshToken:true ja cuida
-      // disso silenciosamente. Chamar refreshSession manualmente em paralelo
-      // causava race com refresh_token_rotation: o supabase-js fazia o auto
-      // refresh, e nosso refreshSession tentava com refresh_token JA ROTACIONADO,
-      // recebia 401, e disparava SIGNED_OUT que limpava o storage.
       console.log('[Auth] checkAuth iniciando getSession');
+      let activeSession = null;
       try {
-        const{data:{session:localSes},error:sErr}=await sb.auth.getSession();
-        console.log('[Auth] getSession resultado:', sErr?'ERRO '+sErr.message:(localSes?.user?'OK '+localSes.user.email:'AUSENTE'));
-        if(localSes?.user){
-          console.log('[Auth] sessao encontrada, chamando handleLogin');
-          await handleLogin({name:localSes.user.user_metadata?.full_name||localSes.user.email,id:localSes.user.id,email:localSes.user.email,photo:localSes.user.user_metadata?.avatar_url});
-          console.log('[Auth] handleLogin OK, autoRefreshToken cuida do resto');
-          return;
-        }
+        const{data:{session:s},error:sErr}=await sb.auth.getSession();
+        console.log('[Auth] getSession resultado:', sErr?'ERRO '+sErr.message:(s?.user?'OK '+s.user.email:'AUSENTE'));
+        activeSession = s;
       } catch(e) { console.warn('[Auth] getSession falhou:',e?.message); }
+
+      // v4.27: FALLBACK — se getSession nao retorna sessao MAS o storage tem
+      // token valido, forca setSession. Cobre bug onde supabase-js nao consegue
+      // ler o storage por algum motivo (race, corrupted state, etc).
+      if (!activeSession?.user) {
+        try {
+          const sbKey = Object.keys(localStorage).find(k => k.startsWith('sb-')&&k.endsWith('-auth-token'));
+          if (sbKey) {
+            const raw = localStorage.getItem(sbKey);
+            const stored = raw ? JSON.parse(raw) : null;
+            const now = Math.floor(Date.now()/1000);
+            if (stored?.access_token && stored?.refresh_token && stored?.expires_at && stored.expires_at > now) {
+              console.log('[Auth] FALLBACK: storage tem token valido (user='+(stored?.user?.email||'?')+', exp '+(stored.expires_at-now)+'s) mas getSession retornou AUSENTE. Forcando setSession.');
+              const{data:{session:s2},error:err2} = await sb.auth.setSession({
+                access_token: stored.access_token,
+                refresh_token: stored.refresh_token
+              });
+              if (err2) console.warn('[Auth] setSession falhou:', err2.message);
+              else console.log('[Auth] setSession OK:', s2?.user?.email);
+              activeSession = s2;
+            } else {
+              console.log('[Auth] storage check: token ausente/expirado/invalido');
+            }
+          }
+        } catch(e) { console.warn('[Auth] fallback storage parse error:', e?.message); }
+      }
+
+      if (activeSession?.user) {
+        console.log('[Auth] sessao ativa, chamando handleLogin');
+        await handleLogin({
+          name: activeSession.user.user_metadata?.full_name || activeSession.user.email,
+          id: activeSession.user.id,
+          email: activeSession.user.email,
+          photo: activeSession.user.user_metadata?.avatar_url
+        });
+        console.log('[Auth] handleLogin OK, autoRefreshToken cuida do resto');
+        return;
+      }
 
       console.log('[Auth] mostrando tela de login (sem sessao)');
       document.getElementById('page-login').style.display='flex';
