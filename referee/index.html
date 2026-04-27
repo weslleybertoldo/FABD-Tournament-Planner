@@ -121,8 +121,15 @@
   </style>
 </head>
 <body>
-  <!-- LOGIN -->
-  <div id="page-login" class="login-page">
+  <!-- LOADING (v4.31 — evita flash de tela de login enquanto supabase-js inicializa) -->
+  <div id="page-loading" style="position:fixed;inset:0;background:linear-gradient(135deg,#1E3A8A 0%,#3B82F6 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;z-index:9999">
+    <iconify-icon icon="mdi:badminton" style="font-size:64px;color:white;animation:spin 2s linear infinite"></iconify-icon>
+    <p style="margin-top:24px;font-size:14px;opacity:0.9">Verificando sessao...</p>
+    <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+  </div>
+
+  <!-- LOGIN (v4.31: começa oculto; checkAuth decide quando mostrar via _resolveNoSession) -->
+  <div id="page-login" class="login-page" style="display:none">
     <div class="logo"><iconify-icon icon="mdi:badminton" style="font-size:56px;color:#1E3A8A"></iconify-icon></div>
     <h2>FABD Arbitro</h2>
     <p>Acesse com sua conta Google para arbitrar partidas</p>
@@ -138,7 +145,7 @@
     </div>
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
     <p id="login-info" style="color:#10B981;font-size:12px;margin-top:12px;display:none"></p>
-    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.29</p>
+    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.31</p>
     <details style="margin-top:8px;font-size:10px;color:#64748B;text-align:left;max-width:320px;width:90%;cursor:pointer">
       <summary>Diagnóstico (toque pra abrir)</summary>
       <pre id="diag-info" style="background:#0F172A;padding:8px;border-radius:6px;font-size:9px;overflow:auto;white-space:pre-wrap;margin-top:6px;color:#CBD5E1">carregando...</pre>
@@ -709,11 +716,43 @@
     }
 
     async function checkAuth(){
-      if(!sb){document.getElementById('page-login').style.display='flex';_renderDiagInfo('sb=null (supabase-js nao carregou)');return;}
+      if(!sb){const lo=document.getElementById('page-loading');if(lo)lo.style.display='none';document.getElementById('page-login').style.display='flex';_renderDiagInfo('sb=null (supabase-js nao carregou)');return;}
 
-      // === Listener de auth (v4.5 padrão PhysiqCalc) ===
-      // SIGNED_OUT só limpa state se foi INTENCIONAL (botao Sair). Se foi
-      // automatico (refresh falhou por rede), IGNORA — mantem usuario logado.
+      // v4.31 — Race condition do supabase-js v2.99+ no boot pos-F5:
+      //   1. createClient() retorna imediatamente, init e assincrono
+      //   2. getSession() pode retornar null ANTES do init terminar
+      //   3. INITIAL_SESSION dispara com user=(none) primeiro
+      //   4. SIGNED_IN dispara DEPOIS com user correto (1-3s depois)
+      //   PhysiqCalc nao sente isso porque usa signInWithPassword (sem PKCE).
+      //   Referee usa OAuth Google + flowType:pkce (default v2.42+).
+      // Solucao: NAO mostrar page-login imediatamente. Aguardar ate 5s pelo
+      // listener antes de desistir. Se sessao chega via listener, handleLogin
+      // troca a tela para matches/pending — user nem ve a tela de login.
+
+      const _hideLoading = () => { const el=document.getElementById('page-loading'); if(el) el.style.display='none'; };
+      let _resolved = false;
+      const _resolveWithSession = async (source, ses) => {
+        if (_resolved) return;
+        _resolved = true;
+        console.log('[Auth] resolved via '+source+': '+ses.user.email);
+        _hideLoading();
+        await handleLogin({
+          name: ses.user.user_metadata?.full_name || ses.user.email,
+          id: ses.user.id,
+          email: ses.user.email,
+          photo: ses.user.user_metadata?.avatar_url
+        });
+      };
+      const _resolveNoSession = (source) => {
+        if (_resolved) return;
+        _resolved = true;
+        console.log('[Auth] resolved no-session via '+source+', mostrando login');
+        _hideLoading();
+        document.getElementById('page-login').style.display='flex';
+        _renderDiagInfo();
+      };
+
+      // === Listener de auth (sempre registrado, antes do early return) ===
       sb.auth.onAuthStateChange(async(ev,ses)=>{
         console.log('[Auth] onAuthStateChange ev='+ev+' user='+(ses?.user?.email||'(none)')+' intentional='+_intentionalLogout);
         if(ev==='SIGNED_OUT'){
@@ -724,76 +763,55 @@
             hideAll();
             document.getElementById('page-login').style.display='flex';
           }
-          // Senao, ignora — refresh falhou mas storage tem token, vamos tentar de novo depois
           return;
         }
-        // v4.29: INITIAL_SESSION incluido — supabase-js v2.99+ dispara esse
-        // evento no boot quando recupera sessao do storage. Antes ignoravamos
-        // e dependia so do checkAuth/getSession. Em algumas situacoes (timing)
-        // o listener era a unica oportunidade de pegar a sessao restaurada.
         if((ev==='SIGNED_IN'||ev==='TOKEN_REFRESHED'||ev==='USER_UPDATED'||ev==='INITIAL_SESSION')&&ses?.user){
-          // Guard contra dupla chamada — se ja logado com mesmo user,
-          // so atualiza dados sem refazer todo o flow (registerReferee, etc).
+          // Guard dupla chamada — se ja logado com mesmo user, so atualiza dados
           if(currentUser&&currentUser.id===ses.user.id){
             currentUser.email=ses.user.email;
             currentUser.name=ses.user.user_metadata?.full_name||ses.user.email;
             return;
           }
-          console.log('[Auth] onAuthStateChange '+ev+' chamando handleLogin');
-          await handleLogin({name:ses.user.user_metadata?.full_name||ses.user.email,id:ses.user.id,email:ses.user.email,photo:ses.user.user_metadata?.avatar_url});
+          await _resolveWithSession('listener-'+ev, ses);
         }
       });
 
-      // === Recupera sessao do storage primeiro (funciona offline) ===
+      // === Tenta getSession (rapido, se ja inicializou) ===
       console.log('[Auth] checkAuth iniciando getSession');
-      let activeSession = null;
       try {
         const{data:{session:s},error:sErr}=await sb.auth.getSession();
         console.log('[Auth] getSession resultado:', sErr?'ERRO '+sErr.message:(s?.user?'OK '+s.user.email:'AUSENTE'));
-        activeSession = s;
+        if (s?.user) { await _resolveWithSession('getSession', s); return; }
       } catch(e) { console.warn('[Auth] getSession falhou:',e?.message); }
 
-      // v4.27: FALLBACK — se getSession nao retorna sessao MAS o storage tem
-      // token valido, forca setSession. Cobre bug onde supabase-js nao consegue
-      // ler o storage por algum motivo (race, corrupted state, etc).
-      if (!activeSession?.user) {
-        try {
-          const sbKey = Object.keys(localStorage).find(k => k.startsWith('sb-')&&k.endsWith('-auth-token'));
-          if (sbKey) {
-            const raw = localStorage.getItem(sbKey);
-            const stored = raw ? JSON.parse(raw) : null;
-            const now = Math.floor(Date.now()/1000);
-            if (stored?.access_token && stored?.refresh_token && stored?.expires_at && stored.expires_at > now) {
-              console.log('[Auth] FALLBACK: storage tem token valido (user='+(stored?.user?.email||'?')+', exp '+(stored.expires_at-now)+'s) mas getSession retornou AUSENTE. Forcando setSession.');
-              const{data:{session:s2},error:err2} = await sb.auth.setSession({
-                access_token: stored.access_token,
-                refresh_token: stored.refresh_token
-              });
-              if (err2) console.warn('[Auth] setSession falhou:', err2.message);
-              else console.log('[Auth] setSession OK:', s2?.user?.email);
-              activeSession = s2;
-            } else {
-              console.log('[Auth] storage check: token ausente/expirado/invalido');
-            }
+      // === FALLBACK imediato — se getSession AUSENTE mas storage tem token, forca setSession ===
+      try {
+        const sbKey = Object.keys(localStorage).find(k => k.startsWith('sb-')&&k.endsWith('-auth-token'));
+        if (sbKey) {
+          const raw = localStorage.getItem(sbKey);
+          const stored = raw ? JSON.parse(raw) : null;
+          const now = Math.floor(Date.now()/1000);
+          if (stored?.access_token && stored?.refresh_token && stored?.expires_at && stored.expires_at > now) {
+            console.log('[Auth] FALLBACK setSession: storage tem token valido (exp '+(stored.expires_at-now)+'s)');
+            const{data:{session:s2},error:err2} = await sb.auth.setSession({
+              access_token: stored.access_token,
+              refresh_token: stored.refresh_token
+            });
+            if (err2) console.warn('[Auth] setSession falhou:', err2.message);
+            else if (s2?.user) { await _resolveWithSession('setSession-fallback', s2); return; }
+          } else {
+            console.log('[Auth] storage check: token ausente/expirado/invalido');
           }
-        } catch(e) { console.warn('[Auth] fallback storage parse error:', e?.message); }
-      }
+        } else {
+          console.log('[Auth] storage check: nenhuma chave sb-*-auth-token');
+        }
+      } catch(e) { console.warn('[Auth] fallback storage parse error:', e?.message); }
 
-      if (activeSession?.user) {
-        console.log('[Auth] sessao ativa, chamando handleLogin');
-        await handleLogin({
-          name: activeSession.user.user_metadata?.full_name || activeSession.user.email,
-          id: activeSession.user.id,
-          email: activeSession.user.email,
-          photo: activeSession.user.user_metadata?.avatar_url
-        });
-        console.log('[Auth] handleLogin OK, autoRefreshToken cuida do resto');
-        return;
-      }
-
-      console.log('[Auth] mostrando tela de login (sem sessao)');
-      document.getElementById('page-login').style.display='flex';
-      _renderDiagInfo();
+      // === Listener-wait: 5s pra supabase-js terminar init e disparar SIGNED_IN ===
+      // Mostra um placeholder leve (overlay sobre login) — se listener resolver
+      // antes dos 5s, troca pra page-matches/pending sem flash de login.
+      console.log('[Auth] aguardando listener por ate 5s...');
+      setTimeout(() => { _resolveNoSession('timeout-5s'); }, 5000);
     }
 
     // === Re-checa sessao quando app volta ao foco (v4.5) ===
