@@ -4332,26 +4332,31 @@ function renderMatches() {
       addName(m.player1);addName(m.player2);
     });
   }
-  // Ticker singleton: atualiza textos do cronometro a cada 1s; quando todos zeram, re-renderiza
+  // Ticker singleton: atualiza textos do cronometro a cada 1s SEM re-renderizar.
+  // Quando algum chega a zero, agenda render via scheduleRender (respeita coalesce/defer-when-typing).
   if(!window.__fabdRestTicker){
     window.__fabdRestTicker=setInterval(()=>{
-      const tbody=document.getElementById('matches-table-body');
-      if(!tbody)return;
-      const nodes=tbody.querySelectorAll('[data-resting-until]');
-      if(!nodes.length)return;
-      const now=Date.now();let needsRerender=false;
-      nodes.forEach(n=>{
-        const ends=parseInt(n.getAttribute('data-resting-until'),10)||0;
-        const remaining=ends-now;
-        if(remaining<=0){needsRerender=true;return;}
-        const txt=n.querySelector('.fabd-rest-text');
-        if(txt){
-          const total=Math.ceil(remaining/1000);
-          const mm=Math.floor(total/60),ss=total%60;
-          txt.textContent=mm>0?`${mm}m ${String(ss).padStart(2,'0')}s`:`${ss}s`;
+      try{
+        const tbody=document.getElementById('matches-table-body');
+        if(!tbody)return;
+        const nodes=tbody.querySelectorAll('[data-resting-until]');
+        if(!nodes.length)return;
+        const now=Date.now();let needsRerender=false;
+        nodes.forEach(n=>{
+          const ends=parseInt(n.getAttribute('data-resting-until'),10)||0;
+          const remaining=ends-now;
+          if(remaining<=0){needsRerender=true;return;}
+          const txt=n.querySelector('.fabd-rest-text');
+          if(txt){
+            const total=Math.ceil(remaining/1000);
+            const mm=Math.floor(total/60),ss=total%60;
+            txt.textContent=mm>0?`${mm}m ${String(ss).padStart(2,'0')}s`:`${ss}s`;
+          }
+        });
+        if(needsRerender&&typeof scheduleRender==='function'&&typeof renderMatches==='function'){
+          scheduleRender('matches',renderMatches);
         }
-      });
-      if(needsRerender&&typeof renderMatches==='function')renderMatches();
+      }catch(e){console.warn('[restTicker]',e);}
     },1000);
   }
 
