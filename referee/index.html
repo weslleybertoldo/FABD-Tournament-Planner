@@ -131,6 +131,11 @@
       Entrar com Google
     </button>
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
+    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.15</p>
+    <details style="margin-top:8px;font-size:10px;color:#64748B;text-align:left;max-width:320px;width:90%;cursor:pointer">
+      <summary>Diagnóstico (toque pra abrir)</summary>
+      <pre id="diag-info" style="background:#0F172A;padding:8px;border-radius:6px;font-size:9px;overflow:auto;white-space:pre-wrap;margin-top:6px;color:#CBD5E1">carregando...</pre>
+    </details>
   </div>
 
   <!-- ESCOLHER FEDERACAO (primeira vez ou sem federacao definida) -->
@@ -609,8 +614,51 @@
       });
     }
 
+    // v4.15: helper de diagnostico — preenche o <pre id="diag-info"> com info pra debug
+    // de problemas de persistencia em PWA mobile.
+    async function _renderDiagInfo(extra){
+      try {
+        const el=document.getElementById('diag-info');if(!el)return;
+        const ua=navigator.userAgent;
+        const standalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+        const lsKeys=Object.keys(localStorage||{});
+        const sbKey=lsKeys.find(k=>k.includes('sb-')&&k.includes('-auth-token'));
+        const tokenStr=sbKey?localStorage.getItem(sbKey):null;
+        let tokenInfo='AUSENTE';
+        if(tokenStr){
+          try{
+            const t=JSON.parse(tokenStr);
+            const exp=t?.expires_at?new Date(t.expires_at*1000).toISOString():'?';
+            const now=Math.floor(Date.now()/1000);
+            const expired=t?.expires_at&&t.expires_at<now;
+            tokenInfo=`PRESENTE (user=${t?.user?.email||'?'}, exp=${exp}, expirado=${expired?'SIM':'nao'})`;
+          }catch{tokenInfo='PRESENTE mas malformado';}
+        }
+        const url=location.href;
+        const hasHashToken=url.includes('#access_token=')||url.includes('#refresh_token=');
+        const hasCode=url.includes('?code=')||url.includes('&code=');
+        let sessionState='nao consultada';
+        try{
+          const{data:{session}}=await sb.auth.getSession();
+          sessionState=session?.user?`PRESENTE (${session.user.email})`:'AUSENTE';
+        }catch(e){sessionState='ERRO: '+(e?.message||e);}
+        el.textContent=[
+          'PWA standalone: '+(standalone?'SIM':'nao (browser tab)'),
+          'Storage key: '+(sbKey||'NENHUMA chave sb-*-auth-token'),
+          'Token storage: '+tokenInfo,
+          'getSession(): '+sessionState,
+          'URL hash #access_token: '+(hasHashToken?'SIM':'nao'),
+          'URL ?code: '+(hasCode?'SIM':'nao'),
+          'localStorage funciona: '+(typeof Storage!=='undefined'?'sim':'NAO'),
+          'localStorage keys: '+lsKeys.length,
+          'UA: '+ua.substring(0,140),
+          extra?'\\n'+extra:'',
+        ].filter(Boolean).join('\\n');
+      } catch(e){ try{document.getElementById('diag-info').textContent='diag erro: '+(e?.message||e);}catch{} }
+    }
+
     async function checkAuth(){
-      if(!sb){document.getElementById('page-login').style.display='flex';return;}
+      if(!sb){document.getElementById('page-login').style.display='flex';_renderDiagInfo('sb=null (supabase-js nao carregou)');return;}
 
       // === Listener de auth (v4.5 padrão PhysiqCalc) ===
       // SIGNED_OUT só limpa state se foi INTENCIONAL (botao Sair). Se foi
@@ -650,6 +698,7 @@
       } catch(e) { console.warn('[Auth] getSession falhou:',e?.message); }
 
       document.getElementById('page-login').style.display='flex';
+      _renderDiagInfo();
     }
 
     // === Re-checa sessao quando app volta ao foco (v4.5) ===

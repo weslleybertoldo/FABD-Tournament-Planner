@@ -1,4 +1,4 @@
-const CACHE='fabd-referee-v8';
+const CACHE='fabd-referee-v15';
 
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll([
@@ -21,6 +21,14 @@ self.addEventListener('activate',e=>{
 
 self.addEventListener('fetch',e=>{
   const url=e.request.url;
+  // v4.15: ignora schemes que nao podem ser cacheados (chrome-extension://,
+  // moz-extension://, devtools://, etc.). Sem esse guard, cache.put crashava
+  // com "Request scheme 'chrome-extension' is unsupported", quebrando o
+  // fluxo de captura do token OAuth no redirect — login Google nao persistia.
+  if(!url.startsWith('http://')&&!url.startsWith('https://'))return;
+  // Tambem skip requests com method != GET (cache.put so aceita GET)
+  if(e.request.method!=='GET')return;
+
   const isAppFile=url.includes('/referee/');
   const isApi=url.includes('supabase.co')||url.includes('googleapis.com')||url.includes('google.com');
   const isCdn=url.includes('cdn.jsdelivr.net')||url.includes('iconify.design')||url.includes('simplesvg.com')||url.includes('unisvg.com');
