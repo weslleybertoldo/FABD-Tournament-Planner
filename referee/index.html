@@ -353,7 +353,16 @@
     const SUPABASE_URL='https://zwjgjtrmsqtyyjtuotuo.supabase.co';
     const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY';
     if(!window.supabase){document.getElementById('login-error').textContent='Erro: Supabase nao carregou.';document.getElementById('login-error').style.display='block';}
-    const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
+    // v4.5: configuracao explicita de auth (referencia: PhysiqCalc useAuth.tsx).
+    // - storage:localStorage explicito (nao confia no default que pode mudar)
+    // - persistSession:true + autoRefreshToken:true
+    // - flowType:'pkce' (padrao seguro pra OAuth em browser)
+    const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
+      auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}
+    }):null;
+    // Flag pra distinguir SIGNED_OUT intencional (botao Sair) de automatico (refresh
+    // falhou por rede). Se nao foi intencional, IGNORAR — manter usuario logado.
+    let _intentionalLogout=false;
 
     let currentUser=null,currentMatch=null,pollInterval=null,deferredPrompt=null;
 
@@ -494,7 +503,13 @@
         else if(data?.url)location.href=data.url;
       }catch(e){errEl.style.color='#EF4444';errEl.textContent='Erro: '+e.message;}
     }
-    function logout(){currentUser=null;sb?.auth.signOut();hideAll();document.getElementById('page-login').style.display='flex';if(pollInterval)clearInterval(pollInterval);}
+    function logout(){
+      // v4.5: marca como intencional pro listener saber que pode limpar state
+      _intentionalLogout=true;
+      currentUser=null;sb?.auth.signOut();hideAll();
+      document.getElementById('page-login').style.display='flex';
+      if(pollInterval)clearInterval(pollInterval);
+    }
     function hideAll(){['page-login','page-federation','page-pending','page-matches','page-scorer'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
 
     async function registerReferee(u){try{await sb.from('referees').upsert({id:u.id,name:u.name,email:u.email||'',photo:u.photo||'',updated_at:new Date().toISOString()},{onConflict:'id'});}catch(e){}}
@@ -561,30 +576,59 @@
 
     async function checkAuth(){
       if(!sb){document.getElementById('page-login').style.display='flex';return;}
-      // Listener de auth — sempre registrado, ANTES do early return.
-      // Captura SIGNED_IN (login novo), TOKEN_REFRESHED (refresh silencioso —
-      // atualiza dados do usuario sem deslogar), SIGNED_OUT (token revogado/refresh falhou
-      // → mostra login). Antes era registrado SO quando nao havia sessao, entao
-      // refresh falho passava despercebido e o usuario "deslogava" sem aviso.
+
+      // === Listener de auth (v4.5 padrão PhysiqCalc) ===
+      // SIGNED_OUT só limpa state se foi INTENCIONAL (botao Sair). Se foi
+      // automatico (refresh falhou por rede), IGNORA — mantem usuario logado.
       sb.auth.onAuthStateChange(async(ev,ses)=>{
+        if(ev==='SIGNED_OUT'){
+          if(_intentionalLogout){
+            _intentionalLogout=false;
+            currentUser=null;
+            if(pollInterval)clearInterval(pollInterval);
+            hideAll();
+            document.getElementById('page-login').style.display='flex';
+          }
+          // Senao, ignora — refresh falhou mas storage tem token, vamos tentar de novo depois
+          return;
+        }
         if((ev==='SIGNED_IN'||ev==='TOKEN_REFRESHED'||ev==='USER_UPDATED')&&ses?.user){
-          // Em TOKEN_REFRESHED com sessao ativa, so atualiza currentUser sem reabrir login
           if(currentUser&&ev==='TOKEN_REFRESHED'){
             currentUser.id=ses.user.id;currentUser.email=ses.user.email;
             return;
           }
           await handleLogin({name:ses.user.user_metadata?.full_name||ses.user.email,id:ses.user.id,email:ses.user.email,photo:ses.user.user_metadata?.avatar_url});
-        } else if(ev==='SIGNED_OUT'){
-          currentUser=null;
-          if(pollInterval)clearInterval(pollInterval);
-          hideAll();
-          document.getElementById('page-login').style.display='flex';
         }
       });
-      const{data:{session}}=await sb.auth.getSession();
-      if(session?.user){await handleLogin({name:session.user.user_metadata?.full_name||session.user.email,id:session.user.id,email:session.user.email,photo:session.user.user_metadata?.avatar_url});return;}
+
+      // === Recupera sessao do storage primeiro (funciona offline) ===
+      try {
+        const{data:{session:localSes}}=await sb.auth.getSession();
+        if(localSes?.user){
+          await handleLogin({name:localSes.user.user_metadata?.full_name||localSes.user.email,id:localSes.user.id,email:localSes.user.email,photo:localSes.user.user_metadata?.avatar_url});
+          // Refresh em BACKGROUND. Falha NAO desloga — storage tem token suficiente.
+          if(navigator.onLine){
+            sb.auth.refreshSession().catch(e=>console.warn('[Auth] refresh em background falhou:',e?.message));
+          }
+          return;
+        }
+      } catch(e) { console.warn('[Auth] getSession falhou:',e?.message); }
+
       document.getElementById('page-login').style.display='flex';
     }
+
+    // === Re-checa sessao quando app volta ao foco (v4.5) ===
+    // Se user fechou o app por horas e voltou, pode ter token novo no storage
+    // (refresh em outra aba) — sincroniza state local sem deslogar.
+    document.addEventListener('visibilitychange', async () => {
+      if(document.visibilityState!=='visible'||!sb)return;
+      try {
+        const{data:{session:s}}=await sb.auth.getSession();
+        if(s?.user&&!currentUser){
+          await handleLogin({name:s.user.user_metadata?.full_name||s.user.email,id:s.user.id,email:s.user.email,photo:s.user.user_metadata?.avatar_url});
+        }
+      } catch {}
+    });
 
     // === MATCHES ===
     function showMatches(){
@@ -1213,8 +1257,9 @@
         }
       }else{
         // === SIMPLES ===
-        document.getElementById('s-left-name').textContent=lName;
-        document.getElementById('s-right-name').textContent=rName;
+        // v4.5: nome+sobrenome (igual em duplas) em vez de nome completo
+        document.getElementById('s-left-name').textContent=firstTwoNames(lName);
+        document.getElementById('s-right-name').textContent=firstTwoNames(rName);
         // v4.1: clube nas laterais (igual em duplas)
         document.getElementById('s-left-club').textContent=getClub(lName);
         document.getElementById('s-right-club').textContent=getClub(rName);
