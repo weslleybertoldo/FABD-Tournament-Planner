@@ -5351,7 +5351,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-categories')renderCategoriesInfo();
   if(panelId==='settings-rankings')renderScoringTables();
 }
-const APP_VERSION='4.37';
+const APP_VERSION='4.38';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
@@ -5396,6 +5396,7 @@ function showTournamentConfig(){
   document.getElementById('tc-tab-courts').style.display='none';
   document.getElementById('tc-tab-schedule').style.display='none';
   const rkPanel=document.getElementById('tc-tab-ranking');if(rkPanel)rkPanel.style.display='none';
+  const cbPanel=document.getElementById('tc-tab-clubes');if(cbPanel)cbPanel.style.display='none';
   document.getElementById('tc-tab-pricing').style.display='none';
   const sel=document.getElementById('tc-profile-select');sel.innerHTML='<option value="">Nenhum</option>';
   gameProfiles.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;if(tournament.gameProfileId===p.id)o.selected=true;sel.appendChild(o);});
@@ -5411,7 +5412,97 @@ function showTournamentConfig(){
   openModal('modal-tournament-config');
 }
 
-function setTcTab(el,id){document.querySelectorAll('#tc-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['tc-tab-system','tc-tab-scoring','tc-tab-courts','tc-tab-schedule','tc-tab-ranking','tc-tab-pricing'].forEach(i=>{const e=document.getElementById(i);if(e)e.style.display=i===id?'':'none';});if(id==='tc-tab-courts')renderCourtNames();if(id==='tc-tab-schedule')renderDaySchedule();if(id==='tc-tab-pricing')renderPricingSummary();if(id==='tc-tab-ranking')renderTcRanking();}
+function setTcTab(el,id){document.querySelectorAll('#tc-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['tc-tab-system','tc-tab-scoring','tc-tab-courts','tc-tab-schedule','tc-tab-ranking','tc-tab-clubes','tc-tab-pricing'].forEach(i=>{const e=document.getElementById(i);if(e)e.style.display=i===id?'':'none';});if(id==='tc-tab-courts')renderCourtNames();if(id==='tc-tab-schedule')renderDaySchedule();if(id==='tc-tab-pricing')renderPricingSummary();if(id==='tc-tab-ranking')renderTcRanking();if(id==='tc-tab-clubes')renderTcClubes();}
+
+// === CLUBES ATIVOS ===
+// Normaliza nome de clube: case-insensitive + colapsa espacos. Filtra valores invalidos.
+function _normalizeClubKey(name){
+  if(!name)return '';
+  const s=String(name).trim().toLowerCase().replace(/\s+/g,' ');
+  return s;
+}
+function _isInvalidClubName(name){
+  const s=_normalizeClubKey(name);
+  if(!s)return true;
+  // Atletas com clube "S/C" ou variantes = sem clube (nao entram em "Clubes Ativos")
+  return /^(s\/?c|sem\s+clube|n\/?a|none|null|-)$/i.test(s);
+}
+
+function getClubsFromPlayers(){
+  // Agrupa por chave normalizada, escolhe o "display name" com mais ocorrencias
+  const groups={}; // key -> { displayCounts: {name: n}, total }
+  (players||[]).forEach(p=>{
+    const raw=(p.club||'').trim();
+    if(_isInvalidClubName(raw))return;
+    const key=_normalizeClubKey(raw);
+    if(!groups[key])groups[key]={displayCounts:{},total:0};
+    groups[key].displayCounts[raw]=(groups[key].displayCounts[raw]||0)+1;
+    groups[key].total++;
+  });
+  return Object.entries(groups).map(([key,g])=>{
+    const sortedDisplays=Object.entries(g.displayCounts).sort((a,b)=>b[1]-a[1]||b[0].length-a[0].length);
+    return{key,name:sortedDisplays[0][0],count:g.total};
+  }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+}
+
+function getClubStatus(clubNameOrKey){
+  if(!tournament)return 'sc';
+  const map=tournament.clubStatuses||{};
+  const key=_normalizeClubKey(clubNameOrKey);
+  // Compat com schemas antigos que possam ter chave nao-normalizada
+  return map[key]||map[clubNameOrKey]||'sc';
+}
+
+function setClubStatus(clubNameOrKey,status){
+  if(!tournament)return;
+  if(!tournament.clubStatuses)tournament.clubStatuses={};
+  const key=_normalizeClubKey(clubNameOrKey);
+  // Limpa eventual entrada com chave nao-normalizada (migracao silenciosa)
+  if(tournament.clubStatuses[clubNameOrKey]&&clubNameOrKey!==key){
+    delete tournament.clubStatuses[clubNameOrKey];
+  }
+  tournament.clubStatuses[key]=status;
+  renderTcClubes();
+}
+
+function setAllClubStatus(status){
+  if(!tournament)return;
+  if(!tournament.clubStatuses)tournament.clubStatuses={};
+  getClubsFromPlayers().forEach(c=>{tournament.clubStatuses[c.key]=status;});
+  renderTcClubes();
+}
+
+function renderTcClubes(){
+  const c=document.getElementById('tc-clubes-list');
+  if(!c)return;
+  const clubs=getClubsFromPlayers();
+  if(!clubs.length){
+    c.innerHTML='<p style="padding:24px;text-align:center;color:var(--fabd-gray-500)">Nenhum atleta com clube cadastrado neste torneio.</p>';
+    return;
+  }
+  let h='<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f8fafc"><th style="padding:10px;text-align:left">Clube</th><th style="padding:10px;text-align:center;width:80px">Atletas</th><th style="padding:10px;text-align:center;width:280px">Status</th></tr></thead><tbody>';
+  clubs.forEach(cl=>{
+    const st=getClubStatus(cl.key);
+    const safe=esc(cl.name);
+    const safeKey=esc(cl.key).replace(/'/g,"\\'");
+    h+=`<tr style="border-top:1px solid #e5e7eb">
+      <td style="padding:10px"><strong>${safe}</strong></td>
+      <td style="padding:10px;text-align:center">${cl.count}</td>
+      <td style="padding:10px;text-align:center">
+        <div style="display:inline-flex;border:1px solid var(--fabd-gray-300);border-radius:6px;overflow:hidden;font-size:12px">
+          <button onclick="setClubStatus('${safeKey}','adimplente')" style="border:none;padding:6px 10px;cursor:pointer;background:${st==='adimplente'?'#10B981':'#fff'};color:${st==='adimplente'?'#fff':'var(--fabd-gray-700)'};font-weight:${st==='adimplente'?'700':'400'}">Adimplente</button>
+          <button onclick="setClubStatus('${safeKey}','inadimplente')" style="border:none;padding:6px 10px;cursor:pointer;border-left:1px solid var(--fabd-gray-300);border-right:1px solid var(--fabd-gray-300);background:${st==='inadimplente'?'#DC2626':'#fff'};color:${st==='inadimplente'?'#fff':'var(--fabd-gray-700)'};font-weight:${st==='inadimplente'?'700':'400'}">Inadimplente</button>
+          <button onclick="setClubStatus('${safeKey}','sc')" style="border:none;padding:6px 10px;cursor:pointer;background:${st==='sc'?'#64748B':'#fff'};color:${st==='sc'?'#fff':'var(--fabd-gray-700)'};font-weight:${st==='sc'?'700':'400'}" title="Sem confirmação">S/C</button>
+        </div>
+      </td>
+    </tr>`;
+  });
+  // Resumo
+  const total=clubs.reduce((s,c)=>s+c.count,0);
+  const adim=clubs.filter(c=>getClubStatus(c.key)==='adimplente').reduce((s,c)=>s+c.count,0);
+  h+=`</tbody><tfoot><tr style="background:#f8fafc;border-top:2px solid var(--fabd-gray-300)"><td style="padding:10px;font-weight:700">${clubs.length} clubes</td><td style="padding:10px;text-align:center;font-weight:700">${total}</td><td style="padding:10px;text-align:center;font-size:12px;color:var(--fabd-gray-600)">${adim} atletas em clubes adimplentes</td></tr></tfoot></table>`;
+  c.innerHTML=h;
+}
 
 function renderTcRanking(){
   const sel=document.getElementById('tc-ranking-select');
@@ -6532,7 +6623,9 @@ function printReport(type){
     case 'oop': body=reportOOP(); break;
     case 'winners': body=reportWinners(); break;
     case 'classification': body=reportClassification(); break;
-    case 'rankingGeral': body=reportRankingGeral(); break;
+    case 'rankingFederados': body=reportRankingFederados(); break;
+    case 'atletasPorClube': body=reportAtletasPorClube(); break;
+    case 'medalhasPorClube': body=reportMedalhasPorClube(); break;
     case 'players': body=reportPlayers(); break;
     default: body='<p>Relatorio nao encontrado.</p>';
   }
@@ -6940,13 +7033,15 @@ function reportClassification(){
       const classification=computeFullClassification(d);
       if(!classification.length)return;
       count++;
+      const isDoubles=d.event==='DM'||d.event==='DF'||d.event==='DX';
       h+=`<div class="cat-title">${esc(d.name)} <span style="font-size:11px;color:#666;font-weight:400">(${d.type} - ${d.players?.length||0} atletas)</span></div>`;
-      h+='<table><thead><tr><th style="width:50px">Pos.</th><th>Jogador</th><th style="width:60px">V</th><th style="width:60px">D</th><th style="width:70px;text-align:right">Pontos</th><th>Obs.</th></tr></thead><tbody>';
+      h+='<table><thead><tr><th style="width:50px">Pos.</th><th>Jogador</th><th>Clube</th><th style="width:60px">V</th><th style="width:60px">D</th><th style="width:70px;text-align:right">Pontos</th><th>Obs.</th></tr></thead><tbody>';
       classification.forEach(c=>{
         const posStyle=c.pos===1?'color:#D4AF37;font-weight:800':c.pos===2?'color:#AAA;font-weight:700':c.pos===3?'color:#CD7F32;font-weight:700':'';
         const medal=c.pos===1?'\uD83E\uDD47 ':c.pos===2?'\uD83E\uDD48 ':c.pos===3?'\uD83E\uDD49 ':'';
         const pts=c.pos>0?pointsForPosition(c.pos,scoringTable):0;
-        h+=`<tr><td style="${posStyle}">${medal}${c.pos}o</td><td>${esc(c.name)}</td><td style="text-align:center">${c.wins!=null?c.wins:'-'}</td><td style="text-align:center">${c.losses!=null?c.losses:'-'}</td><td style="text-align:right;font-weight:600">${pts.toLocaleString('pt-BR')}</td><td style="font-size:11px;color:#666">${esc(c.note||'')}</td></tr>`;
+        const clube=_clubForClassificationEntry(c.name,isDoubles);
+        h+=`<tr><td style="${posStyle}">${medal}${c.pos}o</td><td>${esc(c.name)}</td><td style="font-size:12px">${esc(clube)}</td><td style="text-align:center">${c.wins!=null?c.wins:'-'}</td><td style="text-align:center">${c.losses!=null?c.losses:'-'}</td><td style="text-align:right;font-weight:600">${pts.toLocaleString('pt-BR')}</td><td style="font-size:11px;color:#666">${esc(c.note||'')}</td></tr>`;
       });
       h+='</tbody></table>';
     });
@@ -6974,32 +7069,212 @@ function reportClassification(){
   return h;
 }
 
-function reportRankingGeral(){
+// Categoria-base extraída do nome da chave (Sub 11, Sub 13, ..., Master II)
+const RANKING_CATEGORY_ORDER=['Sub 11','Sub 13','Sub 15','Sub 17','Sub 19','Sub 23','Principal','Senior','Master I','Master II'];
+function _categoryFromDrawName(name){
+  if(!name)return 'Outras';
+  for(const cat of RANKING_CATEGORY_ORDER){
+    if(name.includes(cat))return cat;
+  }
+  return 'Outras';
+}
+
+function _findPlayerByNameForRanking(name){
+  if(!name||!players)return null;
+  const target=name.toLowerCase().trim();
+  return players.find(p=>{
+    const full=`${p.firstName||''} ${p.lastName||''}`.toLowerCase().trim();
+    return full===target;
+  })||null;
+}
+
+// Retorna o clube formatado para uma entrada de classificação (singles ou dupla).
+// Em duplas, mostra "Clube1 / Clube2" (ou só o clube se ambos forem do mesmo).
+function _clubForClassificationEntry(name,isDoubles){
+  if(!name)return '-';
+  if(isDoubles){
+    const partners=String(name).split(/\s*\/\s*/).filter(Boolean);
+    const clubs=partners.map(p=>{
+      const pl=_findPlayerByNameForRanking(p);
+      return (pl?.club||'').trim()||'-';
+    });
+    if(clubs.length===2 && clubs[0]===clubs[1])return clubs[0];
+    return clubs.join(' / ');
+  }
+  const pl=_findPlayerByNameForRanking(name);
+  return (pl?.club||'').trim()||'-';
+}
+
+function _isPersonFederado(name,adimSet){
+  const pl=_findPlayerByNameForRanking(name);
+  return pl && adimSet.has(_normalizeClubKey(pl.club||''));
+}
+
+function _isEntryFederado(classificationName,isDoubles,adimSet){
+  if(isDoubles){
+    const partners=String(classificationName).split(/\s*\/\s*/).filter(Boolean);
+    if(!partners.length)return false;
+    return partners.every(p=>_isPersonFederado(p,adimSet));
+  }
+  return _isPersonFederado(classificationName,adimSet);
+}
+
+// Reposiciona atletas federados de uma classificação preservando empates da chave original.
+// Retorna [{...c, pos: novaPos, points: novaPontuação, originalPos}]
+function _reassignFederados(classification,scoringTable,isDoubles,adimSet){
+  const federados=classification.filter(c=>c.pos>=1 && _isEntryFederado(c.name,isDoubles,adimSet));
+  const reassigned=[];
+  let lastOldPos=null,currentNewPos=0;
+  for(let i=0;i<federados.length;i++){
+    const c=federados[i];
+    if(c.pos!==lastOldPos){
+      currentNewPos=reassigned.length+1;
+      lastOldPos=c.pos;
+    }
+    reassigned.push({...c,pos:currentNewPos,points:pointsForPosition(currentNewPos,scoringTable),originalPos:c.pos});
+  }
+  return reassigned;
+}
+
+// === Helpers compartilhados pra Ranking Federados (formato igual Classificação Geral) ===
+const RANKING_MODE_ORDER={'SM':0,'SF':1,'DM':0,'DF':1,'DX':2};
+function _drawCatSort(name){
+  for(let i=0;i<RANKING_CATEGORY_ORDER.length;i++){
+    if(name && name.includes(RANKING_CATEGORY_ORDER[i]))return i;
+  }
+  return 99;
+}
+function _sortDrawsByCatThenMod(arr){
+  return arr.slice().sort((a,b)=>_drawCatSort(a.name)-_drawCatSort(b.name)||(RANKING_MODE_ORDER[a.event]||0)-(RANKING_MODE_ORDER[b.event]||0));
+}
+
+// Renderiza UMA chave como tabela. opts.reassign?:bool, opts.adimSet?:Set, opts.scoringTable
+function _renderDrawAsRankingTable(d,opts){
+  let classification=computeFullClassification(d);
+  if(!classification.length)return'';
+  const isDoubles=d.event==='DM'||d.event==='DF'||d.event==='DX';
+  const sc=opts.scoringTable;
+  if(opts.reassign){
+    classification=_reassignFederados(classification,sc,isDoubles,opts.adimSet||new Set());
+  }
+  if(!classification.length)return'';
+  let h=`<div class="cat-title">${esc(d.name)} <span style="font-size:11px;color:#666;font-weight:400">(${d.type} - ${d.players?.length||0} atletas)</span></div>`;
+  h+='<table><thead><tr><th style="width:50px">Pos.</th><th>Atleta</th><th>Clube</th><th style="width:60px">V</th><th style="width:60px">D</th><th style="width:80px;text-align:right">Pontos</th><th>Obs.</th></tr></thead><tbody>';
+  classification.forEach(c=>{
+    const posStyle=c.pos===1?'color:#D4AF37;font-weight:800':c.pos===2?'color:#AAA;font-weight:700':c.pos===3?'color:#CD7F32;font-weight:700':'';
+    const medal=c.pos===1?'🥇 ':c.pos===2?'🥈 ':c.pos===3?'🥉 ':'';
+    const pts=c.points!=null?c.points:(c.pos>0?pointsForPosition(c.pos,sc):0);
+    const note=opts.reassign&&c.originalPos&&c.originalPos!==c.pos?`Era ${c.originalPos}º na chave`:(c.note||'');
+    const clube=_clubForClassificationEntry(c.name,isDoubles);
+    h+=`<tr><td style="${posStyle}">${medal}${c.pos}o</td><td><strong>${esc(c.name)}</strong></td><td style="font-size:12px">${esc(clube)}</td><td style="text-align:center">${c.wins!=null?c.wins:'-'}</td><td style="text-align:center">${c.losses!=null?c.losses:'-'}</td><td style="text-align:right;font-weight:700">${pts.toLocaleString('pt-BR')}</td><td style="font-size:11px;color:#666">${esc(note)}</td></tr>`;
+  });
+  h+='</tbody></table>';
+  return h;
+}
+
+function _renderRankingByDraws(simples,duplas,title,subtitle,opts){
+  let h=`<h2 style="color:#1E3A8A;margin-bottom:8px">${esc(title)}</h2>
+  <p style="font-size:12px;color:#64748B;margin-bottom:16px">${subtitle}</p>`;
+  let total=0;
+  if(simples.length){
+    let secHtml='';
+    simples.forEach(d=>{const t=_renderDrawAsRankingTable(d,opts);if(t){secHtml+=t;total++;}});
+    if(secHtml){
+      h+='<h3 style="color:#1E3A8A;margin:20px 0 12px;border-bottom:2px solid #1E3A8A;padding-bottom:6px">'+esc(title)+' - Simples</h3>';
+      h+=secHtml;
+    }
+  }
+  if(duplas.length){
+    let secHtml='';
+    duplas.forEach(d=>{const t=_renderDrawAsRankingTable(d,opts);if(t){secHtml+=t;total++;}});
+    if(secHtml){
+      h+='<h3 style="color:#1E3A8A;margin:30px 0 12px;border-bottom:2px solid #1E3A8A;padding-bottom:6px">'+esc(title)+' - Duplas</h3>';
+      h+=secHtml;
+    }
+  }
+  if(total===0){
+    h+='<p style="font-size:13px;color:#64748B;padding:16px;background:#F8FAFC;border-radius:6px">Nenhuma chave com classificação. Conclua chaves para ver o ranking.</p>';
+  }
+  return h;
+}
+
+function reportRankingFederados(){
   const draws=tournament.draws||[];
   if(!draws.length)return'<p>Nenhuma chave criada.</p>';
-  const scoringTable=getCurrentScoringTable();
-
-  // Agrega pontos por atleta (somando todas as chaves)
-  // Em duplas, cada parceiro recebe o mesmo total de pontos
-  const agg={}; // key (nome) -> {name, club, totalPoints, entries: [{drawName, pos, points}]}
-
-  function findPlayerByName(name){
-    if(!name||!players)return null;
-    const target=name.toLowerCase().trim();
-    return players.find(p=>{
-      const full=`${p.firstName||''} ${p.lastName||''}`.toLowerCase().trim();
-      return full===target;
-    })||null;
+  const clubStatuses=tournament.clubStatuses||{};
+  const adimplentes=Object.keys(clubStatuses).filter(k=>clubStatuses[k]==='adimplente');
+  if(!adimplentes.length){
+    return`<h2 style="color:#1E3A8A;margin-bottom:8px">Ranking Federados</h2>
+    <div style="background:#FEF3C7;border-left:4px solid #F59E0B;padding:14px;border-radius:6px;font-size:13px;color:#92400E">
+      <strong>Nenhum clube marcado como Adimplente.</strong><br>
+      Para gerar este ranking, vá em <strong>Configurar Torneio &rarr; Clubes Ativos</strong> e marque os clubes adimplentes.
+    </div>`;
   }
+  const scoringTable=getCurrentScoringTable();
+  const adimSet=new Set(adimplentes.map(c=>_normalizeClubKey(c)));
+  const simples=_sortDrawsByCatThenMod(draws.filter(d=>d.event==='SM'||d.event==='SF'));
+  const duplas=_sortDrawsByCatThenMod(draws.filter(d=>d.event==='DM'||d.event==='DF'||d.event==='DX'));
+  const subtitle=`Apenas atletas/duplas <strong>federados</strong> (clubes Adimplentes) · Pontuação: <strong>${esc(scoringTable.name)}</strong> · uma tabela por chave · pontos pela posição entre federados (1º federado = 1000, 2º = 850, etc) · ${adimplentes.length} clube(s) · em duplas, ambos parceiros federados`;
+  return _renderRankingByDraws(simples,duplas,'Ranking Federados',subtitle,{scoringTable,reassign:true,adimSet});
+}
 
-  function addEntry(personName,drawName,pos,pts){
-    const key=personName.toLowerCase().trim();
-    if(!agg[key]){
-      const pl=findPlayerByName(personName);
-      agg[key]={name:personName,club:pl?.club||'',state:pl?.state||'',totalPoints:0,entries:[]};
+function reportAtletasPorClube(){
+  if(!players?.length)return'<p>Nenhum atleta cadastrado.</p>';
+  // Agrupa via mesma normalização da aba Clubes Ativos (case-insensitive)
+  const groups={};
+  let semClube=0;
+  players.forEach(p=>{
+    const raw=(p.club||'').trim();
+    if(_isInvalidClubName(raw)){semClube++;return;}
+    const key=_normalizeClubKey(raw);
+    if(!groups[key])groups[key]={displayCounts:{},total:0};
+    groups[key].displayCounts[raw]=(groups[key].displayCounts[raw]||0)+1;
+    groups[key].total++;
+  });
+  const list=Object.values(groups).map(g=>{
+    const sortedDisplays=Object.entries(g.displayCounts).sort((a,b)=>b[1]-a[1]||b[0].length-a[0].length);
+    return{name:sortedDisplays[0][0],count:g.total,isSemClube:false};
+  }).sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name,'pt-BR'));
+  // Adiciona linha "Sem Clube / S/C" no final se houver atletas sem clube
+  if(semClube>0){
+    list.push({name:'Sem Clube (S/C)',count:semClube,isSemClube:true});
+  }
+  const total=list.reduce((s,c)=>s+c.count,0);
+  let h=`<h2 style="color:#1E3A8A;margin-bottom:8px">Atletas por Clube</h2>
+  <p style="font-size:12px;color:#64748B;margin-bottom:16px">${list.filter(c=>!c.isSemClube).length} clube(s) com atletas · ${total} atleta(s) total${semClube?` · ${semClube} sem clube cadastrado`:''}</p>`;
+  h+='<table><thead><tr><th style="width:50px">#</th><th>Clube</th><th style="text-align:right;width:100px">Atletas</th><th style="text-align:right;width:80px">%</th></tr></thead><tbody>';
+  list.forEach((c,i)=>{
+    const pct=total>0?(c.count/total*100).toFixed(1):'0.0';
+    const rowStyle=c.isSemClube?'background:#FEF3C7;color:#92400E':'';
+    const nameStyle=c.isSemClube?'font-style:italic':'';
+    h+=`<tr style="${rowStyle}"><td>${i+1}</td><td style="${nameStyle}"><strong>${esc(c.name)}</strong></td><td style="text-align:right;font-weight:700">${c.count}</td><td style="text-align:right;color:#64748B">${pct}%</td></tr>`;
+  });
+  h+=`</tbody><tfoot><tr style="background:#f8fafc;border-top:2px solid var(--fabd-gray-300)"><td colspan="2" style="padding:10px;font-weight:700">TOTAL</td><td style="padding:10px;text-align:right;font-weight:800">${total}</td><td style="padding:10px;text-align:right">100%</td></tr></tfoot></table>`;
+  return h;
+}
+
+function reportMedalhasPorClube(){
+  const draws=tournament.draws||[];
+  if(!draws.length)return'<p>Nenhuma chave criada.</p>';
+  // Agrupa por chave normalizada (case-insensitive). { [key]: {displayCounts, ouro, prata, bronze, total} }
+  const medals={};
+  const SC_KEY='__sc__';
+
+  function addMedal(personName,kind){
+    const pl=_findPlayerByNameForRanking(personName);
+    const raw=(pl?.club||'').trim();
+    let key,display;
+    if(_isInvalidClubName(raw)){
+      key=SC_KEY;
+      display='Sem Clube (S/C)';
+    }else{
+      key=_normalizeClubKey(raw);
+      display=raw;
     }
-    agg[key].totalPoints+=pts;
-    agg[key].entries.push({drawName,pos,points:pts});
+    if(!medals[key])medals[key]={displayCounts:{},ouro:0,prata:0,bronze:0,total:0};
+    medals[key].displayCounts[display]=(medals[key].displayCounts[display]||0)+1;
+    medals[key][kind]++;
+    medals[key].total++;
   }
 
   draws.forEach(d=>{
@@ -7007,33 +7282,47 @@ function reportRankingGeral(){
     if(!classification.length)return;
     const isDoubles=d.event==='DM'||d.event==='DF'||d.event==='DX';
     classification.forEach(c=>{
-      if(c.pos<1)return;
-      const pts=pointsForPosition(c.pos,scoringTable);
-      if(pts<=0)return;
+      let kind=null;
+      if(c.pos===1)kind='ouro';
+      else if(c.pos===2)kind='prata';
+      else if(c.pos===3||c.pos===4)kind='bronze';
+      if(!kind)return;
       if(isDoubles){
-        // c.name é "Atleta1 / Atleta2" → divide e dá pontos a cada um
         const partners=String(c.name).split(/\s*\/\s*/).filter(Boolean);
-        partners.forEach(name=>{addEntry(name,d.name,c.pos,pts);});
+        partners.forEach(name=>addMedal(name,kind));
       }else{
-        addEntry(c.name,d.name,c.pos,pts);
+        addMedal(c.name,kind);
       }
     });
   });
 
-  const list=Object.values(agg).sort((a,b)=>b.totalPoints-a.totalPoints||a.name.localeCompare(b.name));
-  if(!list.length)return`<h2 style="color:#1E3A8A;margin-bottom:16px">Ranking Geral</h2><p>Nenhum atleta com pontuação. Conclua chaves para ver o ranking.</p>`;
+  // Resolve display name (forma mais frequente; em empate, a com mais letras)
+  const list=Object.entries(medals).map(([key,m])=>{
+    const sortedDisplays=Object.entries(m.displayCounts).sort((a,b)=>b[1]-a[1]||b[0].length-a[0].length);
+    return{club:sortedDisplays[0][0],ouro:m.ouro,prata:m.prata,bronze:m.bronze,total:m.total,_isSC:key===SC_KEY};
+  }).sort((a,b)=>b.total-a.total||b.ouro-a.ouro||b.prata-a.prata||b.bronze-a.bronze||a.club.localeCompare(b.club,'pt-BR'));
+  if(!list.length){
+    return`<h2 style="color:#1E3A8A;margin-bottom:8px">Medalhas por Clube</h2>
+    <p style="font-size:13px;color:#64748B">Nenhuma medalha distribuída ainda. Conclua as finais e semifinais para ver o quadro de medalhas.</p>`;
+  }
+  const totalOuro=list.reduce((s,c)=>s+c.ouro,0);
+  const totalPrata=list.reduce((s,c)=>s+c.prata,0);
+  const totalBronze=list.reduce((s,c)=>s+c.bronze,0);
+  const totalGeral=totalOuro+totalPrata+totalBronze;
 
-  let h=`<h2 style="color:#1E3A8A;margin-bottom:8px">Ranking Geral</h2>
-  <p style="font-size:12px;color:#64748B;margin-bottom:16px">Pontuação aplicada: <strong>${esc(scoringTable.name)}</strong> · ${list.length} atleta(s) classificado(s) · Pontos somados em todas as chaves disputadas</p>`;
-  h+='<table><thead><tr><th style="width:50px">Pos.</th><th>Atleta</th><th>Clube</th><th>UF</th><th style="text-align:center">Chaves</th><th style="text-align:right">Pontos</th><th>Detalhamento</th></tr></thead><tbody>';
-  list.forEach((p,i)=>{
-    const pos=i+1;
-    const posStyle=pos===1?'color:#D4AF37;font-weight:800':pos===2?'color:#AAA;font-weight:700':pos===3?'color:#CD7F32;font-weight:700':'';
-    const medal=pos===1?'🥇 ':pos===2?'🥈 ':pos===3?'🥉 ':'';
-    const detail=p.entries.map(e=>`${esc(e.drawName)} (${e.pos}º: ${e.points})`).join(' · ');
-    h+=`<tr><td style="${posStyle}">${medal}${pos}o</td><td><strong>${esc(p.name)}</strong></td><td>${esc(p.club||'-')}</td><td>${esc(p.state||'-')}</td><td style="text-align:center">${p.entries.length}</td><td style="text-align:right;font-weight:700;font-size:14px">${p.totalPoints.toLocaleString('pt-BR')}</td><td style="font-size:11px;color:#666">${detail}</td></tr>`;
+  let h=`<h2 style="color:#1E3A8A;margin-bottom:8px">Medalhas por Clube</h2>
+  <p style="font-size:12px;color:#64748B;margin-bottom:16px">${list.length} clube(s) com medalhas · 🥇 ${totalOuro} · 🥈 ${totalPrata} · 🥉 ${totalBronze} · Total ${totalGeral}</p>`;
+  h+='<table><thead><tr><th style="width:50px">#</th><th>Clube</th><th style="text-align:center;width:80px">🥇 Ouro</th><th style="text-align:center;width:80px">🥈 Prata</th><th style="text-align:center;width:80px">🥉 Bronze</th><th style="text-align:right;width:90px">Total</th></tr></thead><tbody>';
+  list.forEach((c,i)=>{
+    let rowStyle='';
+    if(c._isSC)rowStyle='background:#FEF3C7;color:#92400E';
+    else if(i===0)rowStyle='background:#FEF9C3';
+    else if(i===1)rowStyle='background:#F1F5F9';
+    else if(i===2)rowStyle='background:#FED7AA';
+    const nameStyle=c._isSC?'font-style:italic':'';
+    h+=`<tr style="${rowStyle}"><td><strong>${i+1}</strong></td><td style="${nameStyle}"><strong>${esc(c.club)}</strong></td><td style="text-align:center;font-weight:600">${c.ouro||'-'}</td><td style="text-align:center;font-weight:600">${c.prata||'-'}</td><td style="text-align:center;font-weight:600">${c.bronze||'-'}</td><td style="text-align:right;font-weight:800;font-size:15px">${c.total}</td></tr>`;
   });
-  h+='</tbody></table>';
+  h+=`</tbody><tfoot><tr style="background:#f8fafc;border-top:2px solid var(--fabd-gray-300)"><td colspan="2" style="padding:10px;font-weight:700">TOTAL</td><td style="padding:10px;text-align:center;font-weight:800">${totalOuro}</td><td style="padding:10px;text-align:center;font-weight:800">${totalPrata}</td><td style="padding:10px;text-align:center;font-weight:800">${totalBronze}</td><td style="padding:10px;text-align:right;font-weight:800;font-size:16px">${totalGeral}</td></tr></tfoot></table>`;
   return h;
 }
 
