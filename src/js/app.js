@@ -381,6 +381,7 @@ async function loadData(autoLoad=false) {
     }
     players = tournament?.players || [];
     await loadGameProfiles();
+    await loadScoringTables();
     // Carregar arbitros do banco se localStorage vazio
     try{
       const umps=loadUmpires();
@@ -1730,6 +1731,84 @@ function sortDraws(draws) {
   });
 }
 
+// === FILTROS DA ABA CHAVES ===
+// drawFilters: cada grupo aceita Set de valores. Vazio = "todos" (não filtra). Não-vazio = só os marcados passam.
+let drawFilters={sorteio:new Set(),premio:new Set(),final:new Set()};
+
+function computeDrawState(d){
+  const has=(d.matches?.length||0)>0;
+  const realMatches=has?(d.matches||[]).filter(m=>!m.isBye&&m.player1&&m.player2&&m.player2!=='BYE'&&m.player1!=='BYE'):[];
+  const allFinished=realMatches.length>0&&realMatches.every(m=>m.winner!==undefined&&m.winner!==null);
+  return{sorteio:has?'sim':'sem',premio:d.awarded?'sim':'nao',final:allFinished?'sim':'nao'};
+}
+
+function applyDrawFilters(draws){
+  const groups=['sorteio','premio','final'];
+  const anyActive=groups.some(g=>drawFilters[g].size>0);
+  if(!anyActive)return draws;
+  return draws.filter(d=>{
+    const st=computeDrawState(d);
+    return groups.every(g=>drawFilters[g].size===0||drawFilters[g].has(st[g]));
+  });
+}
+
+function _countActiveDrawFilters(){
+  return drawFilters.sorteio.size+drawFilters.premio.size+drawFilters.final.size;
+}
+
+function _refreshDrawFilterBadge(){
+  const btn=document.getElementById('draws-filter-btn');
+  const badge=document.getElementById('draws-filter-badge');
+  if(!btn||!badge)return;
+  const n=_countActiveDrawFilters();
+  if(n>0){btn.classList.add('has-active');badge.style.display='';badge.textContent=n;}
+  else{btn.classList.remove('has-active');badge.style.display='none';}
+}
+
+function _refreshDrawFilterPopupUI(){
+  document.querySelectorAll('.draws-filter-option').forEach(el=>{
+    const g=el.dataset.group,v=el.dataset.value;
+    el.classList.toggle('active',drawFilters[g]?.has(v));
+  });
+  _refreshDrawFilterBadge();
+}
+
+function toggleDrawsFilterPopup(ev){
+  if(ev)ev.stopPropagation();
+  const popup=document.getElementById('draws-filter-popup');
+  if(!popup)return;
+  const open=popup.classList.toggle('open');
+  if(open){
+    _refreshDrawFilterPopupUI();
+    setTimeout(()=>{document.addEventListener('click',_drawFilterOutsideClick,{once:true});},10);
+  }
+}
+
+function _drawFilterOutsideClick(){
+  const popup=document.getElementById('draws-filter-popup');
+  if(popup)popup.classList.remove('open');
+}
+
+function closeDrawsFilterPopup(){
+  const popup=document.getElementById('draws-filter-popup');
+  if(popup)popup.classList.remove('open');
+}
+
+function toggleDrawFilter(el){
+  const g=el.dataset.group,v=el.dataset.value;
+  if(!drawFilters[g])return;
+  if(drawFilters[g].has(v))drawFilters[g].delete(v);
+  else drawFilters[g].add(v);
+  _refreshDrawFilterPopupUI();
+  filterDraws();
+}
+
+function clearDrawFilters(){
+  drawFilters={sorteio:new Set(),premio:new Set(),final:new Set()};
+  _refreshDrawFilterPopupUI();
+  filterDraws();
+}
+
 function renderDraws() {
   if (!tournament) return;
   const listEl = document.getElementById('draws-list');
@@ -1739,14 +1818,18 @@ function renderDraws() {
   const ct = document.getElementById('draws-content');
   if (!tournament) { noT.style.display='block'; ct.style.display='none'; return; }
   noT.style.display='none'; ct.style.display='block';
+  _refreshDrawFilterBadge();
 
   const q=(document.getElementById('search-draws')?.value||'').toLowerCase();
-  const draws=allDraws.filter(d=>!q||d.name?.toLowerCase().includes(q));
+  const filteredByText=allDraws.filter(d=>!q||d.name?.toLowerCase().includes(q));
+  const draws=applyDrawFilters(filteredByText);
   const sorted=sortDraws(draws);
 
   if (!sorted.length) {
-    listEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--fabd-gray-500);font-size:13px">${q?'Nenhuma chave encontrada':'Nenhuma chave criada'}</div>`;
-    detailEl.innerHTML = '<div class="empty-state"><div class="icon">&#127960;</div><h3>Crie uma chave</h3></div>';
+    const hasFilters=_countActiveDrawFilters()>0;
+    const msg=q?'Nenhuma chave encontrada':hasFilters?'Nenhuma chave atende aos filtros':'Nenhuma chave criada';
+    listEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--fabd-gray-500);font-size:13px">${msg}</div>`;
+    if(!q&&!hasFilters)detailEl.innerHTML = '<div class="empty-state"><div class="icon">&#127960;</div><h3>Crie uma chave</h3></div>';
     return;
   }
 
@@ -5262,10 +5345,11 @@ async function wizFinish() {
 function setSettingsTab(el, panelId) {
   document.querySelectorAll('#settings-tabs .tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['settings-general','settings-game','settings-umpires','settings-categories'].forEach(id=>{document.getElementById(id).style.display=id===panelId?'':'none';});
+  ['settings-general','settings-game','settings-umpires','settings-categories','settings-rankings'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=id===panelId?'':'none';});
   if(panelId==='settings-game')renderGameProfiles();
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
+  if(panelId==='settings-rankings')renderScoringTables();
 }
 const APP_VERSION='4.37';
 
@@ -5311,6 +5395,7 @@ function showTournamentConfig(){
   document.getElementById('tc-tab-scoring').style.display='none';
   document.getElementById('tc-tab-courts').style.display='none';
   document.getElementById('tc-tab-schedule').style.display='none';
+  const rkPanel=document.getElementById('tc-tab-ranking');if(rkPanel)rkPanel.style.display='none';
   document.getElementById('tc-tab-pricing').style.display='none';
   const sel=document.getElementById('tc-profile-select');sel.innerHTML='<option value="">Nenhum</option>';
   gameProfiles.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;if(tournament.gameProfileId===p.id)o.selected=true;sel.appendChild(o);});
@@ -5326,7 +5411,33 @@ function showTournamentConfig(){
   openModal('modal-tournament-config');
 }
 
-function setTcTab(el,id){document.querySelectorAll('#tc-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['tc-tab-system','tc-tab-scoring','tc-tab-courts','tc-tab-schedule','tc-tab-pricing'].forEach(i=>document.getElementById(i).style.display=i===id?'':'none');if(id==='tc-tab-courts')renderCourtNames();if(id==='tc-tab-schedule')renderDaySchedule();if(id==='tc-tab-pricing')renderPricingSummary();}
+function setTcTab(el,id){document.querySelectorAll('#tc-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');['tc-tab-system','tc-tab-scoring','tc-tab-courts','tc-tab-schedule','tc-tab-ranking','tc-tab-pricing'].forEach(i=>{const e=document.getElementById(i);if(e)e.style.display=i===id?'':'none';});if(id==='tc-tab-courts')renderCourtNames();if(id==='tc-tab-schedule')renderDaySchedule();if(id==='tc-tab-pricing')renderPricingSummary();if(id==='tc-tab-ranking')renderTcRanking();}
+
+function renderTcRanking(){
+  const sel=document.getElementById('tc-ranking-select');
+  if(!sel)return;
+  sel.innerHTML='';
+  scoringTables.forEach(t=>{
+    const o=document.createElement('option');
+    o.value=t.id;
+    o.textContent=t.name+(t.isDefault?' (padrão)':'');
+    if((tournament?.scoringTableId||'default-bwf')===t.id)o.selected=true;
+    sel.appendChild(o);
+  });
+  updateTcRankingPreview();
+}
+
+function updateTcRankingPreview(){
+  const sel=document.getElementById('tc-ranking-select');
+  const prev=document.getElementById('tc-ranking-preview');
+  if(!sel||!prev)return;
+  const t=scoringTables.find(x=>x.id===sel.value);
+  if(!t){prev.innerHTML='';return;}
+  let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f1f5f9"><th style="padding:8px;text-align:left">Colocação</th><th style="padding:8px;text-align:right">Pontos</th></tr></thead><tbody>';
+  SCORING_BUCKETS.forEach(b=>{h+=`<tr style="border-top:1px solid #e5e7eb"><td style="padding:8px">${esc(b.label)}</td><td style="padding:8px;text-align:right;font-weight:600">${(+t.points[b.key]||0).toLocaleString('pt-BR')}</td></tr>`;});
+  h+='</tbody></table>';
+  prev.innerHTML=h;
+}
 
 function renderPricingSummary(){
   const valor=tournament?.valorInscricao||30;
@@ -5494,6 +5605,9 @@ async function saveTournamentConfig(){
     tournament.courtNames=Array.from(document.querySelectorAll('.tc-court-name')).map((inp,i)=>inp.value.trim()||`Quadra ${i+1}`);
     // Salvar programacao por dia
     tournament.daySchedule=collectDaySchedule();
+    // Ranking selecionado pra este torneio
+    const rkSel=document.getElementById('tc-ranking-select');
+    if(rkSel)tournament.scoringTableId=rkSel.value||'default-bwf';
     // Re-sincronizar chaves com novo perfil/config
     syncEntriesFromPlayers();
     await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);closeModal('modal-tournament-config');renderTournamentPage();showToast('Configuracao salva!');
@@ -5630,6 +5744,135 @@ function saveUmpires(l){
   // Salvar no banco tambem para persistir
   window.api.getSettings().then(s=>{s=s||{};s.umpires=l;window.api.saveSettings(s);}).catch(()=>{});
 }
+// === SCORING TABLES (Rankings de Pontuação) ===
+let scoringTables=[];
+const SCORING_BUCKETS=[
+  {key:'p1',  label:'1º (Campeão)',         min:1,   max:1},
+  {key:'p2',  label:'2º (Vice)',            min:2,   max:2},
+  {key:'p3',  label:'3º/4º (Semifinal)',    min:3,   max:4},
+  {key:'p5',  label:'5º-8º (Quartas)',      min:5,   max:8},
+  {key:'p9',  label:'9º-16º (Oitavas)',     min:9,   max:16},
+  {key:'p17', label:'17º-32º (R32)',        min:17,  max:32},
+  {key:'p33', label:'33º-64º (R64)',        min:33,  max:64},
+  {key:'p65', label:'65º-128º (R128)',      min:65,  max:128},
+  {key:'p129',label:'129º-256º (R256)',     min:129, max:256}
+];
+const DEFAULT_SCORING_TABLE={
+  id:'default-bwf', name:'Padrão BWF', isDefault:true,
+  points:{p1:1000,p2:850,p3:700,p5:550,p9:400,p17:250,p33:100,p65:50,p129:25}
+};
+
+async function loadScoringTables(){
+  try{
+    const s=await window.api.getSettings();
+    if(s?.scoringTables?.length)scoringTables=s.scoringTables;
+  }catch{scoringTables=[];}
+  // Garantir que o seed Padrão BWF sempre exista
+  if(!scoringTables.find(t=>t.id==='default-bwf')){
+    scoringTables.unshift(JSON.parse(JSON.stringify(DEFAULT_SCORING_TABLE)));
+    await saveScoringTables();
+  }
+}
+
+async function saveScoringTables(){
+  try{
+    const s=await window.api.getSettings()||{};
+    s.scoringTables=scoringTables;
+    await window.api.saveSettings(s);
+  }catch(e){console.warn('Erro ao salvar rankings:',e);}
+}
+
+function pointsForPosition(pos,table){
+  if(!table?.points||!pos||pos<1)return 0;
+  const p=table.points;
+  for(const b of SCORING_BUCKETS){
+    if(pos>=b.min&&pos<=b.max)return +p[b.key]||0;
+  }
+  return +p.p129||0;
+}
+
+function getCurrentScoringTable(){
+  const id=tournament?.scoringTableId;
+  if(id){
+    const t=scoringTables.find(x=>x.id===id);
+    if(t)return t;
+  }
+  return scoringTables.find(t=>t.id==='default-bwf')||DEFAULT_SCORING_TABLE;
+}
+
+function renderScoringTables(){
+  const c=document.getElementById('settings-rankings-content');
+  if(!c)return;
+  if(!scoringTables.length){
+    c.innerHTML='<p style="color:var(--fabd-gray-500);padding:24px;text-align:center">Carregando...</p>';
+    return;
+  }
+  let h=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <p style="font-size:13px;color:var(--fabd-gray-600);margin:0">Defina tabelas de pontuação por colocação. Use no relatório "Ranking Geral" do torneio.</p>
+    <button class="btn btn-primary btn-sm" onclick="addScoringTable()">+ Novo Ranking</button>
+  </div>`;
+  h+='<table style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden"><thead><tr style="background:#f8fafc"><th style="padding:10px;text-align:left">Nome</th>';
+  SCORING_BUCKETS.forEach(b=>{h+=`<th style="padding:10px;text-align:center;font-size:11px">${esc(b.label.split(' ')[0])}</th>`;});
+  h+='<th style="padding:10px;text-align:center;width:140px">Ações</th></tr></thead><tbody>';
+  scoringTables.forEach(t=>{
+    h+=`<tr style="border-top:1px solid #e5e7eb"><td style="padding:10px"><strong>${esc(t.name)}</strong>${t.isDefault?' <span class="tag tag-blue" style="font-size:10px">Padrão</span>':''}</td>`;
+    SCORING_BUCKETS.forEach(b=>{h+=`<td style="padding:10px;text-align:center;font-size:13px">${(+t.points[b.key]||0).toLocaleString('pt-BR')}</td>`;});
+    h+='<td style="padding:10px;text-align:center">';
+    h+=`<button class="btn btn-sm btn-secondary" onclick="editScoringTable('${esc(t.id)}')">Editar</button>`;
+    if(!t.isDefault)h+=` <button class="btn btn-sm btn-danger" onclick="deleteScoringTable('${esc(t.id)}')">Excluir</button>`;
+    h+='</td></tr>';
+  });
+  h+='</tbody></table>';
+  c.innerHTML=h;
+}
+
+function addScoringTable(){
+  document.getElementById('st-modal-title').textContent='Novo Ranking';
+  document.getElementById('st-id').value='';
+  document.getElementById('st-name').value='';
+  SCORING_BUCKETS.forEach(b=>{const i=document.getElementById('st-'+b.key);if(i)i.value=DEFAULT_SCORING_TABLE.points[b.key];});
+  document.getElementById('st-name').disabled=false;
+  openModal('modal-scoring-table');
+}
+
+function editScoringTable(id){
+  const t=scoringTables.find(x=>x.id===id);if(!t)return;
+  document.getElementById('st-modal-title').textContent=t.isDefault?'Editar Ranking (Padrão)':'Editar Ranking';
+  document.getElementById('st-id').value=t.id;
+  document.getElementById('st-name').value=t.name;
+  document.getElementById('st-name').disabled=!!t.isDefault;
+  SCORING_BUCKETS.forEach(b=>{const i=document.getElementById('st-'+b.key);if(i)i.value=+t.points[b.key]||0;});
+  openModal('modal-scoring-table');
+}
+
+async function saveScoringTableForm(){
+  const id=document.getElementById('st-id').value;
+  const name=(document.getElementById('st-name').value||'').trim();
+  if(!name){alert('Informe o nome do ranking');return;}
+  const points={};
+  SCORING_BUCKETS.forEach(b=>{points[b.key]=parseInt(document.getElementById('st-'+b.key).value)||0;});
+  if(id){
+    const t=scoringTables.find(x=>x.id===id);
+    if(t){if(!t.isDefault)t.name=name;t.points=points;}
+  }else{
+    scoringTables.push({id:'st-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),name,points,isDefault:false});
+  }
+  await saveScoringTables();
+  closeModal('modal-scoring-table');
+  renderScoringTables();
+  showToast('Ranking salvo!');
+}
+
+async function deleteScoringTable(id){
+  const t=scoringTables.find(x=>x.id===id);
+  if(!t||t.isDefault)return;
+  if(!confirm(`Excluir ranking "${t.name}"?`))return;
+  scoringTables=scoringTables.filter(x=>x.id!==id);
+  await saveScoringTables();
+  renderScoringTables();
+  showToast('Ranking removido');
+}
+
 function renderCategoriesInfo(){
   const container=document.getElementById('settings-categories-content');
   if(!container)return;
@@ -6289,6 +6532,7 @@ function printReport(type){
     case 'oop': body=reportOOP(); break;
     case 'winners': body=reportWinners(); break;
     case 'classification': body=reportClassification(); break;
+    case 'rankingGeral': body=reportRankingGeral(); break;
     case 'players': body=reportPlayers(); break;
     default: body='<p>Relatorio nao encontrado.</p>';
   }
@@ -6688,6 +6932,8 @@ function reportClassification(){
   const simples=draws.filter(d=>d.event==='SM'||d.event==='SF').sort((a,b)=>getCatSort(a.name)-getCatSort(b.name)||(modOrder[a.event]||0)-(modOrder[b.event]||0));
   const duplas=draws.filter(d=>d.event==='DM'||d.event==='DF'||d.event==='DX').sort((a,b)=>getCatSort(a.name)-getCatSort(b.name)||(modOrder[a.event]||0)-(modOrder[b.event]||0));
 
+  const scoringTable=getCurrentScoringTable();
+
   function renderSection(drawList){
     let h='',count=0;
     drawList.forEach(d=>{
@@ -6695,18 +6941,20 @@ function reportClassification(){
       if(!classification.length)return;
       count++;
       h+=`<div class="cat-title">${esc(d.name)} <span style="font-size:11px;color:#666;font-weight:400">(${d.type} - ${d.players?.length||0} atletas)</span></div>`;
-      h+='<table><thead><tr><th style="width:50px">Pos.</th><th>Jogador</th><th style="width:60px">V</th><th style="width:60px">D</th><th>Obs.</th></tr></thead><tbody>';
+      h+='<table><thead><tr><th style="width:50px">Pos.</th><th>Jogador</th><th style="width:60px">V</th><th style="width:60px">D</th><th style="width:70px;text-align:right">Pontos</th><th>Obs.</th></tr></thead><tbody>';
       classification.forEach(c=>{
         const posStyle=c.pos===1?'color:#D4AF37;font-weight:800':c.pos===2?'color:#AAA;font-weight:700':c.pos===3?'color:#CD7F32;font-weight:700':'';
         const medal=c.pos===1?'\uD83E\uDD47 ':c.pos===2?'\uD83E\uDD48 ':c.pos===3?'\uD83E\uDD49 ':'';
-        h+=`<tr><td style="${posStyle}">${medal}${c.pos}o</td><td>${esc(c.name)}</td><td style="text-align:center">${c.wins!=null?c.wins:'-'}</td><td style="text-align:center">${c.losses!=null?c.losses:'-'}</td><td style="font-size:11px;color:#666">${esc(c.note||'')}</td></tr>`;
+        const pts=c.pos>0?pointsForPosition(c.pos,scoringTable):0;
+        h+=`<tr><td style="${posStyle}">${medal}${c.pos}o</td><td>${esc(c.name)}</td><td style="text-align:center">${c.wins!=null?c.wins:'-'}</td><td style="text-align:center">${c.losses!=null?c.losses:'-'}</td><td style="text-align:right;font-weight:600">${pts.toLocaleString('pt-BR')}</td><td style="font-size:11px;color:#666">${esc(c.note||'')}</td></tr>`;
       });
       h+='</tbody></table>';
     });
     return{html:h,count};
   }
 
-  let h='<h2 style="color:#1E3A8A;margin-bottom:16px">Classificacao Geral</h2>';
+  let h=`<h2 style="color:#1E3A8A;margin-bottom:8px">Classificacao Geral</h2>
+  <p style="font-size:12px;color:#64748B;margin-bottom:16px">Pontua\u00E7\u00E3o aplicada: <strong>${esc(scoringTable.name)}</strong></p>`;
 
   // Simples
   if(simples.length){
@@ -6723,6 +6971,69 @@ function reportClassification(){
   }
 
   if(!simples.length&&!duplas.length)h+='<p>Nenhuma categoria com resultados.</p>';
+  return h;
+}
+
+function reportRankingGeral(){
+  const draws=tournament.draws||[];
+  if(!draws.length)return'<p>Nenhuma chave criada.</p>';
+  const scoringTable=getCurrentScoringTable();
+
+  // Agrega pontos por atleta (somando todas as chaves)
+  // Em duplas, cada parceiro recebe o mesmo total de pontos
+  const agg={}; // key (nome) -> {name, club, totalPoints, entries: [{drawName, pos, points}]}
+
+  function findPlayerByName(name){
+    if(!name||!players)return null;
+    const target=name.toLowerCase().trim();
+    return players.find(p=>{
+      const full=`${p.firstName||''} ${p.lastName||''}`.toLowerCase().trim();
+      return full===target;
+    })||null;
+  }
+
+  function addEntry(personName,drawName,pos,pts){
+    const key=personName.toLowerCase().trim();
+    if(!agg[key]){
+      const pl=findPlayerByName(personName);
+      agg[key]={name:personName,club:pl?.club||'',state:pl?.state||'',totalPoints:0,entries:[]};
+    }
+    agg[key].totalPoints+=pts;
+    agg[key].entries.push({drawName,pos,points:pts});
+  }
+
+  draws.forEach(d=>{
+    const classification=computeFullClassification(d);
+    if(!classification.length)return;
+    const isDoubles=d.event==='DM'||d.event==='DF'||d.event==='DX';
+    classification.forEach(c=>{
+      if(c.pos<1)return;
+      const pts=pointsForPosition(c.pos,scoringTable);
+      if(pts<=0)return;
+      if(isDoubles){
+        // c.name é "Atleta1 / Atleta2" → divide e dá pontos a cada um
+        const partners=String(c.name).split(/\s*\/\s*/).filter(Boolean);
+        partners.forEach(name=>{addEntry(name,d.name,c.pos,pts);});
+      }else{
+        addEntry(c.name,d.name,c.pos,pts);
+      }
+    });
+  });
+
+  const list=Object.values(agg).sort((a,b)=>b.totalPoints-a.totalPoints||a.name.localeCompare(b.name));
+  if(!list.length)return`<h2 style="color:#1E3A8A;margin-bottom:16px">Ranking Geral</h2><p>Nenhum atleta com pontuação. Conclua chaves para ver o ranking.</p>`;
+
+  let h=`<h2 style="color:#1E3A8A;margin-bottom:8px">Ranking Geral</h2>
+  <p style="font-size:12px;color:#64748B;margin-bottom:16px">Pontuação aplicada: <strong>${esc(scoringTable.name)}</strong> · ${list.length} atleta(s) classificado(s) · Pontos somados em todas as chaves disputadas</p>`;
+  h+='<table><thead><tr><th style="width:50px">Pos.</th><th>Atleta</th><th>Clube</th><th>UF</th><th style="text-align:center">Chaves</th><th style="text-align:right">Pontos</th><th>Detalhamento</th></tr></thead><tbody>';
+  list.forEach((p,i)=>{
+    const pos=i+1;
+    const posStyle=pos===1?'color:#D4AF37;font-weight:800':pos===2?'color:#AAA;font-weight:700':pos===3?'color:#CD7F32;font-weight:700':'';
+    const medal=pos===1?'🥇 ':pos===2?'🥈 ':pos===3?'🥉 ':'';
+    const detail=p.entries.map(e=>`${esc(e.drawName)} (${e.pos}º: ${e.points})`).join(' · ');
+    h+=`<tr><td style="${posStyle}">${medal}${pos}o</td><td><strong>${esc(p.name)}</strong></td><td>${esc(p.club||'-')}</td><td>${esc(p.state||'-')}</td><td style="text-align:center">${p.entries.length}</td><td style="text-align:right;font-weight:700;font-size:14px">${p.totalPoints.toLocaleString('pt-BR')}</td><td style="font-size:11px;color:#666">${detail}</td></tr>`;
+  });
+  h+='</tbody></table>';
   return h;
 }
 
