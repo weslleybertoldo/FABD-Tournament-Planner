@@ -193,7 +193,28 @@
               <!-- Painel lateral com lista de chaves -->
               <div class="draws-sidebar" id="draws-sidebar">
                 <div class="draws-sidebar-title">Chaves</div>
-                <div class="search-box" style="margin:0 8px 8px"><span class="search-icon">&#128269;</span><input type="text" placeholder="Buscar chaves..." id="search-draws" oninput="filterDraws()"></div>
+                <div class="draws-search-bar">
+                  <div class="search-box"><span class="search-icon">&#128269;</span><input type="text" placeholder="Buscar chaves..." id="search-draws" oninput="filterDraws()"></div>
+                  <button type="button" class="draws-filter-btn" id="draws-filter-btn" onclick="toggleDrawsFilterPopup(event)" title="Filtrar chaves">
+                    <iconify-icon icon="lucide:filter"></iconify-icon>
+                    <span class="filter-badge" id="draws-filter-badge" style="display:none">0</span>
+                  </button>
+                </div>
+                <div class="draws-filter-popup" id="draws-filter-popup" onclick="event.stopPropagation()">
+                  <h5>Sorteio</h5>
+                  <div class="draws-filter-option" data-group="sorteio" data-value="sem" onclick="toggleDrawFilter(this)"><span class="filter-radio"></span>Sem sorteio</div>
+                  <div class="draws-filter-option" data-group="sorteio" data-value="sim" onclick="toggleDrawFilter(this)"><span class="filter-radio"></span>Sorteadas</div>
+                  <h5>Premiação</h5>
+                  <div class="draws-filter-option" data-group="premio" data-value="sim" onclick="toggleDrawFilter(this)"><span class="filter-radio"></span>Premiadas</div>
+                  <div class="draws-filter-option" data-group="premio" data-value="nao" onclick="toggleDrawFilter(this)"><span class="filter-radio"></span>Não premiadas</div>
+                  <h5>Finalização</h5>
+                  <div class="draws-filter-option" data-group="final" data-value="sim" onclick="toggleDrawFilter(this)"><span class="filter-radio"></span>Finalizadas</div>
+                  <div class="draws-filter-option" data-group="final" data-value="nao" onclick="toggleDrawFilter(this)"><span class="filter-radio"></span>Não finalizadas</div>
+                  <div class="draws-filter-actions">
+                    <button onclick="clearDrawFilters()">Limpar</button>
+                    <button class="primary" onclick="closeDrawsFilterPopup()">Aplicar</button>
+                  </div>
+                </div>
                 <div id="draws-list">
                   <div style="padding:16px;text-align:center;color:var(--fabd-gray-500);font-size:13px">Nenhuma chave criada</div>
                 </div>
@@ -288,7 +309,10 @@
             <div class="quick-action" onclick="printReport('oop')"><div class="icon">&#128197;</div><div class="label">Ordem de Jogo</div></div>
             <div class="quick-action" onclick="printReport('winners')"><div class="icon">&#127942;</div><div class="label">Premiacao</div></div>
             <div class="quick-action" onclick="printReport('classification')"><div class="icon">&#127941;</div><div class="label">Classificacao Geral</div></div>
-            <div class="quick-action" onclick="printReport('players')"><div class="icon">&#128101;</div><div class="label">Jogadores</div></div>
+            <div class="quick-action" onclick="printReport('rankingFederados')"><div class="icon">&#127913;</div><div class="label">Ranking Federados</div></div>
+            <div class="quick-action" onclick="printReport('atletasPorClube')"><div class="icon">&#128101;</div><div class="label">Atletas por Clube</div></div>
+            <div class="quick-action" onclick="printReport('medalhasPorClube')"><div class="icon">&#129351;</div><div class="label">Medalhas por Clube</div></div>
+            <div class="quick-action" onclick="printReport('players')"><div class="icon">&#128100;</div><div class="label">Jogadores</div></div>
           </div>
         </div>
 
@@ -337,6 +361,7 @@
             <div class="tab" onclick="setSettingsTab(this,'settings-game')">Configuracao de Jogo</div>
             <div class="tab" onclick="setSettingsTab(this,'settings-umpires')">Arbitros</div>
             <div class="tab" onclick="setSettingsTab(this,'settings-categories')">Categorias</div>
+            <div class="tab" onclick="setSettingsTab(this,'settings-rankings')">Ranking</div>
           </div>
           <div class="card" id="settings-general">
             <div class="card-header"><h3>Configuracoes Gerais</h3></div>
@@ -480,6 +505,14 @@
           <!-- CATEGORIAS -->
           <div class="card" id="settings-categories" style="display:none">
             <div id="settings-categories-content" style="min-height:200px">
+              <div style="padding:40px;text-align:center;color:var(--fabd-gray-400)">Carregando...</div>
+            </div>
+          </div>
+
+          <!-- RANKINGS DE PONTUACAO -->
+          <div class="card" id="settings-rankings" style="display:none">
+            <div class="card-header"><h3>Rankings de Pontuação</h3></div>
+            <div id="settings-rankings-content" style="min-height:200px">
               <div style="padding:40px;text-align:center;color:var(--fabd-gray-400)">Carregando...</div>
             </div>
           </div>
@@ -751,6 +784,8 @@
           <div class="tab" onclick="setTcTab(this,'tc-tab-scoring')">Pontuacao</div>
           <div class="tab" onclick="setTcTab(this,'tc-tab-courts')">Quadras</div>
           <div class="tab" onclick="setTcTab(this,'tc-tab-schedule')">Programacao</div>
+          <div class="tab" onclick="setTcTab(this,'tc-tab-ranking')">Ranking</div>
+          <div class="tab" onclick="setTcTab(this,'tc-tab-clubes')">Clubes Ativos</div>
           <div class="tab" onclick="setTcTab(this,'tc-tab-pricing')">Valor das Inscricoes</div>
         </div>
 
@@ -873,6 +908,36 @@
           <div id="tc-day-schedule-container"></div>
         </div>
 
+        <!-- Aba: Ranking de Pontuacao -->
+        <div id="tc-tab-ranking" style="display:none">
+          <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
+            Selecione o ranking de pontuação a ser usado nos relatórios deste torneio. Crie ou edite rankings em <strong>Configurações &rarr; Ranking</strong>.
+          </p>
+          <div class="form-group">
+            <label>Ranking deste torneio</label>
+            <select class="form-control" id="tc-ranking-select" onchange="updateTcRankingPreview()"></select>
+          </div>
+          <div style="background:var(--fabd-gray-100);border-radius:8px;padding:16px;margin-top:12px">
+            <h4 style="margin-bottom:8px;color:var(--fabd-gray-700);font-size:13px">Tabela de pontos</h4>
+            <div id="tc-ranking-preview"></div>
+          </div>
+        </div>
+
+        <!-- Aba: Clubes Ativos -->
+        <div id="tc-tab-clubes" style="display:none">
+          <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
+            Status dos clubes neste torneio. Apenas atletas de clubes <strong>Adimplentes</strong> entram no relatório <strong>Ranking Federados</strong>.
+          </p>
+          <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-secondary" onclick="setAllClubStatus('adimplente')">Marcar todos Adimplentes</button>
+            <button class="btn btn-sm btn-secondary" onclick="setAllClubStatus('inadimplente')">Marcar todos Inadimplentes</button>
+            <button class="btn btn-sm btn-secondary" onclick="setAllClubStatus('sc')">Limpar status (S/C)</button>
+          </div>
+          <div id="tc-clubes-list" style="background:#fff;border:1px solid var(--fabd-gray-200);border-radius:8px;overflow:hidden">
+            <p style="padding:24px;text-align:center;color:var(--fabd-gray-500)">Carregando clubes...</p>
+          </div>
+        </div>
+
         <!-- Aba: Valor das Inscricoes -->
         <div id="tc-tab-pricing" style="display:none">
           <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
@@ -951,6 +1016,41 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-import')">Cancelar</button>
         <button class="btn btn-success" id="import-btn-confirm" onclick="confirmImport()" style="display:none">&#10003; Importar Jogadores</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDITAR RANKING DE PONTUACAO -->
+  <div class="modal-overlay" id="modal-scoring-table">
+    <div class="modal" style="width:560px">
+      <div class="modal-header">
+        <h3 id="st-modal-title">Novo Ranking</h3>
+        <button class="modal-close" onclick="closeModal('modal-scoring-table')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="st-id">
+        <div class="form-group">
+          <label>Nome do Ranking</label>
+          <input type="text" class="form-control" id="st-name" placeholder="Ex: Estadual Alagoas, FABD Etapa, etc.">
+        </div>
+        <p style="font-size:12px;color:var(--fabd-gray-600);margin:12px 0 8px">Defina quantos pontos cada faixa de colocação recebe:</p>
+        <div style="display:grid;grid-template-columns:1fr 130px;gap:8px 12px;align-items:center;background:var(--fabd-gray-100);padding:14px;border-radius:8px">
+          <div style="font-weight:600;font-size:13px;color:var(--fabd-gray-700)">Colocação</div>
+          <div style="font-weight:600;font-size:13px;color:var(--fabd-gray-700);text-align:right">Pontos</div>
+          <label style="font-size:13px">1º (Campeão)</label><input type="number" class="form-control" id="st-p1" min="0" style="text-align:right">
+          <label style="font-size:13px">2º (Vice)</label><input type="number" class="form-control" id="st-p2" min="0" style="text-align:right">
+          <label style="font-size:13px">3º/4º (Semifinal)</label><input type="number" class="form-control" id="st-p3" min="0" style="text-align:right">
+          <label style="font-size:13px">5º-8º (Quartas)</label><input type="number" class="form-control" id="st-p5" min="0" style="text-align:right">
+          <label style="font-size:13px">9º-16º (Oitavas)</label><input type="number" class="form-control" id="st-p9" min="0" style="text-align:right">
+          <label style="font-size:13px">17º-32º (R32)</label><input type="number" class="form-control" id="st-p17" min="0" style="text-align:right">
+          <label style="font-size:13px">33º-64º (R64)</label><input type="number" class="form-control" id="st-p33" min="0" style="text-align:right">
+          <label style="font-size:13px">65º-128º (R128)</label><input type="number" class="form-control" id="st-p65" min="0" style="text-align:right">
+          <label style="font-size:13px">129º-256º (R256)</label><input type="number" class="form-control" id="st-p129" min="0" style="text-align:right">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-scoring-table')">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveScoringTableForm()">&#128190; Salvar</button>
       </div>
     </div>
   </div>

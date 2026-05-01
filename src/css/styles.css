@@ -523,7 +523,9 @@ select, textarea {
 .draws-layout {
   display: flex;
   gap: 16px;
+  height: calc(100vh - 180px);
   min-height: 500px;
+  overflow: hidden;
 }
 
 .draws-sidebar {
@@ -535,6 +537,7 @@ select, textarea {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .draws-sidebar-title {
@@ -584,6 +587,102 @@ select, textarea {
 .draws-main {
   flex: 1;
   min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#draws-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Toolbar de busca/filtro da sidebar */
+.draws-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+.draws-search-bar .search-box { flex: 1; margin: 0; }
+.draws-filter-btn {
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--fabd-white);
+  border: 1px solid var(--fabd-gray-300);
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  color: var(--fabd-gray-600);
+  font-size: 16px;
+  transition: var(--transition);
+}
+.draws-filter-btn:hover { background: var(--fabd-gray-100); border-color: var(--fabd-blue); }
+.draws-filter-btn.has-active { color: var(--fabd-blue); border-color: var(--fabd-blue); background: #EFF6FF; }
+.draws-filter-btn .filter-badge {
+  position: absolute; top: -6px; right: -6px;
+  min-width: 18px; height: 18px; border-radius: 9px;
+  background: var(--fabd-red); color: #fff;
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px;
+}
+
+/* Popup de filtros */
+.draws-filter-popup {
+  position: absolute;
+  top: 50px;
+  right: 8px;
+  width: 240px;
+  background: #fff;
+  border: 1px solid var(--fabd-gray-200);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  z-index: 50;
+  padding: 12px;
+  display: none;
+}
+.draws-filter-popup.open { display: block; }
+.draws-filter-popup h5 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--fabd-gray-500); margin: 8px 0 6px; font-weight: 700;
+}
+.draws-filter-popup h5:first-child { margin-top: 0; }
+.draws-filter-option {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 4px; cursor: pointer;
+  user-select: none; font-size: 13px;
+  color: var(--fabd-gray-700);
+  border-radius: 4px;
+}
+.draws-filter-option:hover { background: var(--fabd-gray-100); }
+.draws-filter-option .filter-radio {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--fabd-gray-400);
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
+}
+.draws-filter-option.active .filter-radio {
+  border-color: var(--fabd-blue);
+  background: var(--fabd-blue);
+}
+.draws-filter-option.active .filter-radio::after {
+  content: ''; width: 6px; height: 6px;
+  background: #fff; border-radius: 50%;
+}
+.draws-filter-actions {
+  display: flex; justify-content: space-between; gap: 8px;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--fabd-gray-200);
+}
+.draws-filter-actions button {
+  flex: 1; padding: 6px 10px; font-size: 12px;
+  border-radius: 6px; cursor: pointer; border: 1px solid var(--fabd-gray-300);
+  background: #fff; color: var(--fabd-gray-700);
+}
+.draws-filter-actions button.primary {
+  background: var(--fabd-blue); color: #fff; border-color: var(--fabd-blue);
 }
 
 /* === BRACKET (estilo chaveamento classico) === */
