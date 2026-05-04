@@ -1829,7 +1829,11 @@ function renderDraws() {
     const hasFilters=_countActiveDrawFilters()>0;
     const msg=q?'Nenhuma chave encontrada':hasFilters?'Nenhuma chave atende aos filtros':'Nenhuma chave criada';
     listEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--fabd-gray-500);font-size:13px">${msg}</div>`;
-    if(!q&&!hasFilters)detailEl.innerHTML = '<div class="empty-state"><div class="icon">&#127960;</div><h3>Crie uma chave</h3></div>';
+    detailEl.innerHTML = q
+      ? '<div class="empty-state"><div class="icon">&#128269;</div><h3>Nenhuma chave encontrada</h3><p>Tente ajustar a busca para localizar uma chave.</p></div>'
+      : hasFilters
+        ? '<div class="empty-state"><div class="icon">&#128295;</div><h3>Nenhuma chave atende aos filtros</h3><p>Altere ou remova os filtros para ver as chaves disponíveis.</p></div>'
+        : '<div class="empty-state"><div class="icon">&#127960;</div><h3>Crie uma chave</h3></div>';
     return;
   }
 
@@ -5351,7 +5355,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-categories')renderCategoriesInfo();
   if(panelId==='settings-rankings')renderScoringTables();
 }
-const APP_VERSION='4.39';
+const APP_VERSION='4.39.1';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
@@ -5484,15 +5488,15 @@ function renderTcClubes(){
   clubs.forEach(cl=>{
     const st=getClubStatus(cl.key);
     const safe=esc(cl.name);
-    const safeKey=esc(cl.key).replace(/'/g,"\\'");
+    const safeKey=esc(cl.key);
     h+=`<tr style="border-top:1px solid #e5e7eb">
       <td style="padding:10px"><strong>${safe}</strong></td>
       <td style="padding:10px;text-align:center">${cl.count}</td>
       <td style="padding:10px;text-align:center">
         <div style="display:inline-flex;border:1px solid var(--fabd-gray-300);border-radius:6px;overflow:hidden;font-size:12px">
-          <button onclick="setClubStatus('${safeKey}','adimplente')" style="border:none;padding:6px 10px;cursor:pointer;background:${st==='adimplente'?'#10B981':'#fff'};color:${st==='adimplente'?'#fff':'var(--fabd-gray-700)'};font-weight:${st==='adimplente'?'700':'400'}">Adimplente</button>
-          <button onclick="setClubStatus('${safeKey}','inadimplente')" style="border:none;padding:6px 10px;cursor:pointer;border-left:1px solid var(--fabd-gray-300);border-right:1px solid var(--fabd-gray-300);background:${st==='inadimplente'?'#DC2626':'#fff'};color:${st==='inadimplente'?'#fff':'var(--fabd-gray-700)'};font-weight:${st==='inadimplente'?'700':'400'}">Inadimplente</button>
-          <button onclick="setClubStatus('${safeKey}','sc')" style="border:none;padding:6px 10px;cursor:pointer;background:${st==='sc'?'#64748B':'#fff'};color:${st==='sc'?'#fff':'var(--fabd-gray-700)'};font-weight:${st==='sc'?'700':'400'}" title="Sem confirmação">S/C</button>
+          <button data-club-key="${safeKey}" data-club-status="adimplente" style="border:none;padding:6px 10px;cursor:pointer;background:${st==='adimplente'?'#10B981':'#fff'};color:${st==='adimplente'?'#fff':'var(--fabd-gray-700)'};font-weight:${st==='adimplente'?'700':'400'}">Adimplente</button>
+          <button data-club-key="${safeKey}" data-club-status="inadimplente" style="border:none;padding:6px 10px;cursor:pointer;border-left:1px solid var(--fabd-gray-300);border-right:1px solid var(--fabd-gray-300);background:${st==='inadimplente'?'#DC2626':'#fff'};color:${st==='inadimplente'?'#fff':'var(--fabd-gray-700)'};font-weight:${st==='inadimplente'?'700':'400'}">Inadimplente</button>
+          <button data-club-key="${safeKey}" data-club-status="sc" style="border:none;padding:6px 10px;cursor:pointer;background:${st==='sc'?'#64748B':'#fff'};color:${st==='sc'?'#fff':'var(--fabd-gray-700)'};font-weight:${st==='sc'?'700':'400'}" title="Sem confirmação">S/C</button>
         </div>
       </td>
     </tr>`;
@@ -5502,6 +5506,9 @@ function renderTcClubes(){
   const adim=clubs.filter(c=>getClubStatus(c.key)==='adimplente').reduce((s,c)=>s+c.count,0);
   h+=`</tbody><tfoot><tr style="background:#f8fafc;border-top:2px solid var(--fabd-gray-300)"><td style="padding:10px;font-weight:700">${clubs.length} clubes</td><td style="padding:10px;text-align:center;font-weight:700">${total}</td><td style="padding:10px;text-align:center;font-size:12px;color:var(--fabd-gray-600)">${adim} atletas em clubes adimplentes</td></tr></tfoot></table>`;
   c.innerHTML=h;
+  c.querySelectorAll('button[data-club-key]').forEach(btn=>{
+    btn.addEventListener('click',()=>setClubStatus(btn.dataset.clubKey,btn.dataset.clubStatus));
+  });
 }
 
 function renderTcRanking(){
@@ -5899,7 +5906,7 @@ function renderScoringTables(){
     return;
   }
   let h=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-    <p style="font-size:13px;color:var(--fabd-gray-600);margin:0">Defina tabelas de pontuação por colocação. Use no relatório "Ranking Geral" do torneio.</p>
+    <p style="font-size:13px;color:var(--fabd-gray-600);margin:0">Defina tabelas de pontuação por colocação. Use nos relatórios "Classificação Geral" e "Ranking Federados" do torneio.</p>
     <button class="btn btn-primary btn-sm" onclick="addScoringTable()">+ Novo Ranking</button>
   </div>`;
   h+='<table style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden"><thead><tr style="background:#f8fafc"><th style="padding:10px;text-align:left">Nome</th>';
