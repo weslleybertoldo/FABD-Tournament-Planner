@@ -27,10 +27,6 @@
     ],
     "extraFiles": [
       {
-        "from": "config.local.json",
-        "to": "config.local.json"
-      },
-      {
         "from": "config.example.json",
         "to": "config.example.json"
       }
