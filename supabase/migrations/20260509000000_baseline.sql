@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS public.live_matches (
 ALTER TABLE public.live_matches ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE IF NOT EXISTS public.live_scores (
-  id bigint NOT NULL,
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   match_id text,
   tournament_id text,
   current_set integer DEFAULT 1,
@@ -250,7 +250,9 @@ CREATE OR REPLACE FUNCTION public.lower_organizer_email()
  LANGUAGE plpgsql
 AS $function$
 BEGIN
-  NEW.email = lower(trim(NEW.email));
+  -- Atribuicao via := (idiomatico em PL/pgSQL). PostgreSQL aceita = em records,
+  -- mas := deixa explicito que e atribuicao (nao comparacao).
+  NEW.email := lower(trim(NEW.email));
   RETURN NEW;
 END;
 $function$;
@@ -465,5 +467,62 @@ CREATE POLICY tournaments_update_fed ON public.tournaments
 -- ========== REVOKE EXECUTE (Fase 1 da auditoria 2026-05-09) ==========
 REVOKE EXECUTE ON FUNCTION public.protect_referee_status() FROM public, anon;
 REVOKE EXECUTE ON FUNCTION public.force_referee_pending_status() FROM public, anon;
+
+-- ========== STORAGE: bucket federation-logos + policies ==========
+-- Bucket precisa ser criado via Supabase Dashboard ou storage.buckets insert
+-- (Management API nao expoe POST /storage/buckets diretamente).
+-- Aqui registramos via INSERT idempotente (storage.buckets aceita).
+INSERT INTO storage.buckets (id, name, public)
+  VALUES ('federation-logos', 'federation-logos', true)
+  ON CONFLICT (id) DO NOTHING;
+
+-- Policies do bucket. logos_public_read deixa SELECT aberto; writes exigem
+-- organizer admin/super_admin com slug da federacao = primeira pasta do path.
+DROP POLICY IF EXISTS logos_public_read ON storage.objects;
+CREATE POLICY logos_public_read ON storage.objects
+  FOR SELECT
+  TO public
+  USING (bucket_id = 'federation-logos'::text);
+
+DROP POLICY IF EXISTS logos_insert_fed_admin ON storage.objects;
+CREATE POLICY logos_insert_fed_admin ON storage.objects
+  FOR INSERT
+  TO public
+  WITH CHECK (((bucket_id = 'federation-logos'::text) AND ((auth.role() = 'service_role'::text) OR (EXISTS ( SELECT 1
+   FROM (organizers o
+     LEFT JOIN federations f ON ((f.id = o.federation_id)))
+  WHERE ((o.email = lower(COALESCE(auth.email(), ''::text))) AND o.active AND (o.role = ANY (ARRAY['super_admin'::text, 'admin'::text])) AND ((o.role = 'super_admin'::text) OR ((storage.foldername(objects.name))[1] = f.slug))))))));
+
+DROP POLICY IF EXISTS logos_update_fed_admin ON storage.objects;
+CREATE POLICY logos_update_fed_admin ON storage.objects
+  FOR UPDATE
+  TO public
+  USING (((bucket_id = 'federation-logos'::text) AND ((auth.role() = 'service_role'::text) OR (EXISTS ( SELECT 1
+   FROM (organizers o
+     LEFT JOIN federations f ON ((f.id = o.federation_id)))
+  WHERE ((o.email = lower(COALESCE(auth.email(), ''::text))) AND o.active AND (o.role = ANY (ARRAY['super_admin'::text, 'admin'::text])) AND ((o.role = 'super_admin'::text) OR ((storage.foldername(objects.name))[1] = f.slug))))))));
+
+DROP POLICY IF EXISTS logos_delete_fed_admin ON storage.objects;
+CREATE POLICY logos_delete_fed_admin ON storage.objects
+  FOR DELETE
+  TO public
+  USING (((bucket_id = 'federation-logos'::text) AND ((auth.role() = 'service_role'::text) OR (EXISTS ( SELECT 1
+   FROM (organizers o
+     LEFT JOIN federations f ON ((f.id = o.federation_id)))
+  WHERE ((o.email = lower(COALESCE(auth.email(), ''::text))) AND o.active AND (o.role = ANY (ARRAY['super_admin'::text, 'admin'::text])) AND ((o.role = 'super_admin'::text) OR ((storage.foldername(objects.name))[1] = f.slug))))))));
+
+-- ========== REALTIME: publication supabase_realtime ==========
+-- live_matches, live_scores e referees sao replicados via Realtime
+-- pra UI publica (placar ao vivo, status arbitros). Idempotente
+-- via DO/EXCEPTION duplicate_object.
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.live_matches;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.live_scores;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.referees;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 COMMIT;

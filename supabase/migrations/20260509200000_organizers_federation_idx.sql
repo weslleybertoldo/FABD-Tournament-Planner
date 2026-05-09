@@ -7,6 +7,10 @@
 -- Aplicado em prod via Management API; migration para versionamento.
 -- =============================================================
 
+BEGIN;
+
 CREATE INDEX IF NOT EXISTS organizers_federation_idx
   ON public.organizers (federation_id)
   WHERE federation_id IS NOT NULL;
+
+COMMIT;
