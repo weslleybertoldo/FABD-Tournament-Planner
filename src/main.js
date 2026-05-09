@@ -14,7 +14,10 @@ const XLSX = require('xlsx');
 //   - Modo Organizador: service_role presente -> escrita liberada
 //   - Modo Somente Leitura: so anon -> escrita bloqueada pelo RLS (Passo 5)
 const DEFAULT_SUPABASE_URL = 'https://zwjgjtrmsqtyyjtuotuo.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY';
+// sb_publishable_* (modern key) substitui o anon JWT legacy. Continua publica
+// por design (vai pro frontend), mas usa signing key ES256 — JWT secret HS256
+// pode ser revogado sem quebrar o app.
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_sCMqtUOnE7McSgZelCkWJQ_cbyslJNX';
 
 function loadSupabaseConfig() {
   const configPaths = [

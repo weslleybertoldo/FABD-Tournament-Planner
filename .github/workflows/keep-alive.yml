@@ -16,7 +16,7 @@ jobs:
         run: |
           set -e
           RES=$(curl -s -w "\n%{http_code}" \
-            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3amdqdHJtc3F0eXlqdHVvdHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NTYyNjIsImV4cCI6MjA5MDMzMjI2Mn0.c6kE4RMlUOr6-FNCY2X5aeedyEvcmVTUxNVn-kvjYWY" \
+            -H "apikey: sb_publishable_sCMqtUOnE7McSgZelCkWJQ_cbyslJNX" \
             "https://zwjgjtrmsqtyyjtuotuo.supabase.co/auth/v1/health")
           CODE=$(echo "$RES" | tail -1)
           echo "FABD Tournament runtime ping: HTTP $CODE"
