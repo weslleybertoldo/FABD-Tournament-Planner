@@ -79,7 +79,7 @@ function _registerEmQuadraIds() {
   const ids = (tournament.matches || [])
     .filter(m => m.status === 'Em Quadra')
     .map(m => _stableMatchId(tournament.id, m));
-  window.api.supabaseRegisterEmQuadra(tournament.id, ids).catch(() => {});
+  window.api.supabaseRegisterEmQuadra(tournament.id, ids).catch(e => console.warn('[supabase] registerEmQuadra falhou (offline ou RLS):', e?.message || e));
 }
 
 // Reconciliacao: main detectou divergencia e nos pede pra re-sincronizar
@@ -93,7 +93,7 @@ if (window.api?.onReconcileNeeded) {
     for (const id of fix) {
       const m = (tournament.matches || []).find(x => _stableMatchId(tournament.id, x) === id);
       if (m && m.status === 'Em Quadra') {
-        try { await window.api.supabaseUpsertMatch(tournament.id, m); } catch {}
+        try { await window.api.supabaseUpsertMatch(tournament.id, m); } catch (e) { console.warn('[reconcile] upsertMatch falhou para', id, ':', e?.message || e); }
       }
     }
   });
@@ -5824,7 +5824,7 @@ function loadUmpires(){
       .map(u=>{ if(typeof u.id!=='string'){u.id=_newUmpireId();migrated=true;} return u; })
       .slice(0,100);
     if(migrated){
-      try{ localStorage.setItem('fabd-umpires',JSON.stringify(parsed)); }catch{}
+      try{ localStorage.setItem('fabd-umpires',JSON.stringify(parsed)); }catch(e){ console.warn('[umpires] localStorage migration falhou (quota?):', e?.message || e); }
     }
     return parsed;
   }catch{return[];}
@@ -5840,7 +5840,7 @@ function getUmpireByName(name){
 function saveUmpires(l){
   localStorage.setItem('fabd-umpires',JSON.stringify(l));
   // Salvar no banco tambem para persistir
-  window.api.getSettings().then(s=>{s=s||{};s.umpires=l;window.api.saveSettings(s);}).catch(()=>{});
+  window.api.getSettings().then(s=>{s=s||{};s.umpires=l;window.api.saveSettings(s);}).catch(e=>console.warn('[settings] saveUmpires DB persist falhou:', e?.message || e));
 }
 // === SCORING TABLES (Rankings de Pontuação) ===
 let scoringTables=[];
