@@ -7509,6 +7509,27 @@ function filterPlayers() {
   _filterPlayersTimer=setTimeout(()=>filterTable('search-players','players-table-body'),150);
 }
 // Sanitizacao HTML (OWASP): use em conteudo de tag (`<td>${esc(x)}</td>`) e
-// em atributo entre aspas duplas (`<a href="${esc(url)}">`). Pra HTML rico
-// (formatacao permitida), integrar DOMPurify (ja em deps) na sprint dedicada.
+// em atributo entre aspas duplas (`<a href="${esc(url)}">`).
 function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/\//g,'&#x2F;'):'';}
+
+// safeHTML: para casos onde a string pode conter HTML legitimo (formatacao,
+// links). Usa DOMPurify (vendor/purify.min.js) com allowlist conservadora.
+// Quando DOMPurify nao esta carregado (test, dev sem vendor), faz fallback
+// pra esc() — degrada graceful.
+//
+// Uso correto: `el.innerHTML = safeHTML(userMarkup, { ALLOWED_TAGS: ['b','br'] })`
+// NAO usar pra dados que ja passam por esc() em template — esc() e mais seguro
+// e barato pra texto puro.
+function safeHTML(html, opts) {
+  if (!html) return '';
+  if (typeof window !== 'undefined' && window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
+    return window.DOMPurify.sanitize(String(html), opts || {
+      ALLOWED_TAGS: ['b','i','strong','em','br','span','small','sub','sup'],
+      ALLOWED_ATTR: ['class','style'],
+      FORBID_TAGS: ['script','style','iframe','object','embed','svg','math'],
+      FORBID_ATTR: ['onerror','onload','onclick','onmouseover','onfocus','onblur','formaction','href','src']
+    });
+  }
+  // Fallback: escape total (texto sem HTML)
+  return esc(html);
+}
