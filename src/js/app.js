@@ -7508,4 +7508,7 @@ function filterPlayers() {
   clearTimeout(_filterPlayersTimer);
   _filterPlayersTimer=setTimeout(()=>filterTable('search-players','players-table-body'),150);
 }
-function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
+// Sanitizacao HTML (OWASP): use em conteudo de tag (`<td>${esc(x)}</td>`) e
+// em atributo entre aspas duplas (`<a href="${esc(url)}">`). Pra HTML rico
+// (formatacao permitida), integrar DOMPurify (ja em deps) na sprint dedicada.
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/\//g,'&#x2F;'):'';}
