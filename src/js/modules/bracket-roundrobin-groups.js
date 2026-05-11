@@ -22,14 +22,17 @@ function generateRoundRobinSchedule(pls) {
   const list=[...pls]; if(list.length%2!==0)list.push('BYE');
   const total=list.length,rounds=total-1,mpr=total/2,matches=[];
   // Pre-computa map name→idx do array original (O(1) lookup vs indexOf O(n) por match).
+  // Preserva semantica original: indexOf retorna PRIMEIRO encontro + -1 se ausente.
   const idxMap = new Map();
-  for (let i = 0; i < pls.length; i++) idxMap.set(pls[i], i);
+  for (let i = 0; i < pls.length; i++) {
+    if (!idxMap.has(pls[i])) idxMap.set(pls[i], i);
+  }
   for(let r=0;r<rounds;r++){for(let m=0;m<mpr;m++){
     const home=m===0?0:(total-1-m+r)%(total-1)+1;
     const away=(m+r)%(total-1)+1;
     const p1=list[home<total?home:0],p2=list[away<total?away:0];
     if(p1==='BYE'||p2==='BYE')continue;
-    matches.push({round:r+1,player1:p1,player2:p2,p1idx:idxMap.get(p1),p2idx:idxMap.get(p2),score1:'',score2:''});
+    matches.push({round:r+1,player1:p1,player2:p2,p1idx:idxMap.get(p1)??-1,p2idx:idxMap.get(p2)??-1,score1:'',score2:''});
   }}
   return matches;
 }
