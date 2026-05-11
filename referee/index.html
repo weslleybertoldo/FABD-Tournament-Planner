@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://code.iconify.design; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://zwjgjtrmsqtyyjtuotuo.supabase.co wss://zwjgjtrmsqtyyjtuotuo.supabase.co https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com https://accounts.google.com; frame-src https://accounts.google.com; form-action 'self' https://accounts.google.com; base-uri 'self'; object-src 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#1E3A8A">
   <meta name="mobile-web-app-capable" content="yes">
@@ -138,7 +139,7 @@
       Entrar com Google
     </button>
     <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
-    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.35.0</p>
+    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.36.0</p>
   </div>
 
   <!-- ESCOLHER FEDERACAO (primeira vez ou sem federacao definida) -->
@@ -547,37 +548,17 @@
       }catch(e){errEl.style.color='#EF4444';errEl.textContent='Erro: '+e.message;}
     }
 
-    // v4.17: Magic Link alternativo pra PWA mobile. Em mobile, OAuth Google
-    // pode abrir browser externo e o redirect nao volta pro PWA standalone —
-    // o token do auth fica isolado no browser. Magic link via email contorna
-    // isso: user clica no link no email do PROPRIO PWA, abre dentro do mesmo
-    // contexto, supabase-js captura o token, persiste no localStorage do PWA.
-    async function loginEmail(){
-      if(!sb)return;
-      const errEl=document.getElementById('login-error');
-      const infoEl=document.getElementById('login-info');
-      errEl.style.display='none';infoEl.style.display='none';
-      const email=(document.getElementById('login-email-input')?.value||'').trim().toLowerCase();
-      if(!email||!email.includes('@')){errEl.style.color='#EF4444';errEl.textContent='Digite um email valido';errEl.style.display='block';return;}
-      try{
-        infoEl.textContent='Enviando link...';infoEl.style.color='#60A5FA';infoEl.style.display='block';
-        const{error}=await sb.auth.signInWithOtp({
-          email,
-          options:{emailRedirectTo:location.href.split('#')[0].split('?')[0]}
-        });
-        if(error){errEl.style.color='#EF4444';errEl.textContent='Erro: '+error.message;errEl.style.display='block';infoEl.style.display='none';return;}
-        infoEl.style.color='#10B981';
-        infoEl.innerHTML='Link enviado para <b>'+esc(email)+'</b>!<br>Abra o email e toque no link para entrar.';
-      }catch(e){errEl.style.color='#EF4444';errEl.textContent='Erro: '+e.message;errEl.style.display='block';infoEl.style.display='none';}
-    }
     function logout(){
       // v4.5: marca como intencional pro listener saber que pode limpar state
       _intentionalLogout=true;
       // v4.34: limpa cache do referee record (proximo login revalida)
       try { if (currentUser?.id) localStorage.removeItem(`fabd-ref-cache-${currentUser.id}`); } catch(e) {}
-      currentUser=null;sb?.auth.signOut();hideAll();
+      // v4.36 P1: cancela Realtime + heartbeat antes de signOut (evita leak de canais)
+      teardownRealtimeAll();
+      if(pollInterval){clearInterval(pollInterval);pollInterval=null;}
+      currentUser=null;currentMatch=null;isReadOnly=false;
+      sb?.auth.signOut();hideAll();
       document.getElementById('page-login').style.display='flex';
-      if(pollInterval)clearInterval(pollInterval);
     }
     function hideAll(){['page-login','page-federation','page-pending','page-matches','page-scorer','page-loading'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
 
@@ -676,8 +657,26 @@
       else { showPending(); return 'pending'; }
     }
 
-    async function handleLogin(u){
+    // v4.36 P0: lock pra evitar handleLogin concorrente (listener + getSession
+    // + setSession-fallback + visibilitychange podem disparar 2-3x quase juntos).
+    let _handleLoginPromise=null;
+    function handleLogin(u){
+      if(_handleLoginPromise){
+        console.log('[Auth] handleLogin re-entry suprimido:', u?.email);
+        return _handleLoginPromise;
+      }
+      _handleLoginPromise=_handleLoginImpl(u).finally(()=>{_handleLoginPromise=null;});
+      return _handleLoginPromise;
+    }
+    async function _handleLoginImpl(u){
       console.log('[Auth] handleLogin start:', u?.email);
+      // Se ja temos esse user logado, evita re-render
+      if(currentUser&&currentUser.id===u?.id){
+        console.log('[Auth] handleLogin skip: mesmo user ja logado');
+        currentUser.email=u.email||currentUser.email;
+        currentUser.name=u.name||currentUser.name;
+        return;
+      }
       currentUser=u;
 
       // 1. Cache hit → navega INSTANTANEAMENTE (zero query)
@@ -1127,43 +1126,56 @@
           if(isDoubles&&(state.p1>0||state.p2>0))canSwapInner=false;
         }
 
-        // Verificar se este árbitro já está em outro jogo ativo (não finalizado)
+        // v4.36 P0: lock atômico via RPC claim_match (substitui check client-side
+        // sujeito a race entre 2 árbitros). RPC valida auth, status do árbitro,
+        // federação, status do jogo, e usa advisory lock no Postgres.
         isReadOnly=false;
-        const lockTimeout=5*60*1000; // 5 minutos de timeout
+        const lockTimeout=5*60*1000;
         {
-          const{data:activeGames}=await sb.from('live_scores').select('match_id,umpire_name,updated_at,winner').eq('umpire_name',currentUser?.name||'').is('winner',null);
-          const otherActive=activeGames?.find(g=>g.match_id!==matchId&&(Date.now()-new Date(g.updated_at||0).getTime())<lockTimeout);
-          if(otherActive){
-            alert('Você já está arbitrando outro jogo. Saia do jogo atual antes de abrir outro.');
+          const{data:claim,error:claimErr}=await sb.rpc('claim_match',{p_match_id:matchId,p_lock_seconds:300});
+          if(claimErr){
+            console.error('[Referee] claim_match RPC error:',claimErr);
+            alert('Erro ao reservar o jogo: '+claimErr.message);
             return;
           }
-        }
-
-        // Verificar se outro árbitro já está marcando este jogo
-        if(sc&&sc.umpire_name&&sc.umpire_name!==currentUser?.name){
-          const lastUpdate=new Date(sc.updated_at||0).getTime();
-          if(Date.now()-lastUpdate<lockTimeout){
-            // Outro árbitro ativo (atualizou nos últimos 5 min) → somente visualização
-            isReadOnly=true;
-            console.log('Modo somente leitura: outro árbitro', sc.umpire_name, 'está neste jogo');
+          if(!claim?.acquired){
+            const reason=claim?.reason||'unknown';
+            if(reason==='locked_by_other'){
+              const who=claim.current_umpire||'outro árbitro';
+              const ageSec=claim.age_seconds||0;
+              const remainSec=Math.max(0,(claim.lock_seconds||300)-ageSec);
+              const mm=Math.floor(remainSec/60),ss=remainSec%60;
+              // Modo leitura — o outro árbitro está ativo
+              isReadOnly=true;
+              console.log('[Referee] locked by',who,'(age',ageSec+'s, remain',remainSec+'s)');
+              alert('Jogo já está sendo arbitrado por '+who+'.\nVocê entra em modo visualização.\nLock libera em ~'+mm+'min'+(ss<10?'0':'')+ss+'s se ele sair.');
+            } else if(reason==='match_finished'){
+              alert('Este jogo já foi finalizado.');
+              return;
+            } else if(reason==='match_not_in_court'){
+              alert('Este jogo não está mais em quadra (status: '+(claim.status||'?')+').');
+              return;
+            } else if(reason==='wrong_federation'){
+              alert('Este jogo pertence a outra federação.');
+              return;
+            } else if(reason==='not_authorized'){
+              alert('Seu cadastro de árbitro ainda não foi autorizado.');
+              return;
+            } else {
+              alert('Não foi possível reservar o jogo ('+reason+').');
+              return;
+            }
           }
-          // Se passou 5 min sem atualização, assume que saiu sem clicar Voltar → libera
-        }
-
-        // Se NÃO é readOnly, registra este árbitro imediatamente no jogo
-        // Usa UPSERT para funcionar mesmo se o row ainda não existe (jogo recém colocado em quadra)
-        if(!isReadOnly&&currentUser?.name){
-          await sb.from('live_scores').upsert({match_id:matchId,tournament_id:currentMatch.tournament_id,federation_id:currentMatch.federation_id,umpire_name:currentUser.name,updated_at:new Date().toISOString()},{onConflict:'match_id'});
         }
 
         hideAll();document.getElementById('page-scorer').style.display='flex';
         if(pollInterval)clearInterval(pollInterval);
-        // Heartbeat: manter lock ativo enquanto está no jogo
+        // Heartbeat: re-claim a cada 30s (RPC mantém lock ativo, libera após 5min sem heartbeat)
         pollInterval=setInterval(async()=>{
           if(!isReadOnly&&currentMatch&&currentUser?.name){
-            await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,federation_id:currentMatch.federation_id,umpire_name:currentUser.name,updated_at:new Date().toISOString()},{onConflict:'match_id'}).then(()=>{},()=>{});
+            try{await sb.rpc('claim_match',{p_match_id:currentMatch.id,p_lock_seconds:300});}catch(e){}
           }
-        },30000); // a cada 30 segundos
+        },30000);
         lockLandscape();
         updateDisplay();
         updateReadOnlyUI();
@@ -1665,16 +1677,14 @@
     }
 
     async function doExitScorer(){
-      // Limpar árbitro do jogo se não estava em modo leitura e jogo não finalizado
+      // v4.36: release_match RPC (idempotente — só limpa se for o dono e jogo não finalizado)
       if(currentMatch&&!isReadOnly&&sb){
-        try{
-          // Só limpar se o jogo ainda está em andamento (não finalizado)
-          const{data:sc}=await sb.from('live_scores').select('umpire_name,winner').eq('match_id',currentMatch.id).single();
-          if(sc&&!sc.winner&&sc.umpire_name===currentUser?.name){
-            await sb.from('live_scores').update({umpire_name:''}).eq('match_id',currentMatch.id);
-          }
-        }catch(e){}
+        try{await sb.rpc('release_match',{p_match_id:currentMatch.id});}catch(e){}
       }
+      // Cancelar heartbeat + score Realtime do jogo que saiu
+      if(pollInterval){clearInterval(pollInterval);pollInterval=null;}
+      if(realtimeScoreChannel){try{sb.removeChannel(realtimeScoreChannel);}catch(e){}realtimeScoreChannel=null;}
+      if(realtimeScoreRetry){clearInterval(realtimeScoreRetry);realtimeScoreRetry=null;}
       hideAll();currentMatch=null;isReadOnly=false;showMatches();try{screen.orientation?.unlock?.();}catch(e){}
     }
     function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
