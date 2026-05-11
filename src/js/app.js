@@ -7572,10 +7572,11 @@ function _resolveAction(name) {
   }
   return { fn: null, ctx: null };
 }
-function _coerceArg(s, el) {
+function _coerceArg(s, el, ev) {
   if (s === '$value') return el.value;
   if (s === '$el') return el;
   if (s === '$checked') return el.checked;
+  if (s === '$event') return ev;
   if (s === 'true') return true;
   if (s === 'false') return false;
   if (s === 'null') return null;
@@ -7584,7 +7585,7 @@ function _coerceArg(s, el) {
   if (/^-?\d+\.\d+$/.test(s)) return Number(s);
   return s;
 }
-function _collectArgs(el) {
+function _collectArgs(el, ev) {
   // Usar getAttribute em vez de dataset: dataset converte hifen-letra pra camelCase
   // mas hifen-digito (`data-arg-1`) tem comportamento inconsistente entre browsers.
   // getAttribute le o atributo HTML literal, sempre confiavel.
@@ -7592,7 +7593,7 @@ function _collectArgs(el) {
   for (let i = 1; ; i++) {
     const v = el.getAttribute('data-arg-' + i);
     if (v === null) break;
-    args.push(_coerceArg(v, el));
+    args.push(_coerceArg(v, el, ev));
   }
   return args;
 }
@@ -7611,7 +7612,9 @@ function _delegateHandler(eventType) {
     const action = el.dataset.action;
     const { fn, ctx } = _resolveAction(action);
     if (!fn) { console.warn('[delegate] acao desconhecida:', action); return; }
-    const args = _collectArgs(el);
+    const args = _collectArgs(el, e);
+    // data-stop-prop="true" -> e.stopPropagation() antes de invocar
+    if (el.getAttribute('data-stop-prop') === 'true') e.stopPropagation();
     try { fn.apply(ctx, args); } catch (err) { console.error('[delegate] erro em', action, err); }
   };
 }
@@ -7622,3 +7625,23 @@ function _registerDelegate(doc) {
   doc.addEventListener('input', _delegateHandler('input'));
 }
 _registerDelegate(document);
+
+// Wrappers globais pra acoes compostas migradas do index.html (issue #11.B).
+// Cada wrapper substitui um inline handler multi-statement / DOM-manipulation.
+window.closeUpdateBar = function() {
+  const bar = document.getElementById('update-bar');
+  if (bar) bar.style.display = 'none';
+};
+window.quickActionNewTournament = function() {
+  if (typeof navigateTo === 'function') navigateTo('tournaments');
+  setTimeout(() => typeof showNewTournamentModal === 'function' && showNewTournamentModal(), 100);
+};
+window.quickActionNewPlayer = function() {
+  if (typeof navigateTo === 'function') navigateTo('players');
+  setTimeout(() => typeof showNewPlayerModal === 'function' && showNewPlayerModal(), 100);
+};
+window.clickLogoFileInput = function() {
+  const inp = document.getElementById('logo-file-input');
+  if (inp) inp.click();
+};
+window._noop = function() { /* placeholder pra data-action quando so importa data-stop-prop */ };
