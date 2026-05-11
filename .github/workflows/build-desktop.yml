@@ -67,7 +67,12 @@ jobs:
             Instalador gerado automaticamente.
 
             **Download:** Baixe o `.exe` abaixo e execute para instalar/atualizar.
-          files: dist/*.exe
+          # latest.yml + .blockmap sao necessarios pro auto-updater (electron-updater)
+          # detectar versao + diff. Sem eles o updater nao funciona.
+          files: |
+            dist/*.exe
+            dist/latest*.yml
+            dist/*.blockmap
           generate_release_notes: true
           make_latest: true
 

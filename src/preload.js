@@ -70,4 +70,12 @@ contextBridge.exposeInMainWorld('api', {
   supabaseGetReferees: () => ipcRenderer.invoke('supabase:getReferees'),
   supabaseUpdateRefereeStatus: (id, status) => ipcRenderer.invoke('supabase:updateRefereeStatus', id, status),
   supabaseGetRefereeName: (id) => ipcRenderer.invoke('supabase:getRefereeByName', id),
+
+  // Auto-updater (electron-updater)
+  updaterDownload: () => ipcRenderer.invoke('updater:download'),
+  updaterInstall: () => ipcRenderer.invoke('updater:install'),
+  onUpdateAvailable: (cb) => { ipcRenderer.removeAllListeners('updater:update-available'); ipcRenderer.on('updater:update-available', (_, d) => cb(d)); },
+  onUpdateProgress: (cb) => { ipcRenderer.removeAllListeners('updater:download-progress'); ipcRenderer.on('updater:download-progress', (_, d) => cb(d)); },
+  onUpdateDownloaded: (cb) => { ipcRenderer.removeAllListeners('updater:update-downloaded'); ipcRenderer.on('updater:update-downloaded', (_, d) => cb(d)); },
+  onUpdateError: (cb) => { ipcRenderer.removeAllListeners('updater:error'); ipcRenderer.on('updater:error', (_, d) => cb(d)); },
 });
