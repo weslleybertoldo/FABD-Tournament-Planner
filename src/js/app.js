@@ -6644,8 +6644,10 @@ function printReport(type){
   // Delegate da janela principal nao alcanca w.document — registrar localmente.
   // window.print/close: globais standard, disponiveis em qualquer Window.
   w.document.addEventListener('click', (e) => {
-    const t = e.target instanceof Element ? e.target : e.target?.parentElement;
-    const el = t?.closest('[data-action]');
+    // nodeType===1 (ELEMENT_NODE) e cross-realm safe (instanceof Element falha
+    // porque Element do popup difere do Element da janela principal).
+    const t = e.target?.nodeType === 1 ? e.target : e.target?.parentElement;
+    const el = t?.closest?.('[data-action]');
     if (!el) return;
     const action = el.getAttribute('data-action');
     if (action === 'print') w.print();
@@ -7597,8 +7599,11 @@ function _collectArgs(el) {
 function _delegateHandler(eventType) {
   return function(e) {
     // e.target pode ser TextNode (clique em texto); closest() so existe em Element.
-    const target = e.target instanceof Element ? e.target : e.target?.parentElement;
-    if (!target) return;
+    // Usar nodeType===1 (ELEMENT_NODE) que e cross-realm safe — `instanceof Element`
+    // falha quando _registerDelegate e usado em document de popup/iframe (cada
+    // realm tem seu proprio Element constructor).
+    const target = e.target?.nodeType === 1 ? e.target : e.target?.parentElement;
+    if (!target || typeof target.closest !== 'function') return;
     const el = target.closest('[data-action]');
     if (!el) return;
     const expectedEvents = (el.dataset.event || 'click').split(/\s+/);
