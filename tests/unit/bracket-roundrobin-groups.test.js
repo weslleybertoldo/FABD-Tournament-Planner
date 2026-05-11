@@ -72,15 +72,16 @@ describe('generateRoundRobinSchedule — invariantes', () => {
   });
 });
 
-describe('generateRoundRobinSchedule — golden master', () => {
+describe('generateRoundRobinSchedule — golden master (output completo)', () => {
   for (const key of ['rr0','rr1','rr2','rr3','rr4','rr5']) {
     const fixture = fixtures[key];
-    it(`${key} matches count bate com fixture`, () => {
+    it(`${key} output bate exatamente com fixture`, () => {
       const { generateRoundRobinSchedule } = loadBracketRR();
       const n = parseInt(key.slice(2));
       const pls = 'ABCDEFGH'.slice(0,n).split('');
       const out = generateRoundRobinSchedule(pls);
-      expect(out).toHaveLength(fixture.length);
+      // Comparacao full: pairs + rounds + idx + score fields
+      expect(out).toEqual(fixture);
     });
   }
 });

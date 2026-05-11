@@ -21,14 +21,15 @@
 function generateRoundRobinSchedule(pls) {
   const list=[...pls]; if(list.length%2!==0)list.push('BYE');
   const total=list.length,rounds=total-1,mpr=total/2,matches=[];
+  // Pre-computa map name→idx do array original (O(1) lookup vs indexOf O(n) por match).
+  const idxMap = new Map();
+  for (let i = 0; i < pls.length; i++) idxMap.set(pls[i], i);
   for(let r=0;r<rounds;r++){for(let m=0;m<mpr;m++){
     const home=m===0?0:(total-1-m+r)%(total-1)+1;
     const away=(m+r)%(total-1)+1;
     const p1=list[home<total?home:0],p2=list[away<total?away:0];
     if(p1==='BYE'||p2==='BYE')continue;
-    // p1idx/p2idx devem ser indices no array ORIGINAL (d.players), nao no shuffled
-    // Usar o indice na lista original passada (que sera d.players apos o sort)
-    matches.push({round:r+1,player1:p1,player2:p2,p1idx:pls.indexOf(p1),p2idx:pls.indexOf(p2),score1:'',score2:''});
+    matches.push({round:r+1,player1:p1,player2:p2,p1idx:idxMap.get(p1),p2idx:idxMap.get(p2),score1:'',score2:''});
   }}
   return matches;
 }
@@ -44,24 +45,37 @@ function _shuffleArray(arr) {
   return a;
 }
 
-// Retorna o clube do atleta (usa tournament.players como fonte). Aceita nome simples OU dupla "A / B"
+// Retorna o clube do atleta (usa tournament.players como fonte). Aceita nome simples OU dupla "A / B".
+// Em duplas com 2 parceiros do mesmo clube, retorna o clube UMA vez (dedup via Set).
 function _getPlayerClub(name) {
   if (!tournament?.players || !name) return '';
   const parts = name.split('/').map(s => s.trim()).filter(Boolean);
-  const clubs = parts.map(n => {
+  const clubs = new Set();
+  for (const n of parts) {
     const p = tournament.players.find(pl => {
       const full = ((pl.firstName || '') + ' ' + (pl.lastName || '')).trim().toLowerCase();
       return full === n.toLowerCase();
     });
-    return p?.club || '';
-  }).filter(Boolean);
-  return clubs.join('|');
+    if (p?.club) clubs.add(p.club);
+  }
+  return [...clubs].join('|');
+}
+
+// Cache de _getPlayerClub por nome — invalidado a cada chamada de _resetPlayerClubCache().
+// Evita .find() em tournament.players repetido durante distribuicao de grupos.
+const _playerClubCache = new Map();
+function _resetPlayerClubCache() { _playerClubCache.clear(); }
+function _getPlayerClubCached(name) {
+  if (_playerClubCache.has(name)) return _playerClubCache.get(name);
+  const v = _getPlayerClub(name);
+  _playerClubCache.set(name, v);
+  return v;
 }
 
 // Distribui 1 jogador no grupo com menor numero de jogadores daquele clube.
 // Em empate de contagem de clube, usa grupo com menos jogadores totais (balanceamento).
 function _placePlayerWithClubProtection(groups, player) {
-  const clubs = _getPlayerClub(player).split('|').filter(Boolean);
+  const clubs = _getPlayerClubCached(player).split('|').filter(Boolean);
   if (!clubs.length) {
     // Sem clube cadastrado — coloca no grupo menos populoso
     const target = groups.reduce((a, b) => (a.players.length <= b.players.length ? a : b));
@@ -73,7 +87,7 @@ function _placePlayerWithClubProtection(groups, player) {
   let best = groups[0], bestScore = Infinity;
   groups.forEach(g => {
     const clubsInGroup = g.players.reduce((acc, p) => {
-      const pc = _getPlayerClub(p).split('|').filter(Boolean);
+      const pc = _getPlayerClubCached(p).split('|').filter(Boolean);
       return acc + clubs.filter(c => pc.includes(c)).length;
     }, 0);
     const score = clubsInGroup * 1000 + g.players.length;
@@ -84,6 +98,7 @@ function _placePlayerWithClubProtection(groups, player) {
 
 function generateGroupsPhase(playerList, numGroups, seeds) {
   seeds = seeds || [];
+  _resetPlayerClubCache(); // invalida cache no inicio de cada geracao
   const groupLabels = 'ABCDEFGH';
   const groups = [];
   for (let i = 0; i < numGroups; i++) {
