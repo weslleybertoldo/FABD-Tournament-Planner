@@ -1,10 +1,16 @@
 // =====================================================================
-// Match Helpers — funcoes puras de manipulacao de matches.
-// _stableMatchId: gera id deterministico (tournament+match num+nomes).
-// sortMatchesByBTPOrder: ordena matches pelo padrao BTP.
-// distributeMatches: distribui jogos entre quadras minimizando descanso.
-// findTournamentMatch: lookup de match no tournament por drawName+idx.
-// Sem deps de globals (apenas argumentos); sem DOM.
+// Match Helpers — helpers de manipulacao de matches (extraidas de app.js).
+// _stableMatchId(tournamentId, m): id deterministico de tournamentId + drawName
+//   sanitizado + player1/2 sanitizados (NAO inclui match num — mantido
+//   estavel mesmo com renumeracao).
+// sortMatchesByBTPOrder(matches): ordena pelo padrao BTP (round → categoria →
+//   modalidade → drawMatchIdx). Depende de globals `getCatIdx` e
+//   `EVENT_ORDER_BTP` definidos em app.js.
+// distributeMatches(matches): agrupa matches por categoria para distribuicao
+//   entre quadras minimizando descanso.
+// findTournamentMatch(drawName, drawMatchIdx, dm): lookup em
+//   `tournament.matches` (global) por drawName + drawMatchIdx.
+// Acoplamento explicito a globals: tournament, getCatIdx, EVENT_ORDER_BTP.
 // Issue #14 sub-tarefa 14.I — auditoria 2026-05-09.
 // =====================================================================
 
@@ -14,9 +20,6 @@ function _stableMatchId(tournamentId, m) {
   const p2 = (m.player2 || '').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
   return `${tournamentId}_${draw}_${p1}_${p2}`;
 }
-
-// Envia pro main process a lista atual de matches Em Quadra. O main usa pra
-// reconciliar a cada 30s — detecta divergencia (upsert falhou silently, RLS, etc.).
 
 function sortMatchesByBTPOrder(matches) {
   return [...matches].sort((a, b) => {
@@ -42,7 +45,6 @@ function sortMatchesByBTPOrder(matches) {
 
 function distributeMatches(matches) {
   if (matches.length <= 1) return matches;
-  const numCourts = tournament?.courts || 4;
 
   // Agrupar por categoria (drawName) para distribuir justamente dentro de cada categoria
   const byCategory = {};
