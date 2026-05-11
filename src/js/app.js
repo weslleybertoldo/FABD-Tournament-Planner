@@ -6641,6 +6641,16 @@ function printReport(type){
   if(!w){showToast('Popup bloqueado. Permita popups para imprimir.','warning');return;}
   w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${esc(tName)} - Relatorio</title>${reportStyles}</head><body>${reportHeader}${printBtn}${body}${printBtn}</body></html>`);
   w.document.close();
+  // Delegate da janela principal nao alcanca w.document — registrar localmente.
+  // window.print/close: globais standard, disponiveis em qualquer Window.
+  w.document.addEventListener('click', (e) => {
+    const t = e.target instanceof Element ? e.target : e.target?.parentElement;
+    const el = t?.closest('[data-action]');
+    if (!el) return;
+    const action = el.getAttribute('data-action');
+    if (action === 'print') w.print();
+    else if (action === 'close') w.close();
+  });
 }
 
 function reportEntries(){
@@ -7586,7 +7596,10 @@ function _collectArgs(el) {
 }
 function _delegateHandler(eventType) {
   return function(e) {
-    const el = e.target.closest('[data-action]');
+    // e.target pode ser TextNode (clique em texto); closest() so existe em Element.
+    const target = e.target instanceof Element ? e.target : e.target?.parentElement;
+    if (!target) return;
+    const el = target.closest('[data-action]');
     if (!el) return;
     const expectedEvents = (el.dataset.event || 'click').split(/\s+/);
     if (!expectedEvents.includes(eventType)) return;
@@ -7597,6 +7610,10 @@ function _delegateHandler(eventType) {
     try { fn.apply(ctx, args); } catch (err) { console.error('[delegate] erro em', action, err); }
   };
 }
-document.addEventListener('click', _delegateHandler('click'));
-document.addEventListener('change', _delegateHandler('change'));
-document.addEventListener('input', _delegateHandler('input'));
+// Reutilizavel: registra delegate em qualquer document (principal ou popup).
+function _registerDelegate(doc) {
+  doc.addEventListener('click', _delegateHandler('click'));
+  doc.addEventListener('change', _delegateHandler('change'));
+  doc.addEventListener('input', _delegateHandler('input'));
+}
+_registerDelegate(document);
