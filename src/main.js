@@ -276,7 +276,6 @@ process.on('unhandledRejection', (e) => { log('ERROR', 'Unhandled:', String(e));
 // que mostra popup "Atualizar agora?". Sim -> downloadUpdate + quitAndInstall.
 // Nao -> adia; popup volta no proximo open do app.
 // =====================================================================
-let _autoUpdaterReady = false;
 function setupAutoUpdater() {
   try {
     const { autoUpdater } = require('electron-updater');
@@ -311,7 +310,16 @@ function setupAutoUpdater() {
 
     ipcMain.handle('updater:download', async () => {
       try { await autoUpdater.downloadUpdate(); return { ok: true }; }
-      catch (err) { log('ERROR', '[updater] downloadUpdate falhou:', err?.message); return { ok: false, error: err?.message }; }
+      catch (err) {
+        const msg = err?.message || String(err);
+        log('ERROR', '[updater] downloadUpdate falhou:', msg);
+        // Emitir tambem o evento pro renderer: garante que UI veja o erro
+        // mesmo se a chamada IPC nao for awaited (defesa em camadas).
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('updater:error', { message: msg });
+        }
+        return { ok: false, error: msg };
+      }
     });
     ipcMain.handle('updater:install', () => {
       log('INFO', '[updater] quitAndInstall');
@@ -319,7 +327,6 @@ function setupAutoUpdater() {
       return { ok: true };
     });
 
-    _autoUpdaterReady = true;
     // Check inicial — apos 5s pra nao competir com bootstrap do app
     setTimeout(() => {
       autoUpdater.checkForUpdates().catch(err => log('WARN', '[updater] checkForUpdates falhou (provavel dev mode):', err?.message));
