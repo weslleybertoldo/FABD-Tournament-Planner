@@ -10,3 +10,7 @@ Thumbs.db
 .env.local
 .env.production
 config.local.json
+
+# Test coverage
+coverage/
+.vitest-result.json

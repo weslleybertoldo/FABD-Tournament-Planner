@@ -5,14 +5,19 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win"
+    "build": "electron-builder --win",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "author": "FABD - Federacao Alagoana de Badminton",
   "license": "MIT",
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.6",
     "electron": "^41.2.1",
     "electron-builder": "^26.8.1",
-    "playwright": "^1.59.1"
+    "playwright": "^1.59.1",
+    "vitest": "^4.1.6"
   },
   "build": {
     "appId": "com.fabd.tournament-planner",
