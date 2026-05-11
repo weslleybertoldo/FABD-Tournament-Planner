@@ -1,0 +1,415 @@
+{
+  "n2_noSeeds": {
+    "players": [
+      "A",
+      "B"
+    ],
+    "seeds": [],
+    "output": [
+      {
+        "round": 1,
+        "slotIdx": 0,
+        "player1": "A",
+        "player2": "B",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      }
+    ]
+  },
+  "n4_noSeeds": {
+    "players": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "seeds": [],
+    "output": [
+      {
+        "round": 1,
+        "slotIdx": 0,
+        "player1": "A",
+        "player2": "D",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 1,
+        "slotIdx": 1,
+        "player1": "B",
+        "player2": "C",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 2,
+        "slotIdx": 0,
+        "player1": "",
+        "player2": "",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      }
+    ]
+  },
+  "n4_2seeds": {
+    "players": [
+      "A",
+      "B"
+    ],
+    "seeds": [
+      "S1",
+      "S2"
+    ],
+    "output": [
+      {
+        "round": 1,
+        "slotIdx": 0,
+        "player1": "S1",
+        "player2": "A",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 1,
+        "slotIdx": 1,
+        "player1": "B",
+        "player2": "S2",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 2,
+        "slotIdx": 0,
+        "player1": "",
+        "player2": "",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      }
+    ]
+  },
+  "n3_2seeds_1bye": {
+    "players": [
+      "A"
+    ],
+    "seeds": [
+      "S1",
+      "S2"
+    ],
+    "output": [
+      {
+        "round": 1,
+        "slotIdx": 0,
+        "player1": "S1",
+        "player2": "BYE",
+        "score1": "",
+        "score2": "",
+        "winner": 1,
+        "isBye": true,
+        "advancer": "S1"
+      },
+      {
+        "round": 1,
+        "slotIdx": 1,
+        "player1": "A",
+        "player2": "S2",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 2,
+        "slotIdx": 0,
+        "player1": "S1",
+        "player2": "",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      }
+    ]
+  },
+  "n8_noSeeds": {
+    "players": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H"
+    ],
+    "seeds": [],
+    "output": [
+      {
+        "round": 1,
+        "slotIdx": 0,
+        "player1": "A",
+        "player2": "F",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 1,
+        "slotIdx": 1,
+        "player1": "B",
+        "player2": "H",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 1,
+        "slotIdx": 2,
+        "player1": "C",
+        "player2": "G",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 1,
+        "slotIdx": 3,
+        "player1": "D",
+        "player2": "E",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 2,
+        "slotIdx": 0,
+        "player1": "",
+        "player2": "",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 2,
+        "slotIdx": 1,
+        "player1": "",
+        "player2": "",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 3,
+        "slotIdx": 0,
+        "player1": "",
+        "player2": "",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      }
+    ]
+  },
+  "n8_2seeds": {
+    "players": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "seeds": [
+      "S1",
+      "S2"
+    ],
+    "output": [
+      {
+        "round": 1,
+        "slotIdx": 0,
+        "player1": "S1",
+        "player2": "A",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 1,
+        "slotIdx": 1,
+        "player1": "F",
+        "player2": "B",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 1,
+        "slotIdx": 2,
+        "player1": "E",
+        "player2": "C",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 1,
+        "slotIdx": 3,
+        "player1": "D",
+        "player2": "S2",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 2,
+        "slotIdx": 0,
+        "player1": "",
+        "player2": "",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 2,
+        "slotIdx": 1,
+        "player1": "",
+        "player2": "",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 3,
+        "slotIdx": 0,
+        "player1": "",
+        "player2": "",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      }
+    ]
+  },
+  "n5_2seeds": {
+    "players": [
+      "A",
+      "B",
+      "C"
+    ],
+    "seeds": [
+      "S1",
+      "S2"
+    ],
+    "output": [
+      {
+        "round": 1,
+        "slotIdx": 0,
+        "player1": "S1",
+        "player2": "BYE",
+        "score1": "",
+        "score2": "",
+        "winner": 1,
+        "isBye": true,
+        "advancer": "S1"
+      },
+      {
+        "round": 1,
+        "slotIdx": 1,
+        "player1": "A",
+        "player2": "BYE",
+        "score1": "",
+        "score2": "",
+        "winner": 1,
+        "isBye": true,
+        "advancer": "A"
+      },
+      {
+        "round": 1,
+        "slotIdx": 2,
+        "player1": "C",
+        "player2": "B",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 1,
+        "slotIdx": 3,
+        "player1": "BYE",
+        "player2": "S2",
+        "score1": "",
+        "score2": "",
+        "winner": 2,
+        "isBye": true,
+        "advancer": "S2"
+      },
+      {
+        "round": 2,
+        "slotIdx": 0,
+        "player1": "S1",
+        "player2": "A",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 2,
+        "slotIdx": 1,
+        "player1": "",
+        "player2": "S2",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      },
+      {
+        "round": 3,
+        "slotIdx": 0,
+        "player1": "",
+        "player2": "",
+        "score1": "",
+        "score2": "",
+        "isBye": false,
+        "advancer": ""
+      }
+    ]
+  },
+  "n1_returnsEmpty": {
+    "players": [
+      "A"
+    ],
+    "seeds": [],
+    "output": []
+  },
+  "n0_returnsEmpty": {
+    "players": [],
+    "seeds": [],
+    "output": []
+  }
+}
