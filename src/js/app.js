@@ -1773,6 +1773,8 @@ function _refreshDrawFilterPopupUI(){
   _refreshDrawFilterBadge();
 }
 
+let _drawFilterRegisterTimeout=null;
+
 function toggleDrawsFilterPopup(ev){
   if(ev)ev.stopPropagation();
   const popup=document.getElementById('draws-filter-popup');
@@ -1780,13 +1782,17 @@ function toggleDrawsFilterPopup(ev){
   const open=popup.classList.toggle('open');
   if(open){
     _refreshDrawFilterPopupUI();
-    // Listener persistente: sai so quando popup fecha (closeDrawsFilterPopup
-    // remove). Antes era {once:true}, mas precisamos checar popup.contains()
-    // pra permitir cliques internos — se for `once`, perde-se no primeiro
-    // clique interno e nao fecha mais.
-    setTimeout(()=>{document.addEventListener('click',_drawFilterOutsideClick);},10);
+    // Defer 10ms pra nao pegar o proprio click que abriu. Guardar timeout id
+    // pra cancelar se popup for fechado antes do callback rodar (race).
+    _drawFilterRegisterTimeout=setTimeout(()=>{
+      _drawFilterRegisterTimeout=null;
+      // Re-checar antes de registrar (proteção contra fechamento no meio).
+      if(popup.classList.contains('open')){
+        document.addEventListener('click',_drawFilterOutsideClick);
+      }
+    },10);
   }else{
-    document.removeEventListener('click',_drawFilterOutsideClick);
+    closeDrawsFilterPopup();
   }
 }
 
@@ -1797,12 +1803,16 @@ function _drawFilterOutsideClick(ev){
   // (data-action="toggleDrawFilter" em filhos) sem fechar e sem precisar
   // bloquear propagation (que quebraria o delegate global).
   if(popup.contains(ev?.target))return;
-  popup.classList.remove('open');
+  closeDrawsFilterPopup();
 }
 
 function closeDrawsFilterPopup(){
   const popup=document.getElementById('draws-filter-popup');
   if(popup)popup.classList.remove('open');
+  if(_drawFilterRegisterTimeout!==null){
+    clearTimeout(_drawFilterRegisterTimeout);
+    _drawFilterRegisterTimeout=null;
+  }
   document.removeEventListener('click',_drawFilterOutsideClick);
 }
 
