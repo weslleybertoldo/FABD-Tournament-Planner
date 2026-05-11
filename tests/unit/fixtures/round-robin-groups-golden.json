@@ -1,0 +1,462 @@
+{
+  "rr2": [
+    {
+      "round": 1,
+      "player1": "A",
+      "player2": "B",
+      "p1idx": 0,
+      "p2idx": 1,
+      "score1": "",
+      "score2": ""
+    }
+  ],
+  "rr3": [
+    {
+      "round": 1,
+      "player1": "A",
+      "player2": "B",
+      "p1idx": 0,
+      "p2idx": 1,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 2,
+      "player1": "A",
+      "player2": "C",
+      "p1idx": 0,
+      "p2idx": 2,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 3,
+      "player1": "C",
+      "player2": "B",
+      "p1idx": 2,
+      "p2idx": 1,
+      "score1": "",
+      "score2": ""
+    }
+  ],
+  "rr4": [
+    {
+      "round": 1,
+      "player1": "A",
+      "player2": "B",
+      "p1idx": 0,
+      "p2idx": 1,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 1,
+      "player1": "D",
+      "player2": "C",
+      "p1idx": 3,
+      "p2idx": 2,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 2,
+      "player1": "A",
+      "player2": "C",
+      "p1idx": 0,
+      "p2idx": 2,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 2,
+      "player1": "B",
+      "player2": "D",
+      "p1idx": 1,
+      "p2idx": 3,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 3,
+      "player1": "A",
+      "player2": "D",
+      "p1idx": 0,
+      "p2idx": 3,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 3,
+      "player1": "C",
+      "player2": "B",
+      "p1idx": 2,
+      "p2idx": 1,
+      "score1": "",
+      "score2": ""
+    }
+  ],
+  "rr5": [
+    {
+      "round": 1,
+      "player1": "A",
+      "player2": "B",
+      "p1idx": 0,
+      "p2idx": 1,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 1,
+      "player1": "E",
+      "player2": "D",
+      "p1idx": 4,
+      "p2idx": 3,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 2,
+      "player1": "A",
+      "player2": "C",
+      "p1idx": 0,
+      "p2idx": 2,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 2,
+      "player1": "B",
+      "player2": "D",
+      "p1idx": 1,
+      "p2idx": 3,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 3,
+      "player1": "A",
+      "player2": "D",
+      "p1idx": 0,
+      "p2idx": 3,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 3,
+      "player1": "C",
+      "player2": "E",
+      "p1idx": 2,
+      "p2idx": 4,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 4,
+      "player1": "A",
+      "player2": "E",
+      "p1idx": 0,
+      "p2idx": 4,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 4,
+      "player1": "C",
+      "player2": "B",
+      "p1idx": 2,
+      "p2idx": 1,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 5,
+      "player1": "E",
+      "player2": "B",
+      "p1idx": 4,
+      "p2idx": 1,
+      "score1": "",
+      "score2": ""
+    },
+    {
+      "round": 5,
+      "player1": "D",
+      "player2": "C",
+      "p1idx": 3,
+      "p2idx": 2,
+      "score1": "",
+      "score2": ""
+    }
+  ],
+  "rr0": [],
+  "rr1": [],
+  "gp_2g6p_2s": {
+    "groups": [
+      {
+        "name": "Grupo A",
+        "players": [
+          "S1",
+          "A",
+          "B"
+        ],
+        "matches": [
+          {
+            "round": 1,
+            "player1": "S1",
+            "player2": "A",
+            "p1idx": 0,
+            "p2idx": 1,
+            "score1": "",
+            "score2": "",
+            "group": "A",
+            "phase": "group"
+          },
+          {
+            "round": 2,
+            "player1": "S1",
+            "player2": "B",
+            "p1idx": 0,
+            "p2idx": 2,
+            "score1": "",
+            "score2": "",
+            "group": "A",
+            "phase": "group"
+          },
+          {
+            "round": 3,
+            "player1": "B",
+            "player2": "A",
+            "p1idx": 2,
+            "p2idx": 1,
+            "score1": "",
+            "score2": "",
+            "group": "A",
+            "phase": "group"
+          }
+        ]
+      },
+      {
+        "name": "Grupo B",
+        "players": [
+          "S2",
+          "D",
+          "C"
+        ],
+        "matches": [
+          {
+            "round": 1,
+            "player1": "S2",
+            "player2": "D",
+            "p1idx": 0,
+            "p2idx": 1,
+            "score1": "",
+            "score2": "",
+            "group": "B",
+            "phase": "group"
+          },
+          {
+            "round": 2,
+            "player1": "S2",
+            "player2": "C",
+            "p1idx": 0,
+            "p2idx": 2,
+            "score1": "",
+            "score2": "",
+            "group": "B",
+            "phase": "group"
+          },
+          {
+            "round": 3,
+            "player1": "C",
+            "player2": "D",
+            "p1idx": 2,
+            "p2idx": 1,
+            "score1": "",
+            "score2": "",
+            "group": "B",
+            "phase": "group"
+          }
+        ]
+      }
+    ],
+    "eliminationMatches": []
+  },
+  "gp_3g9p_3s": {
+    "groups": [
+      {
+        "name": "Grupo A",
+        "players": [
+          "S1",
+          "A",
+          "E"
+        ],
+        "matches": [
+          {
+            "round": 1,
+            "player1": "S1",
+            "player2": "A",
+            "p1idx": 0,
+            "p2idx": 1,
+            "score1": "",
+            "score2": "",
+            "group": "A",
+            "phase": "group"
+          },
+          {
+            "round": 2,
+            "player1": "S1",
+            "player2": "E",
+            "p1idx": 0,
+            "p2idx": 2,
+            "score1": "",
+            "score2": "",
+            "group": "A",
+            "phase": "group"
+          },
+          {
+            "round": 3,
+            "player1": "E",
+            "player2": "A",
+            "p1idx": 2,
+            "p2idx": 1,
+            "score1": "",
+            "score2": "",
+            "group": "A",
+            "phase": "group"
+          }
+        ]
+      },
+      {
+        "name": "Grupo B",
+        "players": [
+          "S2",
+          "F",
+          "C"
+        ],
+        "matches": [
+          {
+            "round": 1,
+            "player1": "S2",
+            "player2": "F",
+            "p1idx": 0,
+            "p2idx": 1,
+            "score1": "",
+            "score2": "",
+            "group": "B",
+            "phase": "group"
+          },
+          {
+            "round": 2,
+            "player1": "S2",
+            "player2": "C",
+            "p1idx": 0,
+            "p2idx": 2,
+            "score1": "",
+            "score2": "",
+            "group": "B",
+            "phase": "group"
+          },
+          {
+            "round": 3,
+            "player1": "C",
+            "player2": "F",
+            "p1idx": 2,
+            "p2idx": 1,
+            "score1": "",
+            "score2": "",
+            "group": "B",
+            "phase": "group"
+          }
+        ]
+      },
+      {
+        "name": "Grupo C",
+        "players": [
+          "S3",
+          "B",
+          "D"
+        ],
+        "matches": [
+          {
+            "round": 1,
+            "player1": "S3",
+            "player2": "B",
+            "p1idx": 0,
+            "p2idx": 1,
+            "score1": "",
+            "score2": "",
+            "group": "C",
+            "phase": "group"
+          },
+          {
+            "round": 2,
+            "player1": "S3",
+            "player2": "D",
+            "p1idx": 0,
+            "p2idx": 2,
+            "score1": "",
+            "score2": "",
+            "group": "C",
+            "phase": "group"
+          },
+          {
+            "round": 3,
+            "player1": "D",
+            "player2": "B",
+            "p1idx": 2,
+            "p2idx": 1,
+            "score1": "",
+            "score2": "",
+            "group": "C",
+            "phase": "group"
+          }
+        ]
+      }
+    ],
+    "eliminationMatches": []
+  },
+  "gp_2g4p_0s": {
+    "groups": [
+      {
+        "name": "Grupo A",
+        "players": [
+          "A",
+          "B"
+        ],
+        "matches": [
+          {
+            "round": 1,
+            "player1": "A",
+            "player2": "B",
+            "p1idx": 0,
+            "p2idx": 1,
+            "score1": "",
+            "score2": "",
+            "group": "A",
+            "phase": "group"
+          }
+        ]
+      },
+      {
+        "name": "Grupo B",
+        "players": [
+          "D",
+          "C"
+        ],
+        "matches": [
+          {
+            "round": 1,
+            "player1": "D",
+            "player2": "C",
+            "p1idx": 0,
+            "p2idx": 1,
+            "score1": "",
+            "score2": "",
+            "group": "B",
+            "phase": "group"
+          }
+        ]
+      }
+    ],
+    "eliminationMatches": []
+  }
+}
