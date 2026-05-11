@@ -6,8 +6,8 @@
 // sortMatchesByBTPOrder(matches): ordena pelo padrao BTP (round → categoria →
 //   modalidade → drawMatchIdx). Depende de globals `getCatIdx` e
 //   `EVENT_ORDER_BTP` definidos em app.js.
-// distributeMatches(matches): agrupa matches por categoria para distribuicao
-//   entre quadras minimizando descanso.
+// distributeMatches(matches): reordena matches (round-robin entre categorias)
+//   pra maximizar gap entre jogos da mesma categoria — caller distribui em quadras depois.
 // findTournamentMatch(drawName, drawMatchIdx, dm): lookup em
 //   `tournament.matches` (global) por drawName + drawMatchIdx.
 // Acoplamento explicito a globals: tournament, getCatIdx, EVENT_ORDER_BTP.
