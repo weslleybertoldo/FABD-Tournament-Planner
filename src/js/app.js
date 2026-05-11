@@ -7552,11 +7552,21 @@ function safeHTML(html, opts) {
 // Usar:        <button data-action="foo" data-arg-1="${esc(id)}" data-arg-2="${idx}">X</button>
 // E o delegate global chama window.foo(arg1, arg2) no click do botao.
 //
-// Args sao convertidos: 'true'/'false' → boolean; numero → Number; '$value' → el.value;
-// '$el' → o proprio elemento; resto → string literal. Preserva ordem via data-arg-N.
+// Args sao convertidos:
+//   '$value'   -> el.value
+//   '$el'      -> o proprio elemento
+//   '$checked' -> el.checked
+//   '$event'   -> o Event original
+//   'true'/'false'/'null'/'undefined' -> bool/null/undefined
+//   Number/Number.Decimal -> Number
+//   resto -> string literal
 //
-// Tipos: data-action (obrigatorio) | data-arg-1..N | data-event (default 'click';
-//        outros: 'change', 'input').
+// Atributos:
+//   data-action          (obrigatorio; suporta namespace: "api.openExternal")
+//   data-arg-1..N        (em ordem, preserva tipo coercido)
+//   data-event           (default 'click'; outros: 'change', 'input' — pode listar
+//                         multiplos separados por espaco: "change input")
+//   data-prevent-default (se "true", e.preventDefault() antes de invocar)
 // =====================================================================
 function _resolveAction(name) {
   if (!name) return { fn: null, ctx: null };
@@ -7613,8 +7623,8 @@ function _delegateHandler(eventType) {
     const { fn, ctx } = _resolveAction(action);
     if (!fn) { console.warn('[delegate] acao desconhecida:', action); return; }
     const args = _collectArgs(el, e);
-    // data-stop-prop="true" -> e.stopPropagation() antes de invocar
-    if (el.getAttribute('data-stop-prop') === 'true') e.stopPropagation();
+    // data-prevent-default="true" -> e.preventDefault() (ex: <a href="#"> handlers)
+    if (el.getAttribute('data-prevent-default') === 'true') e.preventDefault();
     try { fn.apply(ctx, args); } catch (err) { console.error('[delegate] erro em', action, err); }
   };
 }
@@ -7644,4 +7654,14 @@ window.clickLogoFileInput = function() {
   const inp = document.getElementById('logo-file-input');
   if (inp) inp.click();
 };
-window._noop = function() { /* placeholder pra data-action quando so importa data-stop-prop */ };
+window._noop = function() { /* placeholder: usado quando so importa o efeito colateral (preventDefault etc) */ };
+
+// Listener nativo no popup de filtros de chaves: e.stopPropagation() pra
+// impedir que o handler outside-click do document feche o popup quando o
+// usuario clica dentro dele. Delegate global em document nao consegue cobrir
+// esse caso (ambos rodam no mesmo target — stopPropagation no delegate nao
+// bloqueia outras listeners no MESMO document).
+document.addEventListener('DOMContentLoaded', () => {
+  const popup = document.getElementById('draws-filter-popup');
+  if (popup) popup.addEventListener('click', e => e.stopPropagation());
+});
