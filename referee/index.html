@@ -75,7 +75,7 @@
     .court-divider{width:48px;background:#0F172A;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:5}
     .court-divider .set-label{font-size:11px;color:#F59E0B;font-weight:700}
     .court-divider .set-history{font-size:10px;color:#94A3B8;text-align:center}
-    .swap-btn{background:#334155;border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+    .swap-btn{background:#334155;border:none;color:#fff;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
     .swap-btn:active{background:#475569}
     .swap-serve{font-size:20px;background:#1E3A8A;border:1px solid #F59E0B}
 
@@ -480,6 +480,16 @@
     // Scoring dinamico - vem do Supabase (configurado no Planner)
     let PTS=21,MAX=30,BEST=3;
     let intervalAt=11; // ponto de descanso/troca de lado (auto: floor(points/2)+1)
+    // v4.36: centraliza calculo de regras BWF — chame applyScoring({points,maxPoints,sets})
+    // sempre que tournament.scoring chegar do Supabase. Garante MAX/intervalAt
+    // consistentes entre loadMatches/openScorer/checkSetEnd.
+    function applyScoring(sc){
+      sc=sc||{};
+      PTS=sc.points||21;
+      MAX=sc.maxPoints||(PTS===15?20:PTS===11?15:30);
+      BEST=sc.sets||3;
+      intervalAt=Math.floor(PTS/2)+1; // BWF: 21→11, 15→8, 11→6
+    }
     let intervalTimer=null,intervalSeconds=0;
     let intervalAsked=false;
     let currentTournamentId=null;
@@ -954,10 +964,7 @@
         // Carrega scoring do tournament (default 21/30/3 se nao definido)
         const tData=ts[0].data||{};
         currentScoring=tData.scoring||{sets:3,points:21,maxPoints:30};
-        PTS=currentScoring.points||21;
-        MAX=currentScoring.maxPoints||(PTS===15?20:PTS===11?15:30);
-        BEST=currentScoring.sets||3;
-        intervalAt=Math.floor(PTS/2)+1; // BWF: 21->11, 15->8, 11->6
+        applyScoring(currentScoring);
         // Aplica cor da federacao no header
         if(fed?.primary_color){document.querySelector('.matches-page .header').style.background=fed.primary_color;}
         // Jogos em quadra DESTA federacao + tournament
@@ -1086,12 +1093,7 @@
           const{data:td}=await sb.from('tournaments').select('data').eq('id',match.tournament_id).single();
           const tData=td?.data||{};
           clubMap=new Map(((tData.players)||[]).map(p=>[(p.name||'').trim(),p.club||'']));
-          // Atualizar scoring dinamico
-          const sc=tData.scoring||{sets:3,points:21,maxPoints:30};
-          PTS=sc.points||21;
-          MAX=sc.maxPoints||(PTS===15?20:PTS===11?15:30);
-          BEST=sc.sets||3;
-          intervalAt=Math.floor(PTS/2)+1; // BWF: 21->11, 15->8, 11->6
+          applyScoring(tData.scoring);
         }catch(e){clubMap=new Map();}
         leftPlayer=1;rightPlayer=2;
         state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
@@ -1430,16 +1432,21 @@
         updateIntervalDisplay();
         if(intervalSeconds<=0){
           clearInterval(intervalTimer);intervalTimer=null;
-          // Som + vibrar ao finalizar
+          // Vibrate + audio (silenciosos em iOS sem user gesture)
+          try{navigator.vibrate?.([300,100,300,100,300]);}catch(e){}
           try{
-            navigator.vibrate?.([300,100,300,100,300]);
             const ctx=new(window.AudioContext||window.webkitAudioContext)();
             const osc=ctx.createOscillator();osc.type='square';osc.frequency.value=880;
             const gain=ctx.createGain();gain.gain.value=0.3;
             osc.connect(gain);gain.connect(ctx.destination);
             osc.start();setTimeout(()=>{osc.stop();ctx.close();},500);
           }catch(e){}
-          setTimeout(()=>{document.getElementById('modal-interval').classList.remove('active');},500);
+          // v4.36: fallback visual (iOS pode silenciar vibrate+audio).
+          // Flash forte + texto "FIM!" garante que arbitro percebe.
+          timerEl.textContent='FIM!';
+          timerEl.classList.add('warning');
+          document.getElementById('interval-title').textContent='Reiniciando jogo';
+          setTimeout(()=>{document.getElementById('modal-interval').classList.remove('active');timerEl.classList.remove('warning');},1500);
         }
       },1000);
     }
