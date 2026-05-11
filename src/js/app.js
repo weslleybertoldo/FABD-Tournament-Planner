@@ -7703,6 +7703,7 @@ function setupAutoUpdaterUI() {
   });
   window.api.onUpdateError((err) => {
     console.warn('[updater] erro:', err?.message);
+    showToast('Falha no auto-update: ' + (err?.message || 'erro desconhecido'), 'error');
     _hideUpdateModal();
   });
 }
@@ -7754,7 +7755,17 @@ function _hideUpdateModal() {
 }
 window.updaterAccept = async function() {
   _showUpdateModal('downloading');
-  await window.api.updaterDownload();
+  try {
+    const res = await window.api.updaterDownload();
+    if (res && res.ok === false) {
+      // Falha sincrona — UI fica presa em 'downloading' sem este fallback
+      showToast('Falha ao baixar atualizacao: ' + (res.error || 'erro desconhecido'), 'error');
+      _showUpdateModal('available');
+    }
+  } catch (e) {
+    showToast('Falha ao baixar atualizacao: ' + (e?.message || String(e)), 'error');
+    _showUpdateModal('available');
+  }
 };
 window.updaterDecline = function() { _hideUpdateModal(); };
 window.updaterInstallNow = function() { window.api.updaterInstall(); };
