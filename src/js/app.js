@@ -2965,7 +2965,7 @@ function setSettingsTab(el, panelId) {
   if(panelId==='settings-categories')renderCategoriesInfo();
   if(panelId==='settings-rankings')renderScoringTables();
 }
-const APP_VERSION='4.85';
+const APP_VERSION='4.86';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
