@@ -199,7 +199,7 @@ function renderDaySchedule(){
     h+=`</div>`;
     // Mostrar quais categorias ficam neste dia
     const modeDraws=mode==='simples'?simples:mode==='duplas'?duplas:drawNames;
-    if(modeDraws.length)h+=`<div style="margin-top:8px;font-size:12px;color:var(--fabd-gray-500)">Categorias: ${modeDraws.join(', ')}</div>`;
+    if(modeDraws.length)h+=`<div style="margin-top:8px;font-size:12px;color:var(--fabd-gray-500)">Categorias: ${modeDraws.map(esc).join(', ')}</div>`;
     h+=`</div></div>`;
   });
   container.innerHTML=h;
