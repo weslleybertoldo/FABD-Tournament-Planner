@@ -221,8 +221,8 @@ async function loadAccessOrganizers() {
       : o.role === 'admin' ? '<span style="background:#DBEAFE;color:#1E40AF;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Admin</span>'
       : '<span style="background:#F3F4F6;color:#6B7280;padding:2px 8px;border-radius:10px;font-size:11px">Organizer</span>';
     const actions = isMe ? '<span style="color:#94A3B8;font-size:11px">(voce)</span>' :
-      `<button class="btn btn-sm" style="background:#F3F4F6;color:#374151;margin-right:4px" onclick="toggleAccessOrganizer('${esc(o.email)}',${!o.active})">${o.active?'Desativar':'Ativar'}</button>
-       <button class="btn btn-sm btn-danger" onclick="removeAccessOrganizer('${esc(o.email)}')">Remover</button>`;
+      `<button class="btn btn-sm" style="background:#F3F4F6;color:#374151;margin-right:4px" data-action="toggleAccessOrganizer" data-arg-1="${esc(o.email)}" data-arg-2="${!o.active}">${o.active?'Desativar':'Ativar'}</button>
+       <button class="btn btn-sm btn-danger" data-action="removeAccessOrganizer" data-arg-1="${esc(o.email)}">Remover</button>`;
     h += `<tr><td>${dot}</td><td><strong>${esc(o.name)}</strong></td><td>${esc(o.email)}</td><td>${roleBadge}</td><td style="font-size:11px;color:#64748B">${fmt}</td><td>${actions}</td></tr>`;
   });
   h += '</tbody></table>';
@@ -710,7 +710,7 @@ function updateOverview() {
   document.getElementById('breadcrumb').textContent = tournament.name;
   c.innerHTML = `<table><tbody>
     <tr><td><strong>${esc(tournament.name)}</strong></td><td>${fmtDate(tournament.startDate)} - ${fmtDate(tournament.endDate)}</td><td>${esc(tournament.location)||'-'}</td><td>${statusTag(tournament)}</td>
-    <td><button class="btn btn-sm btn-primary" onclick="navigateTo('players')">Gerenciar</button></td></tr>
+    <td><button class="btn btn-sm btn-primary" data-action="navigateTo" data-arg-1="players">Gerenciar</button></td></tr>
   </tbody></table>`;
 }
 
@@ -732,9 +732,9 @@ function renderTournamentPage() {
     <td>${fmtDate(tournament.startDate)}</td><td>${fmtDate(tournament.endDate)}</td>
     <td>${ev.join(', ')||'-'}</td><td>${sysName}</td><td>${statusTag(tournament)}</td>
     <td>
-      <button class="btn btn-sm btn-secondary" onclick="showTournamentConfig()" title="Configuracao">&#9881;</button>
-      <button class="btn btn-sm btn-secondary" onclick="exportTournamentBackup()" title="Backup">&#128230;</button>
-      <button class="btn btn-sm btn-danger" onclick="closeTournament()">Fechar Torneio</button>
+      <button class="btn btn-sm btn-secondary" data-action="showTournamentConfig" title="Configuracao">&#9881;</button>
+      <button class="btn btn-sm btn-secondary" data-action="exportTournamentBackup" title="Backup">&#128230;</button>
+      <button class="btn btn-sm btn-danger" data-action="closeTournament">Fechar Torneio</button>
     </td></tr>`;
 }
 
@@ -860,8 +860,8 @@ function renderPlayers() {
       <td>${esc(p.state)||'-'}</td>
       <td>${inscriptions > 0 ? `<span class="tag tag-green">${inscriptions} cat.</span>` : '<span class="tag tag-gray">0</span>'}</td>
       <td>
-        <button class="btn btn-sm btn-secondary" onclick="editPlayer('${p.id}')">Editar</button>
-        <button class="btn btn-sm btn-danger" onclick="deletePlayer('${p.id}')">Excluir</button>
+        <button class="btn btn-sm btn-secondary" data-action="editPlayer" data-arg-1="${esc(p.id)}">Editar</button>
+        <button class="btn btn-sm btn-danger" data-action="deletePlayer" data-arg-1="${esc(p.id)}">Excluir</button>
       </td></tr>`;
   });
   tb.innerHTML = h;
@@ -949,7 +949,7 @@ function renderPlayerCategories(player) {
     const insc=inscriptions.find(i=>i.key===key);
     const checked=!!insc;
     h+=`<div class="cat-item" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--fabd-gray-200)">
-      <input type="checkbox" class="p-cat-check" data-key="${esc(key)}" data-mod="${mod.code}" data-cat="${esc(cat)}" ${checked?'checked':''} onchange="onCatCheckChange(this)">
+      <input type="checkbox" class="p-cat-check" data-key="${esc(key)}" data-mod="${mod.code}" data-cat="${esc(cat)}" ${checked?'checked':''} data-action="onCatCheckChange" data-event="change" data-arg-1="$el">
       <span style="flex:1;font-size:13px"><strong>${mod.code}</strong> ${esc(cat)}</span>
       <span class="tag tag-gray" style="font-size:10px">Inscrito</span>`;
     if(mod.isDupla&&checked){
@@ -1531,7 +1531,7 @@ function renderRoster() {
       <td>${esc(e.club)||'-'}</td>
       <td><span class="tag tag-blue">${esc(e.key)}</span></td>
       <td><span class="tag ${st[e.status]||'tag-gray'}">${esc(e.status)}</span></td>
-      <td><select class="form-control" style="width:110px;padding:2px 4px;font-size:11px" onchange="updateEntryStatus(${i},this.value)">
+      <td><select class="form-control" style="width:110px;padding:2px 4px;font-size:11px" data-action="updateEntryStatus" data-event="change" data-arg-1="${i}" data-arg-2="$value">
         <option value="inscrito"${e.status==='inscrito'?' selected':''}>Inscrito</option>
         <option value="confirmado"${e.status==='confirmado'?' selected':''}>Confirmado</option>
         <option value="presente"${e.status==='presente'?' selected':''}>Presente</option>
@@ -1845,7 +1845,7 @@ function renderDraws() {
     const allFinished=realMatches.length>0&&realMatches.every(m=>m.winner!==undefined&&m.winner!==null);
     const st = d.awarded ? '<span class="tag" style="background:#D1FAE5;color:#065F46;border:1px solid #10B981">&#127942; Premiado</span>' : allFinished ? '<span class="tag" style="background:#DBEAFE;color:#1E3A8A;border:1px solid #2563EB">JOGOS FINALIZADOS</span>' : has ? '<span class="tag tag-green">Sorteado</span>' : '<span class="tag tag-yellow">Pendente</span>';
     const isActive=(selectedDrawIdx<0&&i===0)?origIdx===allDraws.indexOf(sorted[0]):origIdx===selectedDrawIdx;
-    lh += `<div class="draws-list-item${isActive?' active':''}" data-idx="${origIdx}" onclick="selectDraw(${origIdx})">
+    lh += `<div class="draws-list-item${isActive?' active':''}" data-idx="${origIdx}" data-action="selectDraw" data-arg-1="${origIdx}">
       <div class="draw-item-name">${esc(d.name)}</div>
       <div class="draw-item-info">${esc(d.type)} - ${d.players?.length||0} jogadores - ${has?(d.type==='Eliminatoria'?(d.players?.length||0)-1:((d.players?.length||0)*((d.players?.length||0)-1)/2)):0} jogos ${st}</div>
     </div>`;
@@ -1875,10 +1875,10 @@ function renderDrawDetail(idx) {
   const evNames = {SM:'Simples Masculino',SF:'Simples Feminino',DM:'Duplas Masculinas',DF:'Duplas Femininas',DX:'Duplas Mistas'};
 
   let h = `<div class="card-header"><h3>${esc(d.name)}</h3><div>
-    <button class="btn btn-sm btn-success" onclick="generateSingleDraw(${idx})">&#127922; Sortear esta chave</button>
-    ${has?`<button class="btn btn-sm" style="background:#EFF6FF;color:#1E40AF;border:1px solid #3B82F6" onclick="regenerateDrawSchedule(${idx})">&#128260; Regenerar agenda</button>`:''}
-    ${has?`<button class="btn btn-sm" style="background:${d.awarded?'#D1FAE5;color:#065F46;border:1px solid #10B981':'#FEF3C7;color:#92400E;border:1px solid #F59E0B'}" onclick="toggleAwarded(${idx})">${d.awarded?'&#10003; Premiado':'&#127942; Premiar'}</button>`:''}
-    <button class="btn btn-sm btn-danger" onclick="deleteDraw(${idx})">Excluir</button>
+    <button class="btn btn-sm btn-success" data-action="generateSingleDraw" data-arg-1="${idx}">&#127922; Sortear esta chave</button>
+    ${has?`<button class="btn btn-sm" style="background:#EFF6FF;color:#1E40AF;border:1px solid #3B82F6" data-action="regenerateDrawSchedule" data-arg-1="${idx}">&#128260; Regenerar agenda</button>`:''}
+    ${has?`<button class="btn btn-sm" style="background:${d.awarded?'#D1FAE5;color:#065F46;border:1px solid #10B981':'#FEF3C7;color:#92400E;border:1px solid #F59E0B'}" data-action="toggleAwarded" data-arg-1="${idx}">${d.awarded?'&#10003; Premiado':'&#127942; Premiar'}</button>`:''}
+    <button class="btn btn-sm btn-danger" data-action="deleteDraw" data-arg-1="${idx}">Excluir</button>
   </div></div>
   <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
     <div><span style="font-size:12px;color:var(--fabd-gray-500)">Evento:</span> <span class="tag tag-blue">${esc(evNames[d.event]||d.event)}</span></div>
@@ -1888,11 +1888,11 @@ function renderDrawDetail(idx) {
       <div style="display:flex;gap:12px;align-items:center;padding:6px 10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px">
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fabd-gray-600)" title="${has?'Re-sorteie a chave para aplicar mudancas':'Quantidade de grupos'}">
           <span>Grupos:</span>
-          <input type="number" min="1" max="8" value="${d.numGroups||2}" ${has?'disabled':''} onchange="updateDrawNumGroups(${idx}, this.value)" style="width:54px;padding:4px 6px;border:1px solid #CBD5E1;border-radius:6px;text-align:center;font-weight:700;${has?'background:#F1F5F9;cursor:not-allowed':''}">
+          <input type="number" min="1" max="8" value="${d.numGroups||2}" ${has?'disabled':''} data-action="updateDrawNumGroups" data-event="change" data-arg-1="${idx}" data-arg-2="$value" style="width:54px;padding:4px 6px;border:1px solid #CBD5E1;border-radius:6px;text-align:center;font-weight:700;${has?'background:#F1F5F9;cursor:not-allowed':''}">
         </label>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fabd-gray-600)" title="${has?'Re-sorteie a chave para aplicar mudancas':'Quantos se classificam por grupo para a eliminatoria'}">
           <span>Classificados/grupo:</span>
-          <input type="number" min="1" max="4" value="${d.groupQualifiers||2}" ${has?'disabled':''} onchange="updateDrawQualifiers(${idx}, this.value)" style="width:54px;padding:4px 6px;border:1px solid #CBD5E1;border-radius:6px;text-align:center;font-weight:700;${has?'background:#F1F5F9;cursor:not-allowed':''}">
+          <input type="number" min="1" max="4" value="${d.groupQualifiers||2}" ${has?'disabled':''} data-action="updateDrawQualifiers" data-event="change" data-arg-1="${idx}" data-arg-2="$value" style="width:54px;padding:4px 6px;border:1px solid #CBD5E1;border-radius:6px;text-align:center;font-weight:700;${has?'background:#F1F5F9;cursor:not-allowed':''}">
         </label>
         ${has?'<span style="font-size:11px;color:#D97706">(re-sorteie para mudar)</span>':''}
       </div>
@@ -1953,7 +1953,7 @@ function renderDrawDetail(idx) {
       const current=seedList[s]||'';
       h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
         <span style="font-weight:700;color:var(--fabd-blue);min-width:24px">${s+1}.</span>
-        <select class="form-control" style="flex:1;padding:4px 8px;font-size:12px" onchange="updateSeed(${idx},${s},this.value)">
+        <select class="form-control" style="flex:1;padding:4px 8px;font-size:12px" data-action="updateSeed" data-event="change" data-arg-1="${idx}" data-arg-2="${s}" data-arg-3="$value">
           <option value="">- Selecionar -</option>`;
       (d.players||[]).forEach(p=>{
         const used=seedList.includes(p)&&seedList[s]!==p;
@@ -1971,7 +1971,7 @@ function renderDrawDetail(idx) {
     });
     h+=`</div></div></div>
       <div style="margin-top:16px;text-align:center">
-        <button class="btn btn-success" onclick="generateSingleDraw(${idx})">&#127922; Sortear Agora</button>
+        <button class="btn btn-success" data-action="generateSingleDraw" data-arg-1="${idx}">&#127922; Sortear Agora</button>
       </div>
     </div>`;
   }
@@ -3051,9 +3051,9 @@ function renderGroupsElimination(d) {
   // Abas: Grupo A | Grupo B | ... | Eliminatorias (sempre visivel)
   h += `<div class="tabs" id="ge-tabs" style="margin-bottom:16px">`;
   groups.forEach((g, i) => {
-    h += `<div class="tab${i === 0 ? ' active' : ''}" onclick="setGeTab(${i})">${esc(g.name)}</div>`;
+    h += `<div class="tab${i === 0 ? ' active' : ''}" data-action="setGeTab" data-arg-1="${i}">${esc(g.name)}</div>`;
   });
-  h += `<div class="tab" onclick="setGeTab(${groups.length})">Eliminatorias</div>`;
+  h += `<div class="tab" data-action="setGeTab" data-arg-1="${groups.length}">Eliminatorias</div>`;
   h += `</div>`;
 
   // Paineis dos grupos
@@ -4536,11 +4536,11 @@ function renderMatches() {
     }
 
     const isFinished=m.status==='Finalizada'||m.status==='WO'||m.status==='Desistencia'||m.status==='Desqualificacao';
-    const resetBtn=isFinished?`<button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA;margin-left:4px;padding:2px 6px;font-size:11px" onclick="resetMatch(${i})" title="Desfazer resultado">&#8635;</button>`:'';
+    const resetBtn=isFinished?`<button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA;margin-left:4px;padding:2px 6px;font-size:11px" data-action="resetMatch" data-arg-1="${i}" title="Desfazer resultado">&#8635;</button>`:'';
     const matchDay=getMatchDay(m);
     const dayLabel=matchDay?((d)=>{const o=new Date(d+'T00:00:00');return`${String(o.getDate()).padStart(2,'0')}/${String(o.getMonth()+1).padStart(2,'0')}`;})(matchDay.date):'-';
     const _hideRow=_dayDraws&&!_dayDraws.has(m.drawName||'')?'display:none;':'';
-    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${esc(m.time)||'-'}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" onchange="assignCourt(${i},this.value)"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" onchange="updateMatchField(${i},'umpire',this.value)"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" onclick="showScoreModal(${i})">Placar</button>${resetBtn}`}</td></tr>`;
+    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${esc(m.time)||'-'}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" data-action="assignCourt" data-event="change" data-arg-1="${i}" data-arg-2="$value"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" data-action="updateMatchField" data-event="change" data-arg-1="${i}" data-arg-2="umpire" data-arg-3="$value"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" data-action="showScoreModal" data-arg-1="${i}">Placar</button>${resetBtn}`}</td></tr>`;
   });
   // Quadras livres do ultimo horario
   if (_lastMatchTime && _matchesAtTime < _nc) {
@@ -4645,7 +4645,7 @@ function renderFinishedMatches(){
     } else {
       scoreHtml=`<span style="color:var(--fabd-red);font-weight:700">${esc(m.score||'-')}</span>`;
     }
-    const resetBtn=`<button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA;padding:2px 6px;font-size:11px" onclick="resetMatch(${i})" title="Desfazer resultado">&#8635;</button>`;
+    const resetBtn=`<button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA;padding:2px 6px;font-size:11px" data-action="resetMatch" data-arg-1="${i}" title="Desfazer resultado">&#8635;</button>`;
     h+=`<tr><td>${m.num}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td style="${p1Style}">${esc(m.player1||'')}</td><td style="text-align:center;font-weight:700;font-size:13px;white-space:nowrap">${scoreHtml}</td><td style="${p2Style}">${esc(m.player2||'')}</td><td>${esc(m.court||'-')}</td><td>${esc(m.umpire||'-')}</td><td>${startTime}</td><td>${endTime}</td><td>${duration}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${resetBtn}</td></tr>`;
   });
   tb.innerHTML=h;
@@ -4889,7 +4889,7 @@ function showScoreModal(idx) {
   const c=document.getElementById('score-sets-container');let h='';
   h+=`<div class="score-row score-row-header"><div class="score-cell-name" style="color:var(--fabd-blue);font-weight:700">${esc(m.player1)}</div><div class="score-cell-label"></div><div class="score-cell-name" style="color:var(--fabd-red);font-weight:700">${esc(m.player2)}</div></div>`;
   for(let s=1;s<=sets;s++){
-    h+=`<div class="score-row"><div class="score-cell"><input type="number" id="set-${s}-p1" min="0" max="30" value="" placeholder="0" onchange="autoDetectWinner()" oninput="autoDetectWinner()"></div><div class="score-cell-label">SET ${s}</div><div class="score-cell"><input type="number" id="set-${s}-p2" min="0" max="30" value="" placeholder="0" onchange="autoDetectWinner()" oninput="autoDetectWinner()"></div></div>`;
+    h+=`<div class="score-row"><div class="score-cell"><input type="number" id="set-${s}-p1" min="0" max="30" value="" placeholder="0" data-action="autoDetectWinner" data-event="change input"></div><div class="score-cell-label">SET ${s}</div><div class="score-cell"><input type="number" id="set-${s}-p2" min="0" max="30" value="" placeholder="0" data-action="autoDetectWinner" data-event="change input"></div></div>`;
   }
   c.innerHTML=h;openModal('modal-score');
 }
@@ -5368,7 +5368,7 @@ async function checkForUpdates(){
       const exeAsset=(data.assets||[]).find(a=>a.name.endsWith('.exe'));
       statusEl.innerHTML=`<span style="color:#F59E0B;font-weight:600">Nova versao disponivel: v${esc(latestVersion)}</span>`;
       if(exeAsset){
-        statusEl.innerHTML+=` <button class="btn btn-sm btn-primary" style="margin-left:8px" onclick="window.api.openExternal('${exeAsset.browser_download_url}')">Baixar v${esc(latestVersion)}</button>`;
+        statusEl.innerHTML+=` <button class="btn btn-sm btn-primary" style="margin-left:8px" data-action="api.openExternal" data-arg-1="${esc(exeAsset.browser_download_url)}">Baixar v${esc(latestVersion)}</button>`;
       }
     } else {
       statusEl.innerHTML=`<span style="color:#10B981;font-weight:600">&#10003; App atualizado (v${APP_VERSION})</span>`;
@@ -5742,7 +5742,7 @@ async function saveGameProfiles(){
   localStorage.setItem('fabd-game-profiles',JSON.stringify(gameProfiles));
   try{const s=await window.api.getSettings()||{};s.gameProfiles=gameProfiles;await window.api.saveSettings(s);}catch(e){console.warn('Erro ao sincronizar perfis:', e);}
 }
-function renderGameProfiles(){const c=document.getElementById('game-profiles-list');if(!gameProfiles.length){c.innerHTML='<p style="text-align:center;color:var(--fabd-gray-500)">Sem perfis</p>';return;}let h='<table><thead><tr><th>Nome</th><th>Modo</th><th>Detalhes</th><th>Acoes</th></tr></thead><tbody>';gameProfiles.forEach(p=>{h+=`<tr><td><strong>${esc(p.name)}</strong></td><td>${p.mode==='fixed'?'Fixo':'Personalizado'}</td><td style="font-size:12px">${p.mode==='fixed'?esc(p.fixedType):(p.ranges||[]).map(r=>`${r.min}-${r.max}: ${r.type}`).join(' | ')}</td><td><button class="btn btn-sm btn-secondary" onclick="editGameProfile('${p.id}')">Editar</button> <button class="btn btn-sm btn-danger" onclick="deleteGameProfile('${p.id}')">Excluir</button></td></tr>`;});c.innerHTML=h+'</tbody></table>';}
+function renderGameProfiles(){const c=document.getElementById('game-profiles-list');if(!gameProfiles.length){c.innerHTML='<p style="text-align:center;color:var(--fabd-gray-500)">Sem perfis</p>';return;}let h='<table><thead><tr><th>Nome</th><th>Modo</th><th>Detalhes</th><th>Acoes</th></tr></thead><tbody>';gameProfiles.forEach(p=>{h+=`<tr><td><strong>${esc(p.name)}</strong></td><td>${p.mode==='fixed'?'Fixo':'Personalizado'}</td><td style="font-size:12px">${p.mode==='fixed'?esc(p.fixedType):(p.ranges||[]).map(r=>`${r.min}-${r.max}: ${r.type}`).join(' | ')}</td><td><button class="btn btn-sm btn-secondary" data-action="editGameProfile" data-arg-1="${esc(p.id)}">Editar</button> <button class="btn btn-sm btn-danger" data-action="deleteGameProfile" data-arg-1="${esc(p.id)}">Excluir</button></td></tr>`;});c.innerHTML=h+'</tbody></table>';}
 function addGameProfile(){document.getElementById('profile-editor-title').textContent='Novo Perfil';document.getElementById('gp-name').value='';document.getElementById('gp-mode').value='custom';onGameModeChange();setRanges([{min:2,max:4,type:'Todos contra Todos'},{min:5,max:7,type:'Grupos + Eliminatoria'},{min:8,max:99,type:'Eliminatoria'}]);document.getElementById('game-profile-editor').style.display='';}
 function editGameProfile(id){const p=gameProfiles.find(x=>x.id===id);if(!p)return;document.getElementById('profile-editor-title').textContent='Editar';document.getElementById('gp-name').value=p.name;document.getElementById('gp-mode').value=p.mode;document.getElementById('gp-fixed-type').value=p.fixedType||'Eliminatoria';onGameModeChange();if(p.mode==='custom')setRanges(p.ranges||[]);document.getElementById('game-profile-editor').style.display='';editingProfileId=p.id;}
 let editingProfileId=null;
@@ -5769,7 +5769,7 @@ function setRanges(ranges){
           <option value="Eliminatoria"${r.type==='Eliminatoria'?' selected':''}>Eliminatoria (mata-mata)</option>
         </select>
       </div>
-      <div style="display:flex;align-items:center"><button class="btn btn-sm btn-danger" onclick="removeRange(${i})" title="Remover faixa">&times;</button></div>
+      <div style="display:flex;align-items:center"><button class="btn btn-sm btn-danger" data-action="removeRange" data-arg-1="${i}" title="Remover faixa">&times;</button></div>
     </div>`;
   });
   c.innerHTML = h;
@@ -5907,7 +5907,7 @@ function renderScoringTables(){
   }
   let h=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <p style="font-size:13px;color:var(--fabd-gray-600);margin:0">Defina tabelas de pontuação por colocação. Use nos relatórios "Classificação Geral" e "Ranking Federados" do torneio.</p>
-    <button class="btn btn-primary btn-sm" onclick="addScoringTable()">+ Novo Ranking</button>
+    <button class="btn btn-primary btn-sm" data-action="addScoringTable">+ Novo Ranking</button>
   </div>`;
   h+='<table style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden"><thead><tr style="background:#f8fafc"><th style="padding:10px;text-align:left">Nome</th>';
   SCORING_BUCKETS.forEach(b=>{h+=`<th style="padding:10px;text-align:center;font-size:11px">${esc(b.label.split(' ')[0])}</th>`;});
@@ -5916,8 +5916,8 @@ function renderScoringTables(){
     h+=`<tr style="border-top:1px solid #e5e7eb"><td style="padding:10px"><strong>${esc(t.name)}</strong>${t.isDefault?' <span class="tag tag-blue" style="font-size:10px">Padrão</span>':''}</td>`;
     SCORING_BUCKETS.forEach(b=>{h+=`<td style="padding:10px;text-align:center;font-size:13px">${(+t.points[b.key]||0).toLocaleString('pt-BR')}</td>`;});
     h+='<td style="padding:10px;text-align:center">';
-    h+=`<button class="btn btn-sm btn-secondary" onclick="editScoringTable('${esc(t.id)}')">Editar</button>`;
-    if(!t.isDefault)h+=` <button class="btn btn-sm btn-danger" onclick="deleteScoringTable('${esc(t.id)}')">Excluir</button>`;
+    h+=`<button class="btn btn-sm btn-secondary" data-action="editScoringTable" data-arg-1="${esc(t.id)}">Editar</button>`;
+    if(!t.isDefault)h+=` <button class="btn btn-sm btn-danger" data-action="deleteScoringTable" data-arg-1="${esc(t.id)}">Excluir</button>`;
     h+='</td></tr>';
   });
   h+='</tbody></table>';
@@ -6019,7 +6019,7 @@ function renderUmpires(){
   let h='';
   // Arbitros locais
   if(u.length){
-    u.forEach((x,i)=>{h+=`<tr><td>${i+1}</td><td><strong>${esc(x.name)}</strong></td><td><span class="tag tag-blue">${esc(x.level)}</span></td><td><button class="btn btn-sm btn-danger" onclick="removeUmpire(${i})">Remover</button></td></tr>`;});
+    u.forEach((x,i)=>{h+=`<tr><td>${i+1}</td><td><strong>${esc(x.name)}</strong></td><td><span class="tag tag-blue">${esc(x.level)}</span></td><td><button class="btn btn-sm btn-danger" data-action="removeUmpire" data-arg-1="${i}">Remover</button></td></tr>`;});
   }
   tb.innerHTML=h||'<tr><td colspan="4" style="text-align:center;color:var(--fabd-gray-500);padding:24px">Nenhum arbitro local</td></tr>';
   // Carregar arbitros online do Supabase
@@ -6050,9 +6050,9 @@ async function loadOnlineReferees(){
         <td style="font-size:12px;color:var(--fabd-gray-500)">${esc(r.email||'')}</td>
         <td><span class="tag ${stClass}">${stText}</span></td>
         <td>`;
-      if(r.status!=='autorizado')h+=`<button class="btn btn-sm btn-success" onclick="authorizeReferee('${esc(r.id)}','autorizado')">Liberar</button> `;
-      if(r.status!=='bloqueado')h+=`<button class="btn btn-sm btn-danger" onclick="authorizeReferee('${esc(r.id)}','bloqueado')">Bloquear</button>`;
-      if(r.status==='autorizado')h+=`<button class="btn btn-sm btn-secondary" onclick="authorizeReferee('${esc(r.id)}','pendente')" style="margin-left:4px">Revogar</button>`;
+      if(r.status!=='autorizado')h+=`<button class="btn btn-sm btn-success" data-action="authorizeReferee" data-arg-1="${esc(r.id)}" data-arg-2="autorizado">Liberar</button> `;
+      if(r.status!=='bloqueado')h+=`<button class="btn btn-sm btn-danger" data-action="authorizeReferee" data-arg-1="${esc(r.id)}" data-arg-2="bloqueado">Bloquear</button>`;
+      if(r.status==='autorizado')h+=`<button class="btn btn-sm btn-secondary" data-action="authorizeReferee" data-arg-1="${esc(r.id)}" data-arg-2="pendente" style="margin-left:4px">Revogar</button>`;
       h+=`</td></tr>`;
     });
     h+='</tbody></table>';
@@ -6620,7 +6620,7 @@ function printReport(type){
     <h1>${tName}</h1>
     <p>${tDate} | ${tLocation}</p>
   </div>`;
-  const printBtn='<div class="no-print" style="text-align:center"><button onclick="window.print()" style="padding:10px 24px;font-size:14px;background:#1E3A8A;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">Imprimir</button> <button onclick="window.close()" style="padding:10px 24px;font-size:14px;background:#6B7280;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-left:8px">Fechar</button></div>';
+  const printBtn='<div class="no-print" style="text-align:center"><button data-action="print" style="padding:10px 24px;font-size:14px;background:#1E3A8A;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">Imprimir</button> <button data-action="close" style="padding:10px 24px;font-size:14px;background:#6B7280;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-left:8px">Fechar</button></div>';
 
   let body='';
   switch(type){
@@ -7533,3 +7533,67 @@ function safeHTML(html, opts) {
   // Fallback: escape total (texto sem HTML)
   return esc(html);
 }
+
+// =====================================================================
+// EVENT DELEGATION — substitui inline handlers em template strings.
+// Em vez de:   <button onclick="foo('${esc(id)}',${idx})">X</button>
+// Usar:        <button data-action="foo" data-arg-1="${esc(id)}" data-arg-2="${idx}">X</button>
+// E o delegate global chama window.foo(arg1, arg2) no click do botao.
+//
+// Args sao convertidos: 'true'/'false' → boolean; numero → Number; '$value' → el.value;
+// '$el' → o proprio elemento; resto → string literal. Preserva ordem via data-arg-N.
+//
+// Tipos: data-action (obrigatorio) | data-arg-1..N | data-event (default 'click';
+//        outros: 'change', 'input').
+// =====================================================================
+function _resolveAction(name) {
+  if (!name) return { fn: null, ctx: null };
+  const parts = name.split('.');
+  let ctx = window;
+  for (let i = 0; i < parts.length; i++) {
+    if (ctx == null) return { fn: null, ctx: null };
+    if (i === parts.length - 1) {
+      const fn = ctx[parts[i]];
+      return typeof fn === 'function' ? { fn, ctx: parts.length > 1 ? ctx : null } : { fn: null, ctx: null };
+    }
+    ctx = ctx[parts[i]];
+  }
+  return { fn: null, ctx: null };
+}
+function _coerceArg(s, el) {
+  if (s === '$value') return el.value;
+  if (s === '$el') return el;
+  if (s === '$checked') return el.checked;
+  if (s === 'true') return true;
+  if (s === 'false') return false;
+  if (s === 'null') return null;
+  if (s === 'undefined') return undefined;
+  if (/^-?\d+$/.test(s)) return Number(s);
+  if (/^-?\d+\.\d+$/.test(s)) return Number(s);
+  return s;
+}
+function _collectArgs(el) {
+  const args = [];
+  for (let i = 1; ; i++) {
+    const v = el.dataset['arg' + i];
+    if (v === undefined) break;
+    args.push(_coerceArg(v, el));
+  }
+  return args;
+}
+function _delegateHandler(eventType) {
+  return function(e) {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const expectedEvents = (el.dataset.event || 'click').split(/\s+/);
+    if (!expectedEvents.includes(eventType)) return;
+    const action = el.dataset.action;
+    const { fn, ctx } = _resolveAction(action);
+    if (!fn) { console.warn('[delegate] acao desconhecida:', action); return; }
+    const args = _collectArgs(el);
+    try { fn.apply(ctx, args); } catch (err) { console.error('[delegate] erro em', action, err); }
+  };
+}
+document.addEventListener('click', _delegateHandler('click'));
+document.addEventListener('change', _delegateHandler('change'));
+document.addEventListener('input', _delegateHandler('input'));
