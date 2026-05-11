@@ -204,7 +204,7 @@
                     <span class="filter-badge" id="draws-filter-badge" style="display:none">0</span>
                   </button>
                 </div>
-                <div class="draws-filter-popup" id="draws-filter-popup" data-action="_noop" data-stop-prop="true">
+                <div class="draws-filter-popup" id="draws-filter-popup">
                   <h5>Sorteio</h5>
                   <div class="draws-filter-option" data-group="sorteio" data-value="sem" data-action="toggleDrawFilter" data-arg-1="$el"><span class="filter-radio"></span>Sem sorteio</div>
                   <div class="draws-filter-option" data-group="sorteio" data-value="sim" data-action="toggleDrawFilter" data-arg-1="$el"><span class="filter-radio"></span>Sorteadas</div>
@@ -977,7 +977,7 @@
             <h3 style="margin-bottom:8px">Selecione o arquivo CSV</h3>
             <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
               O arquivo deve seguir o modelo de importacao.<br>
-              <a href="#" data-action="downloadImportTemplate" style="color:var(--fabd-blue)">Clique aqui para baixar o modelo</a>
+              <a href="#" data-action="downloadImportTemplate" data-prevent-default="true" style="color:var(--fabd-blue)">Clique aqui para baixar o modelo</a>
             </p>
             <button class="btn btn-primary btn-lg" data-action="selectImportFile">&#128193; Selecionar Arquivo CSV</button>
           </div>
