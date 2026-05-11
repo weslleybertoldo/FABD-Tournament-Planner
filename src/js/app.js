@@ -556,31 +556,7 @@ function normalizeCategory(catStr){
 }
 
 // === CATEGORY BY AGE ===
-function calculateCategory(dob) {
-  if (!dob) return 'Principal';
-  // Aceitar formatos DD/MM/YYYY e YYYY-MM-DD
-  let birthYear;
-  const brMatch = dob.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (brMatch) { birthYear = parseInt(brMatch[3]); }
-  else {
-    const isoMatch = dob.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (isoMatch) { birthYear = parseInt(isoMatch[1]); }
-    else { return 'Principal'; }
-  }
-  const age = new Date().getFullYear() - birthYear;
-
-  // Regra: "ate X anos ESTE ANO" = ano_atual - ano_nascimento
-  if (age <= 10) return 'Sub 11';
-  if (age <= 12) return 'Sub 13';
-  if (age <= 14) return 'Sub 15';
-  if (age <= 16) return 'Sub 17';
-  if (age <= 18) return 'Sub 19';
-  if (age <= 22) return 'Sub 23';
-  if (age >= 55) return 'Master II';
-  if (age >= 45) return 'Master I';
-  if (age >= 35) return 'Senior';
-  return 'Principal';
-}
+// calculateCategory() extraida pra src/js/modules/csv-parser.js (issue #14)
 
 function checkAloneInCategory(playerInscriptions) {
   if (!tournament?.entries?.length || !playerInscriptions?.length) return [];
@@ -6312,75 +6288,9 @@ async function selectImportFile(){
   }catch(e){showToast('Erro: '+e.message,'error');}
 }
 function parseCSV(content,filePath){const fl=content.split('\n')[0];const sep=(fl.match(/;/g)||[]).length>(fl.match(/,/g)||[]).length?';':',';document.getElementById('import-separator').textContent=sep===';'?'Ponto e virgula':'Virgula';const lines=content.split('\n').map(l=>l.trim()).filter(l=>l);if(lines.length<2){showToast('Arquivo precisa de cabecalho + dados','warning');return;}const headers=parseCSVLine(lines[0],sep);const colMap=mapColumns(headers);importedRows=[];for(let i=1;i<lines.length;i++){const cols=parseCSVLine(lines[i],sep);if(cols.length<2)continue;const row={firstName:cleanAthleteName(getCol(cols,colMap.firstName)),lastName:cleanAthleteName(getCol(cols,colMap.lastName)),gender:normalizeGender(getCol(cols,colMap.gender)),dob:normalizeDate(getCol(cols,colMap.dob)),club:getCol(cols,colMap.club),state:getCol(cols,colMap.state)||'AL',ranking:getCol(cols,colMap.ranking),phone:getCol(cols,colMap.phone),email:getCol(cols,colMap.email),inscricoesRaw:getCol(cols,colMap.inscricoes),duplaDM:getCol(cols,colMap.duplaDM),duplaDF:getCol(cols,colMap.duplaDF),duplaDX:getCol(cols,colMap.duplaDX),valid:true,error:''};if(!row.firstName&&!row.lastName){row.valid=false;row.error='Nome vazio';}if(row.gender!=='M'&&row.gender!=='F'){row.valid=false;row.error='Genero invalido';}row.category=calculateCategory(row.dob);importedRows.push(row);}document.getElementById('import-file-name').textContent=filePath.split(/[/\\]/).pop();document.getElementById('import-count').textContent=`${importedRows.length} linha(s)`;const vc=importedRows.filter(r=>r.valid).length,ic=importedRows.filter(r=>!r.valid).length;document.getElementById('import-preview-head').innerHTML='<tr><th>#</th><th>Nome</th><th>Sobrenome</th><th>Gen.</th><th>Nasc.</th><th>Cat.</th><th>Clube</th><th>Inscricoes</th><th>Status</th></tr>';let tb='';importedRows.forEach((r,i)=>{const inscs=(r.inscricoesRaw||'').split(/[;|]/).filter(x=>x.trim()).map(x=>`<span class="tag tag-blue" style="margin:1px;font-size:9px">${esc(x.trim())}</span>`).join(' ')||'-';tb+=`<tr style="${r.valid?'':'background:#FEE2E2'}"><td>${i+1}</td><td>${esc(r.firstName)}</td><td>${esc(r.lastName)}</td><td>${esc(r.gender)}</td><td>${esc(r.dob)}</td><td>${esc(r.category)}</td><td>${esc(r.club)}</td><td>${inscs}</td><td>${r.valid?'<span class="tag tag-green">OK</span>':`<span class="tag tag-red">${esc(r.error)}</span>`}</td></tr>`;});document.getElementById('import-preview-body').innerHTML=tb;document.getElementById('import-summary').innerHTML=`<strong>${vc}</strong> valido(s)${ic?`<br><span style="color:var(--fabd-red)">${ic} com erro</span>`:''}`;document.getElementById('import-step-1').style.display='none';document.getElementById('import-step-2').style.display='';document.getElementById('import-btn-confirm').style.display=vc?'':'none';}
-function parseCSVLine(line,sep){const r=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(q&&line[i+1]==='"'){c+='"';i++;}else q=!q;}else if(ch===sep&&!q){r.push(c.trim());c='';}else c+=ch;}r.push(c.trim());return r;}
-function mapColumns(h){const m={firstName:-1,lastName:-1,gender:-1,dob:-1,club:-1,state:-1,ranking:-1,phone:-1,email:-1,inscricoes:-1,duplaDM:-1,duplaDF:-1,duplaDX:-1};const a={firstName:['nome','firstname','first name'],lastName:['sobrenome','lastname','last name'],gender:['genero','gender','sexo'],dob:['data nascimento','datanascimento','dob','date of birth','data nasc','dt nascimento'],club:['clube','club'],state:['estado','state','uf'],ranking:['ranking','classificacao','rank'],phone:['telefone','phone','tel','celular','mobile'],email:['email','e-mail','mail'],inscricoes:['inscricoes','inscricao','categories','categorias'],duplaDM:['dupla_dm','dupladm','parceiro_dm'],duplaDF:['dupla_df','dupladf','parceira_df'],duplaDX:['dupla_dx','duladx','parceiro_dx','parceira_dx']};h.forEach((x,i)=>{if(x==null)return;const l=String(x).toLowerCase().replace(/[^a-z0-9_ ]/g,'').trim();Object.keys(a).forEach(k=>{if(a[k].some(al=>l===al||l.includes(al))&&m[k]===-1)m[k]=i;});});if(m.firstName===-1)m.firstName=0;if(m.lastName===-1)m.lastName=1;if(m.gender===-1)m.gender=2;if(m.dob===-1)m.dob=3;if(m.club===-1)m.club=4;if(m.state===-1)m.state=5;if(m.ranking===-1)m.ranking=6;if(m.phone===-1)m.phone=7;if(m.email===-1)m.email=8;if(m.inscricoes===-1)m.inscricoes=9;if(m.duplaDM===-1)m.duplaDM=10;if(m.duplaDF===-1)m.duplaDF=11;if(m.duplaDX===-1)m.duplaDX=12;return m;}
-function getCol(c,i){return i>=0&&i<c.length&&c[i]!=null?String(c[i]).replace(/^["']|["']$/g,'').trim():'';}
-function normalizeName(s){return(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
-// Normaliza nome de atleta: remove prefixos em caixa alta, numeros, hifens no fim
-// "RONALD LUIS ROGERIO DA SILVA" -> "Luis Rogerio da Silva"
-// "1234 - PEDRO SANTOS" -> "Pedro Santos"
-// "JOAO SILVA-" -> "João Silva"
-function cleanAthleteName(n){
-  if(!n)return'';
-  let s=String(n).trim();
-  s=s.replace(/^[d]+[s]*[-–—s]+/,'');
-  const parts=s.split(/[s]+/).filter(p=>p);
-  if(parts.length===0)return'';
-  const connectors=['da','de','do','das','dos','e','di','du','von','van'];
-  return parts.map(p=>{
-    const clean=p.replace(/[-–—]+$/,'');
-    const low=clean.toLowerCase();
-    if(connectors.includes(low))return low;
-    // Se palavra é MAIÚSCULA (ou mix case), converter para Title Case
-    if((clean===clean.toUpperCase()||/^[A-Z][a-z]+$/.test(clean)) && clean.length>1){
-      return clean.charAt(0).toUpperCase()+low.slice(1);
-    }
-    return clean;
-  }).join(' ');
-}
-
-// C6: normalizeGender — so retorna 'M' ou 'F' (ou '' se invalido/vazio).
-// Antes retornava valor nao-reconhecido como-estava, quebrando modalidade DM/DF/DX.
-function normalizeGender(g){
-  if(!g)return'';
-  const v=String(g).toUpperCase().trim();
-  if(['M','MASCULINO','MASC','MALE','H','HOMEM'].includes(v))return'M';
-  if(['F','FEMININO','FEM','FEMALE','MULHER'].includes(v))return'F';
-  return ''; // invalido -> vazio (validacao posterior marca linha invalida)
-}
-// R5+R6: normalizeDate aceita Date object, serial Excel (numero/string numerica),
-// strings DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, ISO YYYY-MM-DD. Retorna '' para invalido
-// (nao mais o valor original). Caller deve checar '' para detectar DOBs nao-reconhecidos.
-function normalizeDate(d){
-  if(d==null||d==='')return'';
-  // Date object
-  if(d instanceof Date){
-    if(isNaN(d.getTime()))return'';
-    const y=d.getUTCFullYear(),m=d.getUTCMonth()+1,day=d.getUTCDate();
-    return `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-  }
-  // Serial Excel (numero) — dias desde 1899-12-30 (epoch Excel).
-  // Faixa razoavel: 1 (1900-01-01) a 73000 (~2099).
-  if(typeof d==='number'&&d>0&&d<100000){
-    const dt=new Date(Date.UTC(1899,11,30)+d*86400000);
-    if(!isNaN(dt.getTime())){
-      const y=dt.getUTCFullYear(),m=dt.getUTCMonth()+1,day=dt.getUTCDate();
-      return `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    }
-    return'';
-  }
-  const s=String(d).trim();
-  if(!s)return'';
-  // DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
-  let m=s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
-  if(m)return`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  // ISO YYYY-MM-DD (com ou sem tempo)
-  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if(m)return`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
-  // String puramente numerica (serial Excel que veio como string)
-  if(/^\d+(\.\d+)?$/.test(s))return normalizeDate(parseFloat(s));
-  return ''; // nao reconhecido
-}
+// parseCSVLine, mapColumns, getCol, normalizeName, cleanAthleteName,
+// normalizeGender, normalizeDate — extraidas pra src/js/modules/csv-parser.js
+// (issue #14 sub-tarefa 14.A). Continuam disponiveis como globais.
 async function confirmImport(){
   try{
     const vr=importedRows.filter(r=>r.valid);
