@@ -1780,18 +1780,30 @@ function toggleDrawsFilterPopup(ev){
   const open=popup.classList.toggle('open');
   if(open){
     _refreshDrawFilterPopupUI();
-    setTimeout(()=>{document.addEventListener('click',_drawFilterOutsideClick,{once:true});},10);
+    // Listener persistente: sai so quando popup fecha (closeDrawsFilterPopup
+    // remove). Antes era {once:true}, mas precisamos checar popup.contains()
+    // pra permitir cliques internos — se for `once`, perde-se no primeiro
+    // clique interno e nao fecha mais.
+    setTimeout(()=>{document.addEventListener('click',_drawFilterOutsideClick);},10);
+  }else{
+    document.removeEventListener('click',_drawFilterOutsideClick);
   }
 }
 
-function _drawFilterOutsideClick(){
+function _drawFilterOutsideClick(ev){
   const popup=document.getElementById('draws-filter-popup');
-  if(popup)popup.classList.remove('open');
+  if(!popup)return;
+  // So fecha se o clique foi FORA do popup. Permite cliques internos
+  // (data-action="toggleDrawFilter" em filhos) sem fechar e sem precisar
+  // bloquear propagation (que quebraria o delegate global).
+  if(popup.contains(ev?.target))return;
+  popup.classList.remove('open');
 }
 
 function closeDrawsFilterPopup(){
   const popup=document.getElementById('draws-filter-popup');
   if(popup)popup.classList.remove('open');
+  document.removeEventListener('click',_drawFilterOutsideClick);
 }
 
 function toggleDrawFilter(el){
@@ -7654,14 +7666,3 @@ window.clickLogoFileInput = function() {
   const inp = document.getElementById('logo-file-input');
   if (inp) inp.click();
 };
-window._noop = function() { /* placeholder: usado quando so importa o efeito colateral (preventDefault etc) */ };
-
-// Listener nativo no popup de filtros de chaves: e.stopPropagation() pra
-// impedir que o handler outside-click do document feche o popup quando o
-// usuario clica dentro dele. Delegate global em document nao consegue cobrir
-// esse caso (ambos rodam no mesmo target — stopPropagation no delegate nao
-// bloqueia outras listeners no MESMO document).
-document.addEventListener('DOMContentLoaded', () => {
-  const popup = document.getElementById('draws-filter-popup');
-  if (popup) popup.addEventListener('click', e => e.stopPropagation());
-});
