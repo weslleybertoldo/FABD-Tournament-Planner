@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('[INIT] Overview updated');
     const verEl=document.getElementById('current-version');
     if(verEl)verEl.textContent=`Versao atual: v${APP_VERSION}`;
+    setupAutoUpdaterUI();
     console.log('[INIT] Done!');
   } catch(e) {
     console.error('[INIT] ERROR:', e.message, e.stack);
@@ -7676,3 +7677,85 @@ window.clickLogoFileInput = function() {
   const inp = document.getElementById('logo-file-input');
   if (inp) inp.click();
 };
+
+// =====================================================================
+// AUTO-UPDATER UI (issue #13)
+// Mostra modal "nova atualizacao disponivel" quando main process detecta.
+// Sim -> baixa em background + reinicia automaticamente em quitAndInstall.
+// Nao -> popup fecha; volta no proximo open (main re-checa a cada startup).
+// =====================================================================
+let _updateInfo = null;
+function setupAutoUpdaterUI() {
+  if (!window.api?.onUpdateAvailable) return;
+  window.api.onUpdateAvailable((info) => {
+    _updateInfo = info;
+    _showUpdateModal('available');
+  });
+  window.api.onUpdateProgress((p) => {
+    const bar = document.getElementById('update-progress-bar');
+    const pct = document.getElementById('update-progress-pct');
+    if (bar) bar.style.width = p.percent + '%';
+    if (pct) pct.textContent = p.percent + '%';
+  });
+  window.api.onUpdateDownloaded((info) => {
+    _updateInfo = info;
+    _showUpdateModal('ready');
+  });
+  window.api.onUpdateError((err) => {
+    console.warn('[updater] erro:', err?.message);
+    _hideUpdateModal();
+  });
+}
+function _showUpdateModal(state) {
+  let modal = document.getElementById('update-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'update-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.7);z-index:99998;display:flex;align-items:center;justify-content:center';
+    document.body.appendChild(modal);
+  }
+  modal.style.display = 'flex';
+  const v = _updateInfo?.version || '?';
+  if (state === 'available') {
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+        <h3 style="margin:0 0 12px;color:#1E3A8A">Nova atualizacao disponivel</h3>
+        <p style="margin:0 0 8px;color:#475569;font-size:14px">Versao <strong>v${esc(String(v))}</strong> pronta pra baixar.</p>
+        <p style="margin:0 0 20px;color:#94A3B8;font-size:12px">Atualizar agora baixa em background e reinicia o app automaticamente.</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-secondary" data-action="updaterDecline">Mais tarde</button>
+          <button class="btn btn-primary" data-action="updaterAccept">Atualizar agora</button>
+        </div>
+      </div>`;
+  } else if (state === 'downloading') {
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+        <h3 style="margin:0 0 12px;color:#1E3A8A">Baixando v${esc(String(v))}...</h3>
+        <div style="background:#E2E8F0;border-radius:6px;height:8px;overflow:hidden;margin-bottom:8px">
+          <div id="update-progress-bar" style="background:#3B82F6;height:100%;width:0%;transition:width .2s"></div>
+        </div>
+        <p style="margin:0;color:#64748B;font-size:13px;text-align:center"><span id="update-progress-pct">0%</span></p>
+      </div>`;
+  } else if (state === 'ready') {
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+        <h3 style="margin:0 0 12px;color:#065F46">Atualizacao baixada!</h3>
+        <p style="margin:0 0 20px;color:#475569;font-size:14px">v${esc(String(v))} pronta. App vai reiniciar pra aplicar.</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-secondary" data-action="updaterDeclineInstall">Reiniciar depois</button>
+          <button class="btn btn-primary" data-action="updaterInstallNow">Reiniciar agora</button>
+        </div>
+      </div>`;
+  }
+}
+function _hideUpdateModal() {
+  const modal = document.getElementById('update-modal');
+  if (modal) modal.style.display = 'none';
+}
+window.updaterAccept = async function() {
+  _showUpdateModal('downloading');
+  await window.api.updaterDownload();
+};
+window.updaterDecline = function() { _hideUpdateModal(); };
+window.updaterInstallNow = function() { window.api.updaterInstall(); };
+window.updaterDeclineInstall = function() { _hideUpdateModal(); };

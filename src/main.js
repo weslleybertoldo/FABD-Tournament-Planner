@@ -255,6 +255,8 @@ app.whenReady().then(async () => {
   createWindow();
   // Log bootstrap apos window criada
   log('INFO', 'App iniciado');
+  // Auto-updater: check pos-startup, prompt via renderer.
+  setupAutoUpdater();
 });
 app.on('window-all-closed', () => {
   if(saveTimeout)clearTimeout(saveTimeout);
@@ -267,6 +269,65 @@ app.on('window-all-closed', () => {
 app.on('activate', () => { if(!BrowserWindow.getAllWindows().length) createWindow(); });
 process.on('uncaughtException', (e) => { log('ERROR', 'Uncaught:', e.message); });
 process.on('unhandledRejection', (e) => { log('ERROR', 'Unhandled:', String(e)); });
+
+// =====================================================================
+// AUTO-UPDATER (electron-updater + GitHub Releases)
+// Fluxo: check on startup -> se ha update, manda evento pro renderer
+// que mostra popup "Atualizar agora?". Sim -> downloadUpdate + quitAndInstall.
+// Nao -> adia; popup volta no proximo open do app.
+// =====================================================================
+let _autoUpdaterReady = false;
+function setupAutoUpdater() {
+  try {
+    const { autoUpdater } = require('electron-updater');
+    autoUpdater.autoDownload = false; // user confirma antes
+    autoUpdater.autoInstallOnAppQuit = false;
+    autoUpdater.logger = { info: (m) => log('INFO', '[updater]', m), warn: (m) => log('WARN', '[updater]', m), error: (m) => log('ERROR', '[updater]', m), debug: () => {} };
+
+    autoUpdater.on('update-available', (info) => {
+      log('INFO', '[updater] update disponivel:', info.version);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('updater:update-available', { version: info.version, releaseNotes: info.releaseNotes || '', releaseDate: info.releaseDate });
+      }
+    });
+    autoUpdater.on('update-not-available', () => log('INFO', '[updater] sem update'));
+    autoUpdater.on('download-progress', (p) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('updater:download-progress', { percent: Math.round(p.percent), bytesPerSecond: p.bytesPerSecond, transferred: p.transferred, total: p.total });
+      }
+    });
+    autoUpdater.on('update-downloaded', (info) => {
+      log('INFO', '[updater] baixou:', info.version);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('updater:update-downloaded', { version: info.version });
+      }
+    });
+    autoUpdater.on('error', (err) => {
+      log('ERROR', '[updater] erro:', err?.message || String(err));
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('updater:error', { message: err?.message || String(err) });
+      }
+    });
+
+    ipcMain.handle('updater:download', async () => {
+      try { await autoUpdater.downloadUpdate(); return { ok: true }; }
+      catch (err) { log('ERROR', '[updater] downloadUpdate falhou:', err?.message); return { ok: false, error: err?.message }; }
+    });
+    ipcMain.handle('updater:install', () => {
+      log('INFO', '[updater] quitAndInstall');
+      setImmediate(() => autoUpdater.quitAndInstall(false, true));
+      return { ok: true };
+    });
+
+    _autoUpdaterReady = true;
+    // Check inicial — apos 5s pra nao competir com bootstrap do app
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch(err => log('WARN', '[updater] checkForUpdates falhou (provavel dev mode):', err?.message));
+    }, 5000);
+  } catch (e) {
+    log('WARN', '[updater] setup falhou (provavel dev mode):', e?.message);
+  }
+}
 
 // === IPC: TORNEIO (só 1 por vez) ===
 ipcMain.handle('db:getTournament', () => db.tournament);
