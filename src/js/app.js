@@ -7573,10 +7573,13 @@ function _coerceArg(s, el) {
   return s;
 }
 function _collectArgs(el) {
+  // Usar getAttribute em vez de dataset: dataset converte hifen-letra pra camelCase
+  // mas hifen-digito (`data-arg-1`) tem comportamento inconsistente entre browsers.
+  // getAttribute le o atributo HTML literal, sempre confiavel.
   const args = [];
   for (let i = 1; ; i++) {
-    const v = el.dataset['arg' + i];
-    if (v === undefined) break;
+    const v = el.getAttribute('data-arg-' + i);
+    if (v === null) break;
     args.push(_coerceArg(v, el));
   }
   return args;
