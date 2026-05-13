@@ -103,8 +103,18 @@ jobs:
           git add package.json src/js/app.js
           git diff --staged --quiet || git commit -m "chore: bump version to v$NEXT [skip ci]"
           # Race-safe push: outro workflow (ex: referee-sw-bump) pode ter pushed entre o build e este step
+          pushed=0
           for i in 1 2 3 4 5; do
-            git pull --rebase origin master && git push && break
+            if git pull --rebase origin master && git push; then
+              pushed=1
+              break
+            fi
+            # rebase pode ter ficado em andamento se houve conflito — aborta antes da proxima tentativa
+            git rebase --abort 2>/dev/null || true
             echo "Push falhou (tentativa $i/5), aguardando..."
             sleep $((RANDOM % 5 + 2))
           done
+          if [ "$pushed" != "1" ]; then
+            echo "ERRO: nao consegui pushar bump de versao apos 5 tentativas"
+            exit 1
+          fi
