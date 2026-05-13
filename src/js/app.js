@@ -3944,45 +3944,40 @@ function setupAutoUpdaterUI() {
     _hideUpdateModal();
   });
 }
+// Toast canto inferior direito, NAO-bloqueante (estilo fabd-fluxos):
+// usuario continua usando o app enquanto baixa. Sem overlay/backdrop.
 function _showUpdateModal(state) {
   let modal = document.getElementById('update-modal');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'update-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.7);z-index:99998;display:flex;align-items:center;justify-content:center';
+    modal.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99998;max-width:360px;width:92%;background:#fff;border:1px solid #BFDBFE;border-radius:16px;padding:16px;box-shadow:0 12px 40px rgba(15,23,42,.25);font-size:14px';
     document.body.appendChild(modal);
   }
-  modal.style.display = 'flex';
+  modal.style.display = 'block';
   const v = _updateInfo?.version || '?';
   if (state === 'available') {
     modal.innerHTML = `
-      <div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-        <h3 style="margin:0 0 12px;color:#1E3A8A">Nova atualizacao disponivel</h3>
-        <p style="margin:0 0 8px;color:#475569;font-size:14px">Versao <strong>v${esc(String(v))}</strong> pronta pra baixar.</p>
-        <p style="margin:0 0 20px;color:#94A3B8;font-size:12px">Atualizar agora baixa em background e reinicia o app automaticamente.</p>
-        <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-secondary" data-action="updaterDecline">Mais tarde</button>
-          <button class="btn btn-primary" data-action="updaterAccept">Atualizar agora</button>
-        </div>
+      <p style="margin:0 0 4px;color:#0F172A;font-weight:600">Nova atualizacao disponivel (v${esc(String(v))})</p>
+      <p style="margin:0 0 12px;color:#64748B;font-size:12px">Atualizar agora baixa em background. Voce pode continuar usando o app.</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary" data-action="updaterDecline">Mais tarde</button>
+        <button class="btn btn-primary" data-action="updaterAccept">Atualizar agora</button>
       </div>`;
   } else if (state === 'downloading') {
     modal.innerHTML = `
-      <div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-        <h3 style="margin:0 0 12px;color:#1E3A8A">Baixando v${esc(String(v))}...</h3>
-        <div style="background:#E2E8F0;border-radius:6px;height:8px;overflow:hidden;margin-bottom:8px">
-          <div id="update-progress-bar" style="background:#3B82F6;height:100%;width:0%;transition:width .2s"></div>
-        </div>
-        <p style="margin:0;color:#64748B;font-size:13px;text-align:center"><span id="update-progress-pct">0%</span></p>
-      </div>`;
+      <p style="margin:0 0 8px;color:#0F172A;font-weight:600">Baixando v${esc(String(v))}...</p>
+      <div style="background:#E2E8F0;border-radius:6px;height:8px;overflow:hidden;margin-bottom:6px">
+        <div id="update-progress-bar" style="background:#3B82F6;height:100%;width:0%;transition:width .2s"></div>
+      </div>
+      <p style="margin:0;color:#64748B;font-size:12px;text-align:center"><span id="update-progress-pct">0%</span></p>`;
   } else if (state === 'ready') {
     modal.innerHTML = `
-      <div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-        <h3 style="margin:0 0 12px;color:#065F46">Atualizacao baixada!</h3>
-        <p style="margin:0 0 20px;color:#475569;font-size:14px">v${esc(String(v))} pronta. App vai reiniciar pra aplicar.</p>
-        <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-secondary" data-action="updaterDeclineInstall">Reiniciar depois</button>
-          <button class="btn btn-primary" data-action="updaterInstallNow">Reiniciar agora</button>
-        </div>
+      <p style="margin:0 0 4px;color:#065F46;font-weight:600">Atualizacao baixada (v${esc(String(v))})</p>
+      <p style="margin:0 0 12px;color:#475569;font-size:12px">App vai reiniciar pra aplicar. Pode adiar — fica pronto pra proxima abertura.</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary" data-action="updaterDeclineInstall">Reiniciar depois</button>
+        <button class="btn btn-primary" data-action="updaterInstallNow">Reiniciar agora</button>
       </div>`;
   }
 }
