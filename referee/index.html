@@ -235,22 +235,6 @@
     </div>
   </div>
 
-  <!-- Toast de atualizacao (PWA): aparece quando ha nova versao do app em espera.
-       Equivalente ao fluxo de update in-app do fabd-fluxos, com barra de progresso. -->
-  <div id="update-toast" style="display:none;position:fixed;bottom:16px;right:16px;left:16px;max-width:360px;margin-left:auto;z-index:9999;background:#fff;border:1px solid #BFDBFE;border-radius:16px;padding:16px;box-shadow:0 10px 25px rgba(0,0,0,.15);font-family:inherit">
-    <p id="update-toast-title" style="margin:0;font-size:14px;font-weight:600;color:#1E3A8A">Nova versao disponivel</p>
-    <div id="update-toast-actions" style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
-      <button type="button" onclick="dismissUpdate()" style="padding:6px 12px;font-size:12px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;color:#334155;cursor:pointer">Depois</button>
-      <button type="button" onclick="applyUpdate()" style="padding:6px 12px;font-size:12px;font-weight:600;border-radius:8px;border:none;background:#1E40AF;color:#fff;cursor:pointer">Atualizar agora</button>
-    </div>
-    <div id="update-toast-progress" style="display:none;margin-top:12px">
-      <div style="height:8px;border-radius:999px;background:#DBEAFE;overflow:hidden">
-        <div id="update-toast-bar" style="height:100%;width:10%;background:#1E40AF;border-radius:999px;transition:width .25s ease"></div>
-      </div>
-      <p style="margin:6px 0 0;text-align:center;font-size:11px;color:#64748B">Atualizando...</p>
-    </div>
-  </div>
-
   <!-- SCORER -->
   <div id="page-scorer" class="scorer-page">
     <div class="scorer-top">
@@ -526,50 +510,12 @@
     // Controle de setinhas (só aparecem no inicio de cada set)
     let canSwapInner=true;
 
-    // === PWA SERVICE WORKER (update toast com barra, estilo fabd-fluxos) ===
-    let _swWaiting=null;       // SW novo em espera, aguardando confirmacao
-    let _swReloading=false;    // guarda contra reload duplo no controllerchange
-
-    function showUpdateToast(worker){
-      _swWaiting=worker;
-      const t=document.getElementById('update-toast');
-      if(t)t.style.display='block';
-    }
-    function dismissUpdate(){
-      const t=document.getElementById('update-toast');
-      if(t)t.style.display='none';
-    }
-    function applyUpdate(){
-      if(!_swWaiting){location.reload();return;}
-      // Mostra a barra de progresso e dispara a troca de SW.
-      document.getElementById('update-toast-actions').style.display='none';
-      document.getElementById('update-toast-progress').style.display='block';
-      const bar=document.getElementById('update-toast-bar');
-      if(bar){requestAnimationFrame(()=>{bar.style.width='90%';});}
-      _swWaiting.postMessage({type:'SKIP_WAITING'});
-      // controllerchange dispara o reload quando o novo SW assume.
-    }
-
+    // === PWA SERVICE WORKER ===
     if('serviceWorker' in navigator){
-      navigator.serviceWorker.register('./sw.js').then(reg=>{
-        // Ja ha um SW novo em espera (versao baixada antes desta visita)?
-        if(reg.waiting&&navigator.serviceWorker.controller)showUpdateToast(reg.waiting);
-        // Detecta um SW novo chegando enquanto o app esta aberto.
-        reg.addEventListener('updatefound',()=>{
-          const nw=reg.installing;
-          if(!nw)return;
-          nw.addEventListener('statechange',()=>{
-            // 'installed' + ja existe controller = update (nao a 1a instalacao).
-            if(nw.state==='installed'&&navigator.serviceWorker.controller)showUpdateToast(nw);
-          });
-        });
-      }).catch(()=>{});
-
-      // Quando o novo SW assume o controle, recarrega pra rodar a versao nova.
+      navigator.serviceWorker.register('./sw.js').catch(()=>{});
+      // Notifica quando nova versao esta pronta
       navigator.serviceWorker.addEventListener('controllerchange',()=>{
-        if(_swReloading)return;
-        _swReloading=true;
-        location.reload();
+        if(confirm('Nova versao do app disponivel! Atualizar agora?'))location.reload();
       });
     }
 
