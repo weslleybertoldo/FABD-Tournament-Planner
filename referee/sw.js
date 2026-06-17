@@ -7,8 +7,14 @@ self.addEventListener('install',e=>{
     './icon-192.png',
     './icon-512.png'
   ])));
-  // ATUALIZAÇÃO AUTOMÁTICA: ativa imediatamente sem esperar
-  self.skipWaiting();
+  // NAO faz skipWaiting automatico: o novo SW fica em "waiting" ate o arbitro
+  // tocar "Atualizar" no toast (index.html dispara SKIP_WAITING via postMessage).
+  // Sem isso a versao podia trocar sozinha no meio de uma partida.
+});
+
+// O toast manda SKIP_WAITING quando o arbitro confirma a atualizacao.
+self.addEventListener('message',e=>{
+  if(e.data&&e.data.type==='SKIP_WAITING')self.skipWaiting();
 });
 
 self.addEventListener('activate',e=>{
