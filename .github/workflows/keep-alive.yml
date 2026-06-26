@@ -2,24 +2,27 @@ name: Keep Supabase Active
 
 on:
   schedule:
-    # A cada 5 dias as 9h UTC (antes do limite de 7 dias)
-    - cron: '0 9 */5 * *'
+    # A cada 3 dias as 9h UTC (folga confortavel antes do limite de 7 dias)
+    - cron: '0 9 */3 * *'
   workflow_dispatch:
 
 jobs:
   ping-supabase:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping runtime do projeto (auth/v1/health)
-        # Trafego HTTP no host <ref>.supabase.co — exatamente o tipo de
-        # trafego que uso normal faz. Anon key e publica (vai pro frontend).
+      - name: Ping REST/PostgREST (atividade que CONTA p/ o auto-pause)
+        # O auth/v1/health NAO reseta o contador de inatividade do Supabase
+        # (o projeto pausou mesmo com a Action verde). O que conta e trafego
+        # real na Data API: GET numa tabela com leitura publica via anon key.
         run: |
           set -e
+          KEY="sb_publishable_sCMqtUOnE7McSgZelCkWJQ_cbyslJNX"
           RES=$(curl -s -w "\n%{http_code}" \
-            -H "apikey: sb_publishable_sCMqtUOnE7McSgZelCkWJQ_cbyslJNX" \
-            "https://zwjgjtrmsqtyyjtuotuo.supabase.co/auth/v1/health")
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY" \
+            "https://zwjgjtrmsqtyyjtuotuo.supabase.co/rest/v1/federations?select=id&limit=1")
           CODE=$(echo "$RES" | tail -1)
-          echo "FABD Tournament runtime ping: HTTP $CODE"
+          echo "FABD Tournament REST ping: HTTP $CODE"
           [ "$CODE" = "200" ] || (echo "ERRO" && exit 1)
 
       - name: Executar SQL real no Postgres (camada extra)
