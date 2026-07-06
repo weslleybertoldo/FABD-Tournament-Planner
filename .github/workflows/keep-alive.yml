@@ -2,28 +2,35 @@ name: Keep Supabase Active
 
 on:
   schedule:
-    # A cada 3 dias as 9h UTC (folga confortavel antes do limite de 7 dias)
-    - cron: '0 9 */3 * *'
+    # 4x/dia. Criterio oficial do auto-pause NAO e "qualquer atividade reseta
+    # o contador" — e "sufficient user database activity... a few user
+    # requests to the database EACH DAY over the previous week"
+    # (docs/guides/platform/free-project-pausing). Ping a cada 3 dias falhou
+    # no NutriTrack: runs verdes 28/06 e 01/07 e pausou 04/07/2026.
+    - cron: '0 3,9,15,21 * * *'
   workflow_dispatch:
 
 jobs:
   ping-supabase:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping REST/PostgREST (atividade que CONTA p/ o auto-pause)
+      - name: Pings REST/PostgREST (atividade que CONTA p/ o auto-pause)
         # O auth/v1/health NAO reseta o contador de inatividade do Supabase
         # (o projeto pausou mesmo com a Action verde). O que conta e trafego
         # real na Data API: GET numa tabela com leitura publica via anon key.
         run: |
           set -e
           KEY="sb_publishable_sCMqtUOnE7McSgZelCkWJQ_cbyslJNX"
-          RES=$(curl -s -w "\n%{http_code}" \
-            -H "apikey: $KEY" \
-            -H "Authorization: Bearer $KEY" \
-            "https://zwjgjtrmsqtyyjtuotuo.supabase.co/rest/v1/federations?select=id&limit=1")
-          CODE=$(echo "$RES" | tail -1)
-          echo "FABD Tournament REST ping: HTTP $CODE"
-          [ "$CODE" = "200" ] || (echo "ERRO" && exit 1)
+          # 3 queries por run x 4 runs/dia = ~12 queries/dia ("a few each day")
+          for i in 1 2 3; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "apikey: $KEY" \
+              -H "Authorization: Bearer $KEY" \
+              "https://zwjgjtrmsqtyyjtuotuo.supabase.co/rest/v1/federations?select=id&limit=$i")
+            echo "FABD Tournament REST ping $i/3: HTTP $CODE"
+            [ "$CODE" = "200" ] || (echo "ERRO" && exit 1)
+            sleep 2
+          done
 
       - name: Executar SQL real no Postgres (camada extra)
         run: |
