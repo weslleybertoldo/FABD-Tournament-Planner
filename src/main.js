@@ -1312,6 +1312,35 @@ ipcMain.handle('organizers:update', async (_, email, patch) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
+// Aba Configuracoes > Eventos: listar torneios publicados no site ao vivo
+ipcMain.handle('supabase:listLiveTournaments', async () => {
+  try {
+    if (!currentFederation?.id) return { ok: false, error: 'Login necessario' };
+    const { data, error } = await supabase.from('tournaments')
+      .select('id,name,updated_at')
+      .eq('federation_id', currentFederation.id)
+      .order('updated_at', { ascending: false });
+    if (error) throw error;
+    return { ok: true, tournaments: data || [] };
+  } catch (e) { log('ERROR', 'listLiveTournaments:', e.message); return { ok: false, error: e.message }; }
+});
+
+// Fechar evento do site ao vivo: remove tournament + live_matches + live_scores.
+// Reabrir o torneio no Planner re-publica (upsert normal do fluxo existente).
+ipcMain.handle('supabase:closeLiveEvent', async (_, tournamentId) => {
+  try {
+    if (!currentFederation?.id) return { ok: false, error: 'Login necessario' };
+    const tid = String(tournamentId);
+    await supabase.from('live_scores').delete().eq('tournament_id', tid);
+    await supabase.from('live_matches').delete().eq('tournament_id', tid);
+    const { error } = await supabase.from('tournaments').delete()
+      .eq('id', tid).eq('federation_id', currentFederation.id);
+    if (error) throw error;
+    log('INFO', 'Evento fechado no site ao vivo:', tid);
+    return { ok: true };
+  } catch (e) { log('ERROR', 'closeLiveEvent:', e.message); return { ok: false, error: e.message }; }
+});
+
 ipcMain.handle('organizers:remove', async (_, email) => {
   try {
     if (!currentOrganizer) return { ok: false, error: 'Login necessario' };
