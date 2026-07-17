@@ -933,9 +933,14 @@
     let pollingInterval=null,realtimeRetryInterval=null;
     let realtimeActive=false;
 
+    let _loadingSince=0;
     function refreshCurrent(){
+      // Watchdog: se um fetch fica pendurado (aba suspensa em background, rede
+      // dormindo), isLoading travava pra sempre e a pagina parava de atualizar
+      // ate o F5. Preso ha >15s = destrava e refaz.
+      if(isLoading&&Date.now()-_loadingSince>15000){isLoading=false;}
       if(isLoading)return;
-      isLoading=true;
+      isLoading=true;_loadingSince=Date.now();
       const done=()=>{isLoading=false;};
       if(currentSection==='hub'){loadHub().finally(done);}
       else if(currentSection==='live'){loadLive().finally(done);}
@@ -960,6 +965,16 @@
         console.log('[Live] Polling parado (Realtime ativo)');
       }
     }
+
+    // Aba voltou ao foco: browsers throttlam timers e derrubam websockets em
+    // background — refaz o fetch na hora e reconecta o Realtime, sem esperar F5.
+    document.addEventListener('visibilitychange',()=>{
+      if(document.visibilityState==='visible'){
+        isLoading=false;
+        refreshCurrent();
+        if(!realtimeActive)setupRealtime();
+      }
+    });
 
     function setupRealtime(){
       if(!sb)return startPolling();
