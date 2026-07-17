@@ -81,8 +81,14 @@ const fileStorage = {
   }
 };
 
+// Canal do app: build beta (extraMetadata.betaChannel) usa o schema staging —
+// testes nao poluem producao nem aparecem no site publico. Dev/prod = public.
+const IS_BETA_CHANNEL = (() => { try { return !!require('../package.json').betaChannel; } catch (_e) { return false; } })();
+const DB_SCHEMA = IS_BETA_CHANNEL ? 'staging' : 'public';
+
 // Cliente principal: prioridade service_role (legacy/emergencia) -> sessao autenticada (login OTP) -> anon
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY, {
+  db: { schema: DB_SCHEMA },
   realtime: { timeout: 30000, transport: WebSocket },
   auth: HAS_SERVICE_ROLE
     ? { persistSession: false, autoRefreshToken: false }
@@ -373,12 +379,26 @@ ipcMain.handle('app:openExternal', (_, url) => {
 });
 ipcMain.handle('app:checkUpdate', async () => {
   try {
+    if (IS_BETA_CHANNEL) {
+      // Canal beta: pega a pre-release mais nova (releases/latest ignora pre-releases,
+      // entao o app de producao nunca ve as betas — e o beta nunca oferece stable).
+      const resp = await fetch('https://api.github.com/repos/weslleybertoldo/FABD-Tournament-Planner/releases?per_page=20');
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const list = await resp.json();
+      const beta = (list || []).find(r => r.prerelease);
+      if (!beta) return { beta_channel: true, up_to_date: true };
+      beta.beta_channel = true;
+      beta.up_to_date = beta.tag_name === 'v' + app.getVersion();
+      return beta;
+    }
     const resp = await fetch('https://api.github.com/repos/weslleybertoldo/FABD-Tournament-Planner/releases/latest');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     return data;
   } catch (e) { return { error: e.message }; }
 });
+
+ipcMain.handle('app:info', () => ({ version: app.getVersion(), beta: IS_BETA_CHANNEL, schema: DB_SCHEMA }));
 
 ipcMain.handle('db:closeTournament', async () => {
   // Limpar TODOS os dados do Supabase (torneio atual + residuos antigos)
@@ -1379,7 +1399,7 @@ ipcMain.handle('supabase:subscribe', async (_, tournamentId) => {
     // Tentar Realtime primeiro
     if (realtimeChannel) { supabase.removeChannel(realtimeChannel); realtimeChannel = null; }
     realtimeChannel = supabase.channel(`scores_${tournamentId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_scores', filter: `tournament_id=eq.${tournamentId}` },
+      .on('postgres_changes', { event: '*', schema: DB_SCHEMA, table: 'live_scores', filter: `tournament_id=eq.${tournamentId}` },
         (payload) => {
           log('INFO', 'Realtime score update:', JSON.stringify(payload.new?.match_id));
           if (mainWindow && !mainWindow.isDestroyed() && payload && payload.new) {
@@ -1420,7 +1440,7 @@ ipcMain.handle('supabase:subscribe', async (_, tournamentId) => {
               log('INFO', 'Tentando reconectar Realtime...');
               if (realtimeChannel) { supabase.removeChannel(realtimeChannel); realtimeChannel = null; }
               realtimeChannel = supabase.channel(`scores_retry_${tournamentId}_${Date.now()}`)
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'live_scores', filter: `tournament_id=eq.${tournamentId}` },
+                .on('postgres_changes', { event: '*', schema: DB_SCHEMA, table: 'live_scores', filter: `tournament_id=eq.${tournamentId}` },
                   (payload) => {
                     log('INFO', 'Realtime score update:', JSON.stringify(payload.new?.match_id));
                     if (mainWindow && !mainWindow.isDestroyed() && payload && payload.new) {

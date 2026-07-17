@@ -270,7 +270,11 @@
     // Esta pagina so faz SELECT (leitura) - RLS garante que nao pode escrever dados
     const SUPABASE_URL='https://zwjgjtrmsqtyyjtuotuo.supabase.co';
     const SUPABASE_KEY='sb_publishable_sCMqtUOnE7McSgZelCkWJQ_cbyslJNX';
-    const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
+    // Ambiente: /live-beta/ usa o schema staging (testes nao poluem producao)
+    const IS_BETA=location.pathname.includes('-beta');
+    const DB_SCHEMA=IS_BETA?'staging':'public';
+    const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{db:{schema:DB_SCHEMA}}):null;
+    if(IS_BETA)document.addEventListener('DOMContentLoaded',()=>{const h=document.querySelector('.header .sub');if(h)h.insertAdjacentHTML('beforeend',' <span style="background:#D97706;color:#000;padding:1px 8px;border-radius:10px;font-weight:700;font-size:10px">BETA</span>');});
 
     let currentSection='live';
     let tournamentId=null;
@@ -1014,7 +1018,7 @@
 
       // Channel para live_scores (placares em tempo real)
       realtimeChannelScores=sb.channel('live_scores_'+Date.now())
-        .on('postgres_changes',{event:'*',schema:'public',table:'live_scores'},onChange)
+        .on('postgres_changes',{event:'*',schema:DB_SCHEMA,table:'live_scores'},onChange)
         .subscribe((status)=>{
           console.log('[Live] Realtime scores status:',status);
           if(status==='SUBSCRIBED'){
@@ -1033,7 +1037,7 @@
 
       // Channel para live_matches (jogos entrando/saindo de quadra)
       realtimeChannelMatches=sb.channel('live_matches_'+Date.now())
-        .on('postgres_changes',{event:'*',schema:'public',table:'live_matches'},onChange)
+        .on('postgres_changes',{event:'*',schema:DB_SCHEMA,table:'live_matches'},onChange)
         .subscribe((status)=>{
           console.log('[Live] Realtime matches status:',status);
         });

@@ -400,7 +400,10 @@
     }
 
     // v4.5.1: configuracao explicita de auth (referencia: PhysiqCalc useAuth.tsx).
-    const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
+    // Ambiente: /referee-beta/ usa o schema staging (testes nao poluem producao)
+    const IS_BETA=location.pathname.includes('-beta');
+    const DB_SCHEMA=IS_BETA?'staging':'public';
+    const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{db:{schema:DB_SCHEMA},
       global:{fetch:createResilientFetch(2,15000)},
       auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
     }):null;
@@ -426,8 +429,8 @@
       if(realtimeListRetry){clearInterval(realtimeListRetry);realtimeListRetry=null;}
 
       realtimeListChannel=sb.channel('ref_list_'+Date.now())
-        .on('postgres_changes',{event:'*',schema:'public',table:'live_matches'},()=>{try{callback();}catch(e){}})
-        .on('postgres_changes',{event:'*',schema:'public',table:'referees'},()=>{try{callback();}catch(e){}})
+        .on('postgres_changes',{event:'*',schema:DB_SCHEMA,table:'live_matches'},()=>{try{callback();}catch(e){}})
+        .on('postgres_changes',{event:'*',schema:DB_SCHEMA,table:'referees'},()=>{try{callback();}catch(e){}})
         .subscribe((status)=>{
           console.log('[Referee] Realtime list status:',status);
           if(status==='SUBSCRIBED'){
@@ -453,7 +456,7 @@
       if(realtimeScoreRetry){clearInterval(realtimeScoreRetry);realtimeScoreRetry=null;}
 
       realtimeScoreChannel=sb.channel('ref_score_'+matchId+'_'+Date.now())
-        .on('postgres_changes',{event:'*',schema:'public',table:'live_scores',filter:'match_id=eq.'+matchId},(payload)=>{try{callback(payload?.new);}catch(e){}})
+        .on('postgres_changes',{event:'*',schema:DB_SCHEMA,table:'live_scores',filter:'match_id=eq.'+matchId},(payload)=>{try{callback(payload?.new);}catch(e){}})
         .subscribe((status)=>{
           console.log('[Referee] Realtime score status:',status);
           if(status==='TIMED_OUT'||status==='CHANNEL_ERROR'||status==='CLOSED'){

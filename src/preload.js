@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('api', {
 
   openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
   checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
+  appInfo: () => ipcRenderer.invoke('app:info'),
   log: (l, m) => ipcRenderer.send('log', l, m),
 
   // Excel (XLSX)

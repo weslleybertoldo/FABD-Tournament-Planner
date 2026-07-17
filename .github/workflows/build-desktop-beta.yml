@@ -1,0 +1,70 @@
+name: Build Desktop Beta
+
+# Canal BETA: push na branch staging builda a variante "FABD Tournament Planner Beta"
+# (appId/dados separados, schema staging) e publica como PRE-RELEASE — o app de
+# producao usa releases/latest e nunca enxerga; o app beta so enxerga pre-releases.
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-beta:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Compute beta version
+        id: version
+        shell: bash
+        run: |
+          BASE=$(node -p "require('./package.json').version")
+          BETA="$BASE-beta.${{ github.run_number }}"
+          echo "beta=$BETA" >> $GITHUB_OUTPUT
+          echo "Building BETA version: $BETA"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Electron app (beta variant)
+        shell: bash
+        run: |
+          npx electron-builder --win \
+            -c.appId=com.fabd.tournament-planner.beta \
+            -c.productName="FABD Tournament Planner Beta" \
+            -c.nsis.shortcutName="FABD Planner Beta" \
+            -c.nsis.artifactName='FABD-Tournament-Planner-Beta-Setup-${version}.${ext}' \
+            -c.extraMetadata.version=${{ steps.version.outputs.beta }} \
+            -c.extraMetadata.betaChannel=true \
+            -c.publish=null
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Pre-Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.beta }}
+          name: FABD Tournament Planner v${{ steps.version.outputs.beta }} (BETA)
+          prerelease: true
+          make_latest: false
+          body: |
+            ## BETA — canal de staging
+
+            Build de teste da branch `staging` (schema staging no Supabase; instala
+            lado a lado com o app de producao, dados separados).
+
+            O app de producao NAO recebe esta versao.
+          files: |
+            dist/*.exe

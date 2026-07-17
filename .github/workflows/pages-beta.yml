@@ -1,0 +1,46 @@
+name: Pages Beta (live-beta/referee-beta)
+
+# Push na branch staging publica copias do site ao vivo e do referee em
+# /live-beta/ e /referee-beta/ (commit no master, que alimenta o GitHub Pages).
+# Os apps detectam "-beta" no path e usam o schema staging — producao intocada.
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-beta:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout staging
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+          path: staging-tree
+
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          path: master-tree
+
+      - name: Sync live-beta e referee-beta
+        run: |
+          rm -rf master-tree/live-beta master-tree/referee-beta
+          cp -r staging-tree/live master-tree/live-beta
+          cp -r staging-tree/referee master-tree/referee-beta
+          cd master-tree
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add live-beta referee-beta
+          git diff --staged --quiet && { echo "sem mudancas"; exit 0; }
+          git commit -m "chore(pages): sync live-beta/referee-beta de staging@${GITHUB_SHA::7} [skip ci]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin master && git push && break
+            echo "push falhou ($i/5)"; sleep 3
+          done
