@@ -476,6 +476,8 @@ async function loadData(autoLoad=false) {
   // Versão no rodapé (dinâmica)
   const vFooter=document.getElementById('app-version-footer');
   if(vFooter)vFooter.textContent='FABD Tournament Planner v'+APP_VERSION;
+  // Build beta: identifica no rodape (schema staging, canal de update proprio)
+  try{window.api.appInfo?.().then(i=>{if(i?.beta&&vFooter)vFooter.textContent='FABD Tournament Planner v'+i.version+' (BETA - ambiente de teste)';}).catch(()=>{});}catch(_e){}
   // Verificação automática de atualização
   checkAutoUpdate();
 }
@@ -497,7 +499,9 @@ async function checkAutoUpdate(){
     if(!data||data.error)return;
     const latestVersion=(data.tag_name||'').replace('v','');
     if(!latestVersion)return;
-    if(isNewerVersion(latestVersion,APP_VERSION)){
+    // Canal beta: main ja decidiu (compara tag com app.getVersion()) — nao usa
+    // isNewerVersion, que nao entende sufixo "-beta.N".
+    if(data.beta_channel?!data.up_to_date:isNewerVersion(latestVersion,APP_VERSION)){
       const exeAsset=(data.assets||[]).find(a=>a.name.endsWith('.exe'));
       const bar=document.getElementById('update-bar');
       const txt=document.getElementById('update-bar-text');
@@ -3025,7 +3029,7 @@ async function checkForUpdates(){
     const data=await window.api.checkUpdate();
     if(data.error)throw new Error(data.error);
     const latestVersion=(data.tag_name||'').replace('v','');
-    if(latestVersion&&isNewerVersion(latestVersion,APP_VERSION)){
+    if(latestVersion&&(data.beta_channel?!data.up_to_date:isNewerVersion(latestVersion,APP_VERSION))){
       const exeAsset=(data.assets||[]).find(a=>a.name.endsWith('.exe'));
       statusEl.innerHTML=`<span style="color:#F59E0B;font-weight:600">Nova versao disponivel: v${esc(latestVersion)}</span>`;
       if(exeAsset){
