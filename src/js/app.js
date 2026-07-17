@@ -2628,6 +2628,10 @@ async function handleRealtimeScoreUpdate(data){
       m.liveScore='';
       try{propagateResultToDraws(m);}catch(e){console.warn('Erro ao propagar resultado:',e);showToast('Aviso: resultado recebido mas propagacao na chave falhou','warning');}
       await window.api.saveTournament(tournament);
+      // Re-publica o torneio (tournaments.data) — sem isso a "Tabela de Jogos"
+      // do site ao vivo ficava presa em "Em Quadra" apos finalizacao do referee
+      // (a aba Ao Vivo usa live_scores e atualizava, a tabela usa tournaments.data).
+      prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
       // Tira o jogo do set de reconciliacao — sem isso o reconcile de 30s
       // ficava re-adotando o mesmo resultado em loop infinito no log.
       _registerEmQuadraIds();
@@ -2985,10 +2989,21 @@ async function renderLiveEvents(){
   if(!r?.ok){c.innerHTML=`<div style="padding:20px;color:var(--fabd-red)">Erro ao listar: ${esc(r?.error||'desconhecido')}</div>`;return;}
   if(!r.tournaments.length){c.innerHTML='<div style="padding:30px;text-align:center;color:var(--fabd-gray-400)">Nenhum evento publicado no site ao vivo.</div>';return;}
   let h='<table class="table"><thead><tr><th>Evento</th><th>Ultima atualizacao</th><th></th></tr></thead><tbody>';
+  const cutoff=Date.now()-24*60*60*1000; // mesmo criterio do site ao vivo: updated_at nas ultimas 24h
   r.tournaments.forEach(t=>{
     const dt=t.updated_at?new Date(t.updated_at).toLocaleString('pt-BR'):'-';
-    const ativo=tournament&&String(tournament.id)===String(t.id);
-    h+=`<tr><td><strong>${esc(t.name||t.id)}</strong>${ativo?' <span class="tag tag-blue">ativo no Planner</span>':''}</td><td style="font-size:12px">${esc(dt)}</td><td style="text-align:right"><button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA" data-action="closeLiveEvent" data-arg-1="${esc(String(t.id))}" data-arg-2="${esc(t.name||'')}">Fechar evento</button></td></tr>`;
+    const ativoPlanner=tournament&&String(tournament.id)===String(t.id);
+    const ativoSite=t.updated_at&&new Date(t.updated_at).getTime()>=cutoff;
+    let tags='';
+    if(ativoPlanner)tags+=' <span class="tag tag-blue">ativo no Planner</span>';
+    if(ativoSite)tags+=' <span class="tag tag-green">ativo no site</span>';
+    // Fechar so quando esta no site E sem vinculo com o torneio aberto no Planner —
+    // o ativo no Planner re-publica sozinho (fechar aqui so criaria estado preso).
+    const podeFechar=ativoSite&&!ativoPlanner;
+    const acao=podeFechar
+      ?`<button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA" data-action="closeLiveEvent" data-arg-1="${esc(String(t.id))}" data-arg-2="${esc(t.name||'')}">Fechar evento</button>`
+      :(ativoPlanner?'<span style="font-size:11px;color:var(--fabd-gray-400)">feche saindo do torneio</span>':'<span style="font-size:11px;color:var(--fabd-gray-400)">fora do site</span>');
+    h+=`<tr><td><strong>${esc(t.name||t.id)}</strong>${tags}</td><td style="font-size:12px">${esc(dt)}</td><td style="text-align:right">${acao}</td></tr>`;
   });
   h+='</tbody></table>';
   c.innerHTML=h;
