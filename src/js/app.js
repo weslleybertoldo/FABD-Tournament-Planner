@@ -2695,6 +2695,11 @@ async function assignCourt(idx, value) {
       // Ativar Realtime ao colocar primeiro jogo em quadra
       const emQuadraCount = tournament.matches.filter(x => x.status === 'Em Quadra').length;
       if (emQuadraCount === 1) {
+        // Garante o listener mesmo quando o torneio foi criado/ativado DEPOIS do
+        // startup — sem isso o main recebe os updates do referee e o renderer
+        // nunca aplica (placar/arbitro/finalizacao ficavam presos). Idempotente:
+        // o preload faz removeAllListeners antes de registrar.
+        window.api.onScoreUpdate(handleRealtimeScoreUpdate);
         await window.api.supabaseSubscribe(tournament.id);
         console.log('Realtime ativado (primeiro jogo em quadra)');
       }

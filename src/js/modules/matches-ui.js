@@ -183,7 +183,10 @@ function renderMatches() {
         if(!isEQ&&restingUntil.has(trimmed))return`<span style="background:#DBEAFE;padding:2px 6px;border-radius:4px">${nameStr}${restBadge(restingUntil.get(trimmed))}</span>`;
         return`<span>${nameStr}</span>`;
       }
-      const escapedParts=(m.player1Display||m.player1||'A definir')===rawName?p1.split('/'):p2.split('/');
+      // esc() escapa '/' como &#x2F; — split no display ESCAPADO nao funciona.
+      // Splita o display cru e escapa cada parte individualmente.
+      const rawDisplaySide=(m.player1===rawName)?(m.player1Display||m.player1||''):(m.player2Display||m.player2||'');
+      const escapedParts=String(rawDisplaySide).split('/').map(s=>esc(s.trim()));
       const highlighted=parts.map((p,idx)=>{
         const trimmed=p.trim();
         const display=(escapedParts[idx]||esc(trimmed)).trim();
