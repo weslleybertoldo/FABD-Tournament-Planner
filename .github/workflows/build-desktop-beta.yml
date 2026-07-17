@@ -48,7 +48,7 @@ jobs:
             -c.nsis.artifactName='FABD-Tournament-Planner-Beta-Setup-${version}.${ext}' \
             -c.extraMetadata.version=${{ steps.version.outputs.beta }} \
             -c.extraMetadata.betaChannel=true \
-            -c.publish=null
+            --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
