@@ -1,0 +1,1708 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://code.iconify.design; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://zwjgjtrmsqtyyjtuotuo.supabase.co wss://zwjgjtrmsqtyyjtuotuo.supabase.co https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com https://accounts.google.com; frame-src https://accounts.google.com; form-action 'self' https://accounts.google.com; base-uri 'self'; object-src 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1E3A8A">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="screen-orientation" content="landscape">
+  <title>FABD - Arbitro</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <script src="https://code.iconify.design/iconify-icon/3.0.2/iconify-icon.min.js"></script>
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    body{font-family:'Segoe UI',sans-serif;background:#0F172A;color:#fff;min-height:100vh;overflow:hidden;-webkit-user-select:none;user-select:none}
+
+    /* LOGIN */
+    .login-page{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;text-align:center}
+    .login-page .logo{font-size:48px;margin-bottom:16px}
+    .login-page h2{font-size:24px;margin-bottom:8px}
+    .login-page p{color:#94A3B8;margin-bottom:24px}
+    .btn-google{background:#fff;color:#333;display:flex;align-items:center;gap:12px;padding:14px 24px;font-size:16px;border-radius:12px;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+    .btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+    .btn-primary{background:#2563EB;color:#fff}
+    .btn-danger{background:#DC2626;color:#fff}
+    .btn-success{background:#10B981;color:#fff}
+
+    /* PENDING */
+    .pending-page{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px;text-align:center}
+
+    /* MATCHES LIST */
+    .matches-page{display:none;height:100vh;flex-direction:column}
+    .header{background:#1E3A8A;padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
+    .header h1{font-size:15px;font-weight:700}
+    .header .user{font-size:12px;color:#93C5FD;display:flex;align-items:center;gap:8px}
+    .ref-tabs{display:flex;background:#1E293B;border-bottom:1px solid #334155}
+    .ref-tab{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;color:#64748B;cursor:pointer;border-bottom:3px solid transparent}
+    .ref-tab.active{color:#fff;border-bottom-color:#F59E0B}
+    .matches-list{flex:1;padding:12px;overflow-y:auto}
+    .match-card{background:#1E293B;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;border-left:4px solid #2563EB}
+    .match-card:active{transform:scale(0.98)}
+    .match-card .court{font-size:11px;color:#60A5FA;font-weight:700;text-transform:uppercase}
+    .match-card .players{font-size:15px;font-weight:600;margin:4px 0}
+    .match-card .draw{font-size:12px;color:#94A3B8}
+    .empty{text-align:center;padding:60px 20px;color:#64748B}
+    .install-bar{background:#1E293B;padding:12px 16px;text-align:center;border-top:1px solid #334155;flex-shrink:0;position:fixed;bottom:0;left:0;right:0;z-index:10}
+    .install-bar button{background:#2563EB;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+
+    /* SCORER - LANDSCAPE COURT */
+    .scorer-page{display:none;width:100vw;height:100vh;flex-direction:column}
+    .scorer-top{background:#1E3A8A;padding:6px 12px;display:flex;align-items:center;justify-content:space-between;font-size:12px;z-index:5}
+    .scorer-top .back{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 8px}
+
+    .court-container{flex:1;display:flex;position:relative;overflow:hidden}
+
+    /* Lado esquerdo */
+    .court-side{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:background 0.1s}
+    .court-side:active{filter:brightness(1.2)}
+    .court-left{background:#1565C0}
+    .court-right{background:#C62828}
+
+    /* Linhas da quadra */
+    .court-side::before{content:'';position:absolute;top:8px;left:8px;right:8px;bottom:8px;border:2px solid rgba(255,255,255,0.3);border-radius:4px}
+    .court-side::after{content:'';position:absolute;top:50%;left:8px;right:8px;height:0;border-top:1px dashed rgba(255,255,255,0.2)}
+
+    .court-side .player-name{font-size:14px;font-weight:600;position:absolute;top:12px;left:50%;transform:translateX(-50%);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90%;text-align:center;z-index:2}
+    .court-side .score-big{font-size:72px;font-weight:900;line-height:1;z-index:2;text-shadow:2px 2px 8px rgba(0,0,0,0.3)}
+    .court-side .sets-info{font-size:13px;color:rgba(255,255,255,0.7);position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:2}
+
+    /* Shuttle (peteca) - indica servico */
+    .shuttle{position:absolute;font-size:28px;z-index:3;transition:all 0.3s ease;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))}
+
+    /* Divisor central */
+    .court-divider{width:48px;background:#0F172A;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:5}
+    .court-divider .set-label{font-size:11px;color:#F59E0B;font-weight:700}
+    .court-divider .set-history{font-size:10px;color:#94A3B8;text-align:center}
+    .swap-btn{background:#334155;border:none;color:#fff;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+    .swap-btn:active{background:#475569}
+    .swap-serve{font-size:20px;background:#1E3A8A;border:1px solid #F59E0B}
+
+    /* Barra inferior */
+    .scorer-bottom{background:#0F172A;padding:8px 12px;display:flex;gap:8px;align-items:center;justify-content:center;z-index:5;flex-shrink:0}
+    .scorer-bottom .btn{padding:10px 20px;font-size:14px}
+
+    /* Modal */
+    .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:100;align-items:center;justify-content:center;padding:20px}
+    .modal-overlay.active{display:flex}
+    .modal{background:#1E293B;border-radius:16px;padding:24px;max-width:400px;width:100%;text-align:center}
+    .modal h3{font-size:18px;margin-bottom:12px}
+    .modal .final-score{font-size:22px;font-weight:700;color:#F59E0B;margin-bottom:6px}
+    .modal .winner{font-size:15px;color:#10B981;margin-bottom:20px}
+    .modal .actions{display:flex;gap:12px}
+    .modal .actions .btn{flex:1;padding:12px}
+
+    /* Nome do servidor ao lado da peteca */
+    .server-name{position:absolute;font-size:16px;font-weight:700;color:rgba(255,255,255,0.95);z-index:3;white-space:nowrap;transition:all 0.3s ease;text-shadow:1px 1px 4px rgba(0,0,0,0.6)}
+
+    /* Modal Intervalo */
+    .interval-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:150;align-items:center;justify-content:center}
+    .interval-overlay.active{display:flex}
+    .interval-box{text-align:center;color:#fff}
+    .interval-box h2{font-size:20px;margin-bottom:8px;color:#F59E0B}
+    .interval-box .timer{font-size:64px;font-weight:900;margin:16px 0;font-variant-numeric:tabular-nums}
+    .interval-box .timer.warning{color:#EF4444;animation:pulse 1s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+    @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+    /* Duplas: 2 jogadores por lado */
+    .doubles-court .court-side{display:flex;flex-direction:row;padding:0}
+    .doubles-court .court-half{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;min-height:100%}
+    .doubles-court .court-half-divider{width:0;border-left:1px dashed rgba(255,255,255,0.2);align-self:stretch;margin:8px 0}
+    .doubles-court .court-half .player-name-doubles{font-size:11px;font-weight:600;position:absolute;top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90%;z-index:2}
+    .swap-inner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,0.25);border:2px solid rgba(255,255,255,0.4);color:#fff;width:44px;height:44px;border-radius:50%;font-size:20px;cursor:pointer;z-index:10;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+    .swap-inner:active{background:rgba(255,255,255,0.5)}
+
+    @media (orientation:portrait){
+      .scorer-page .court-container{flex-direction:column}
+      .court-divider{width:100%;height:44px;flex-direction:row}
+      .court-side .score-big{font-size:56px}
+    }
+  </style>
+</head>
+<body>
+  <!-- LOADING (v4.31 — evita flash de tela de login enquanto supabase-js inicializa) -->
+  <div id="page-loading" style="position:fixed;inset:0;background:linear-gradient(135deg,#1E3A8A 0%,#3B82F6 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;z-index:9999">
+    <iconify-icon icon="mdi:badminton" style="font-size:64px;color:white;animation:spin 2s linear infinite"></iconify-icon>
+    <p style="margin-top:24px;font-size:14px;opacity:0.9">Verificando sessao...</p>
+    <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+  </div>
+
+  <!-- LOGIN (v4.31: começa oculto; checkAuth decide quando mostrar via _resolveNoSession) -->
+  <div id="page-login" class="login-page" style="display:none">
+    <div class="logo"><iconify-icon icon="mdi:badminton" style="font-size:56px;color:#1E3A8A"></iconify-icon></div>
+    <h2>FABD Arbitro</h2>
+    <p>Acesse com sua conta Google para arbitrar partidas</p>
+    <button class="btn-google" onclick="loginGoogle()">
+      <svg width="24" height="24" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Entrar com Google
+    </button>
+    <p id="login-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
+    <p style="margin-top:16px;font-size:10px;color:#64748B">Referee v4.36.0</p>
+  </div>
+
+  <!-- ESCOLHER FEDERACAO (primeira vez ou sem federacao definida) -->
+  <div id="page-federation" class="pending-page" style="display:none;text-align:center">
+    <div style="margin-bottom:8px"><iconify-icon icon="lucide:trophy" style="font-size:56px;color:#F59E0B"></iconify-icon></div>
+    <h3 style="color:#F59E0B;margin-bottom:8px">Em qual federacao voce vai arbitrar?</h3>
+    <p style="color:#94A3B8;font-size:13px;max-width:340px;margin-bottom:16px">Selecione a federacao para se cadastrar. Apos a escolha, o organizador da federacao precisa autorizar seu acesso.</p>
+    <select id="fed-select" style="width:90%;max-width:340px;padding:14px;border-radius:10px;border:1px solid #334155;background:#1E293B;color:#fff;font-size:15px;margin-bottom:12px">
+      <option value="">Carregando federacoes...</option>
+    </select>
+    <button class="btn btn-primary" style="padding:12px 28px;font-size:15px;font-weight:700" onclick="confirmFederation()">Confirmar</button>
+    <p id="fed-error" style="color:#EF4444;font-size:12px;margin-top:12px;display:none"></p>
+    <button class="btn btn-danger" style="margin-top:24px;padding:6px 14px;font-size:11px" onclick="logout()">Sair</button>
+  </div>
+
+  <!-- AGUARDANDO -->
+  <div id="page-pending" class="pending-page">
+    <div style="margin-bottom:16px"><iconify-icon icon="lucide:clock-3" style="font-size:56px;color:#F59E0B"></iconify-icon></div>
+    <h3 style="color:#F59E0B;margin-bottom:12px">Aguardando Autorizacao</h3>
+    <p style="color:#94A3B8;font-size:14px;max-width:300px">Seu acesso foi solicitado. Aguarde o organizador liberar.</p>
+    <p style="color:#475569;font-size:12px;margin-top:24px">Verificando a cada 5s...</p>
+    <button class="btn btn-danger" style="margin-top:20px" onclick="logout()">Sair</button>
+  </div>
+
+  <!-- LISTA DE JOGOS -->
+  <div id="page-matches" class="matches-page">
+    <div class="header">
+      <h1 id="tournament-name">FABD Arbitro</h1>
+      <div class="user">
+        <span id="user-name"></span>
+        <button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="logout()">Sair</button>
+      </div>
+    </div>
+    <div class="ref-tabs">
+      <div class="ref-tab active" onclick="setRefTab('jogos')">Jogos</div>
+      <div class="ref-tab" onclick="setRefTab('historico')">Historico</div>
+      <div class="ref-tab" onclick="setRefTab('arbitros')">Arbitros</div>
+      <div class="ref-tab" onclick="setRefTab('config')">Config</div>
+    </div>
+    <div id="ref-tab-jogos" class="matches-list">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px;border-bottom:1px solid #334155;background:#0F172A">
+        <span id="ref-last-update" style="font-size:11px;color:#64748B">Atualizando...</span>
+        <button onclick="refreshMatches()" style="padding:6px 12px;font-size:12px;border-radius:8px;border:none;background:#1E40AF;color:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span id="ref-refresh-icon">&#10227;</span> Atualizar</button>
+      </div>
+      <div id="ref-jogos-content">
+        <div class="empty"><div style="font-size:48px">&#9203;</div><p>Nenhum jogo em quadra.<br>Aguarde o organizador.</p></div>
+      </div>
+    </div>
+    <div id="ref-tab-historico" class="matches-list" style="display:none">
+      <div style="padding:8px"><input type="text" id="hist-search" placeholder="Buscar por arbitro, atleta..." oninput="filterHistory()" style="width:100%;padding:10px 14px;border-radius:8px;border:2px solid #334155;background:#1E293B;color:#fff;font-size:14px"></div>
+      <div id="hist-list"></div>
+    </div>
+    <div id="ref-tab-arbitros" class="matches-list" style="display:none">
+      <div id="arb-list"></div>
+    </div>
+    <div id="ref-tab-config" class="matches-list" style="display:none">
+      <div style="padding:16px">
+        <div style="background:#1E293B;border-radius:12px;padding:16px;margin-bottom:12px">
+          <h3 style="color:#F59E0B;margin-bottom:12px;font-size:14px">CONFIGURACAO DO JOGO</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:left">
+            <div style="background:#0F172A;padding:10px;border-radius:8px">
+              <div style="font-size:11px;color:#64748B">Total de Pontos</div>
+              <div style="font-size:18px;font-weight:700;color:#fff" id="cfg-points">21</div>
+            </div>
+            <div style="background:#0F172A;padding:10px;border-radius:8px">
+              <div style="font-size:11px;color:#64748B">Maximo por Set</div>
+              <div style="font-size:18px;font-weight:700;color:#fff" id="cfg-max">30</div>
+            </div>
+            <div style="background:#0F172A;padding:10px;border-radius:8px">
+              <div style="font-size:11px;color:#64748B">Sets para Vencer</div>
+              <div style="font-size:18px;font-weight:700;color:#fff" id="cfg-sets">3</div>
+            </div>
+            <div style="background:#0F172A;padding:10px;border-radius:8px">
+              <div style="font-size:11px;color:#64748B">Intervalo</div>
+              <div style="font-size:18px;font-weight:700;color:#fff" id="cfg-interval">11</div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#64748B;margin-top:12px">Valores definidos no Planner pelo organizador</p>
+        </div>
+        <div style="background:#1E293B;border-radius:12px;padding:16px">
+          <h3 style="color:#F59E0B;margin-bottom:12px;font-size:14px">INFO</h3>
+          <div style="font-size:12px;color:#94A3B8;text-align:left">
+            <p style="margin-bottom:8px"><strong>Torneio:</strong> <span id="cfg-tournament">-</span></p>
+            <p style="margin-bottom:8px"><strong>Federacao:</strong> <span id="cfg-federation">-</span></p>
+            <p style="margin-bottom:8px"><strong>Arbitro:</strong> <span id="cfg-referee">-</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="install-bar" id="install-bar" style="display:block">
+      <button id="install-btn" onclick="installPWA()">&#128229; Instalar App no Dispositivo</button>
+      <p id="install-hint" style="display:none;font-size:11px;color:#64748B;margin-top:6px"></p>
+    </div>
+  </div>
+
+  <!-- SCORER -->
+  <div id="page-scorer" class="scorer-page">
+    <div class="scorer-top">
+      <button class="back" onclick="requestExitScorer()">&#8592; Voltar</button>
+      <span id="scorer-info"></span>
+      <span id="scorer-court" style="color:#60A5FA"></span>
+      <span id="sync-status" style="width:8px;height:8px;border-radius:50%;background:#10B981;display:inline-block"></span>
+    </div>
+    <!-- QUADRA SIMPLES -->
+    <div class="court-container" id="court-singles">
+      <div class="court-side court-left" onclick="addPoint('left')">
+        <div class="player-name" id="s-left-club" style="top:8px;font-size:11px;left:12px;transform:none;text-align:left;opacity:0.75"></div>
+        <div class="player-name" id="s-left-name">Jogador 1</div>
+        <div class="score-big" id="s-left-score">0</div>
+        <div class="sets-info" id="s-left-sets">Sets: 0</div>
+        <div class="shuttle" id="s-shuttle-left" style="display:none">&#127992;</div>
+        <div class="server-name" id="s-server-left" style="display:none"></div>
+      </div>
+      <div class="court-divider">
+        <div class="set-label" id="s-div-set">SET 1</div>
+        <button class="swap-btn" onclick="swapSides()" title="Trocar lados">&#8646;</button>
+        <button class="swap-btn swap-serve" id="s-swap-serve" onclick="swapServer()" title="Trocar saque">&#127992;</button>
+        <div class="set-history" id="s-div-history"></div>
+      </div>
+      <div class="court-side court-right" onclick="addPoint('right')">
+        <div class="player-name" id="s-right-club" style="top:8px;font-size:11px;right:12px;left:auto;transform:none;text-align:right;opacity:0.75"></div>
+        <div class="player-name" id="s-right-name">Jogador 2</div>
+        <div class="score-big" id="s-right-score">0</div>
+        <div class="sets-info" id="s-right-sets">Sets: 0</div>
+        <div class="shuttle" id="s-shuttle-right" style="display:none">&#127992;</div>
+        <div class="server-name" id="s-server-right" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- QUADRA DUPLAS -->
+    <div class="court-container" id="court-doubles" style="display:none">
+      <div class="court-side court-left" onclick="addPoint('left')">
+        <div class="player-name" id="d-left-name">Dupla 1</div>
+        <div class="score-big" id="d-left-score">0</div>
+        <div class="sets-info" id="d-left-sets">Sets: 0</div>
+        <div class="shuttle" id="d-shuttle-left" style="display:none">&#127992;</div>
+        <div class="server-name" id="d-server-left" style="display:none"></div>
+        <div class="player-name" id="d-left-top" style="top:25%;font-size:26px;left:50%;transform:translate(-50%,-50%);text-align:center"></div>
+        <div class="player-name" id="d-left-bottom" style="top:75%;bottom:auto;font-size:26px;left:50%;transform:translate(-50%,-50%);text-align:center"></div>
+        <div class="player-name" id="d-left-top-club" style="top:8px;font-size:11px;left:12px;transform:none;text-align:left;opacity:0.75"></div>
+        <div class="player-name" id="d-left-bottom-club" style="top:auto;bottom:22px;font-size:11px;left:12px;transform:none;text-align:left;opacity:0.75"></div>
+      </div>
+      <div class="court-divider">
+        <div class="set-label" id="d-div-set">SET 1</div>
+        <button class="swap-btn" onclick="swapSides()" title="Trocar lados">&#8646;</button>
+        <button class="swap-btn swap-serve" id="d-swap-serve" onclick="swapServer()" title="Trocar saque">&#127992;</button>
+        <div class="set-history" id="d-div-history"></div>
+      </div>
+      <div class="court-side court-right" onclick="addPoint('right')">
+        <div class="player-name" id="d-right-name">Dupla 2</div>
+        <div class="score-big" id="d-right-score">0</div>
+        <div class="sets-info" id="d-right-sets">Sets: 0</div>
+        <div class="shuttle" id="d-shuttle-right" style="display:none">&#127992;</div>
+        <div class="server-name" id="d-server-right" style="display:none"></div>
+        <div class="player-name" id="d-right-top" style="top:25%;font-size:26px;left:50%;right:auto;transform:translate(-50%,-50%);text-align:center"></div>
+        <div class="player-name" id="d-right-bottom" style="top:75%;bottom:auto;font-size:26px;left:50%;right:auto;transform:translate(-50%,-50%);text-align:center"></div>
+        <div class="player-name" id="d-right-top-club" style="top:8px;font-size:11px;right:12px;left:auto;transform:none;text-align:right;opacity:0.75"></div>
+        <div class="player-name" id="d-right-bottom-club" style="top:auto;bottom:22px;font-size:11px;right:12px;left:auto;transform:none;text-align:right;opacity:0.75"></div>
+      </div>
+    </div>
+    <div class="scorer-bottom">
+      <span style="font-size:10px;color:#94A3B8" id="scorer-umpire"></span>
+      <button class="btn btn-danger" id="btn-undo" onclick="undoPoint()">&#8630; Desfazer</button>
+      <span style="font-size:11px;color:#64748B" id="scorer-draw-info"></span>
+      <span style="font-size:10px;color:#F59E0B;display:none" id="readonly-badge">&#128274; Somente visualização</span>
+    </div>
+  </div>
+
+  <!-- MODAL CONFIRMAR -->
+  <div class="modal-overlay" id="modal-confirm">
+    <div class="modal">
+      <h3>&#127942; Partida Finalizada!</h3>
+      <div class="final-score" id="confirm-score"></div>
+      <div class="winner" id="confirm-winner"></div>
+      <div class="actions">
+        <button class="btn btn-danger" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-success" onclick="confirmResult()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL SAIR DO JOGO -->
+  <div class="modal-overlay" id="modal-exit">
+    <div class="modal">
+      <h3>&#8592; Sair do Jogo</h3>
+      <p style="color:#94A3B8;margin-bottom:20px">Ao sair, o jogo ficará disponível para outro árbitro.</p>
+      <div class="actions">
+        <button class="btn btn-danger" onclick="closeExitModal()">Cancelar</button>
+        <button class="btn btn-success" onclick="confirmExit()">Sair</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL INTERVALO -->
+  <div class="interval-overlay" id="modal-interval">
+    <div class="interval-box">
+      <h2 id="interval-title">Intervalo</h2>
+      <div class="timer" id="interval-timer">1:00</div>
+      <p id="interval-msg" style="font-size:13px;color:#94A3B8;margin-bottom:16px"></p>
+      <button class="btn btn-primary" id="interval-skip-btn" onclick="skipInterval()">Pular</button>
+    </div>
+  </div>
+
+  <!-- MODAL PERGUNTAR INTERVALO (pontos dinamicos) -->
+  <div class="modal-overlay" id="modal-ask-interval">
+    <div class="modal">
+      <h3>&#9200; Intervalo</h3>
+      <p style="color:#94A3B8;margin-bottom:20px" id="interval-modal-text">Primeiro jogador atingiu <span id="interval-pts">11</span> pontos.<br>Deseja descansar?</p>
+      <div class="actions">
+        <button class="btn btn-danger" onclick="declineInterval()">Não</button>
+        <button class="btn btn-success" onclick="acceptInterval()">Sim (1 min)</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.99.3/dist/umd/supabase.min.js"></script>
+  <script>
+    // This is the publishable anon key - safe for client-side use with proper RLS
+    // Arbitros se autenticam via Google OAuth - RLS restringe writes ao proprio registro
+    const SUPABASE_URL='https://zwjgjtrmsqtyyjtuotuo.supabase.co';
+    const SUPABASE_ANON_KEY='sb_publishable_sCMqtUOnE7McSgZelCkWJQ_cbyslJNX';
+    if(!window.supabase){document.getElementById('login-error').textContent='Erro: Supabase nao carregou.';document.getElementById('login-error').style.display='block';}
+
+    // v4.7: fetch resiliente (referencia: PhysiqCalc client.ts createResilientFetch).
+    // Retry exponencial em 5xx/429/erro de rede + timeout 15s. NAO faz retry em
+    // 401/403 (auth — usuario precisa relogar). Resolve queries que falham por
+    // rede instavel sem deslogar o user.
+    function createResilientFetch(retries, timeoutMs) {
+      return async (input, init) => {
+        let lastError = null;
+        for (let attempt = 0; attempt <= retries; attempt++) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+          try {
+            const response = await fetch(input, Object.assign({}, init, { signal: controller.signal }));
+            clearTimeout(timeoutId);
+            if (response.status === 401 || response.status === 403) return response;
+            if (response.status >= 500 || response.status === 429) {
+              if (attempt < retries) {
+                const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+                await new Promise(r => setTimeout(r, delay + Math.random() * 500));
+                continue;
+              }
+            }
+            return response;
+          } catch (err) {
+            clearTimeout(timeoutId);
+            lastError = err;
+            if (attempt < retries && err && err.name !== 'AbortError') {
+              const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+              await new Promise(r => setTimeout(r, delay));
+              continue;
+            }
+          }
+        }
+        throw lastError || new Error('Fetch failed after retries');
+      };
+    }
+
+    // v4.5.1: configuracao explicita de auth (referencia: PhysiqCalc useAuth.tsx).
+    // Ambiente: /referee-beta/ usa o schema staging (testes nao poluem producao)
+    const IS_BETA=location.pathname.includes('-beta');
+    const DB_SCHEMA=IS_BETA?'staging':'public';
+    const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{db:{schema:DB_SCHEMA},
+      global:{fetch:createResilientFetch(2,15000)},
+      auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+    }):null;
+    // Flag pra distinguir SIGNED_OUT intencional (botao Sair) de automatico (refresh
+    // falhou por rede). Se nao foi intencional, IGNORAR — manter usuario logado.
+    let _intentionalLogout=false;
+
+    let currentUser=null,currentMatch=null,pollInterval=null,deferredPrompt=null;
+
+    // ═══════════════════════════════════════════════════════════
+    //  REALTIME + FALLBACK POLLING (mesmo padrão do Planner)
+    //  Polling continua rodando como fallback (30s).
+    //  Realtime dispara callback imediatamente quando há mudança.
+    //  Se Realtime cair, a cada 30s tenta reconectar.
+    // ═══════════════════════════════════════════════════════════
+    let realtimeListChannel=null,realtimeListRetry=null,realtimeListActive=false;
+    let realtimeScoreChannel=null,realtimeScoreRetry=null;
+
+    function setupRealtimeForList(callback){
+      if(!sb)return;
+      // Limpar channel anterior
+      if(realtimeListChannel){try{sb.removeChannel(realtimeListChannel);}catch(e){}realtimeListChannel=null;}
+      if(realtimeListRetry){clearInterval(realtimeListRetry);realtimeListRetry=null;}
+
+      realtimeListChannel=sb.channel('ref_list_'+Date.now())
+        .on('postgres_changes',{event:'*',schema:DB_SCHEMA,table:'live_matches'},()=>{try{callback();}catch(e){}})
+        .on('postgres_changes',{event:'*',schema:DB_SCHEMA,table:'referees'},()=>{try{callback();}catch(e){}})
+        .subscribe((status)=>{
+          console.log('[Referee] Realtime list status:',status);
+          if(status==='SUBSCRIBED'){
+            realtimeListActive=true;
+            if(realtimeListRetry){clearInterval(realtimeListRetry);realtimeListRetry=null;}
+          }
+          if(status==='TIMED_OUT'||status==='CHANNEL_ERROR'||status==='CLOSED'){
+            realtimeListActive=false;
+            // Reagendar reconexão
+            if(!realtimeListRetry){
+              realtimeListRetry=setInterval(()=>{
+                console.log('[Referee] Tentando reconectar Realtime list...');
+                setupRealtimeForList(callback);
+              },30000);
+            }
+          }
+        });
+    }
+
+    function setupRealtimeForScore(matchId,callback){
+      if(!sb||!matchId)return;
+      if(realtimeScoreChannel){try{sb.removeChannel(realtimeScoreChannel);}catch(e){}realtimeScoreChannel=null;}
+      if(realtimeScoreRetry){clearInterval(realtimeScoreRetry);realtimeScoreRetry=null;}
+
+      realtimeScoreChannel=sb.channel('ref_score_'+matchId+'_'+Date.now())
+        .on('postgres_changes',{event:'*',schema:DB_SCHEMA,table:'live_scores',filter:'match_id=eq.'+matchId},(payload)=>{try{callback(payload?.new);}catch(e){}})
+        .subscribe((status)=>{
+          console.log('[Referee] Realtime score status:',status);
+          if(status==='TIMED_OUT'||status==='CHANNEL_ERROR'||status==='CLOSED'){
+            if(!realtimeScoreRetry){
+              realtimeScoreRetry=setInterval(()=>{
+                console.log('[Referee] Tentando reconectar Realtime score...');
+                setupRealtimeForScore(matchId,callback);
+              },30000);
+            }
+          }
+        });
+    }
+
+    function teardownRealtimeAll(){
+      if(realtimeListChannel){try{sb.removeChannel(realtimeListChannel);}catch(e){}realtimeListChannel=null;}
+      if(realtimeScoreChannel){try{sb.removeChannel(realtimeScoreChannel);}catch(e){}realtimeScoreChannel=null;}
+      if(realtimeListRetry){clearInterval(realtimeListRetry);realtimeListRetry=null;}
+      if(realtimeScoreRetry){clearInterval(realtimeScoreRetry);realtimeScoreRetry=null;}
+    }
+    let clubMap=new Map(); // mapeia nome completo -> clube do jogador
+    // Sides: quem esta em qual lado da tela
+    let leftPlayer=1,rightPlayer=2; // 1=player1, 2=player2
+    let state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
+    // Scoring dinamico - vem do Supabase (configurado no Planner)
+    let PTS=21,MAX=30,BEST=3;
+    let intervalAt=11; // ponto de descanso/troca de lado (auto: floor(points/2)+1)
+    // v4.36: centraliza calculo de regras BWF — chame applyScoring({points,maxPoints,sets})
+    // sempre que tournament.scoring chegar do Supabase. Garante MAX/intervalAt
+    // consistentes entre loadMatches/openScorer/checkSetEnd.
+    function applyScoring(sc){
+      sc=sc||{};
+      PTS=sc.points||21;
+      MAX=sc.maxPoints||(PTS===15?20:PTS===11?15:30);
+      BEST=sc.sets||3;
+      intervalAt=Math.floor(PTS/2)+1; // BWF: 21→11, 15→8, 11→6
+    }
+    let intervalTimer=null,intervalSeconds=0;
+    let intervalAsked=false;
+    let currentTournamentId=null;
+    let currentScoring=null; // {sets, points, maxPoints}
+    let isReadOnly=false; // true quando outro árbitro já está marcando
+
+    // === DUPLAS ===
+    let isDoubles=false;
+    // Nomes dos jogadores das duplas
+    let p1a='',p1b='',p2a='',p2b='';
+    // Posição na quadra: quem está no topo (esquerda quadra = direita da tela espelhada)
+    // left side: leftTopPlayer, leftBottomPlayer (indices: 'p1a','p1b' ou 'p2a','p2b')
+    // right side: rightTopPlayer, rightBottomPlayer
+    let leftTopPlayer='',leftBottomPlayer='',rightTopPlayer='',rightBottomPlayer='';
+    // Quem está sacando individualmente (em duplas)
+    let doublesServer=''; // 'p1a','p1b','p2a','p2b'
+    let doublesReceiver=''; // quem recebe
+    // Controle de setinhas (só aparecem no inicio de cada set)
+    let canSwapInner=true;
+
+    // === PWA SERVICE WORKER ===
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('./sw.js').catch(()=>{});
+      // Notifica quando nova versao esta pronta
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        if(confirm('Nova versao do app disponivel! Atualizar agora?'))location.reload();
+      });
+    }
+
+    // === PWA INSTALL ===
+    window.addEventListener('beforeinstallprompt',e=>{
+      e.preventDefault();deferredPrompt=e;
+      document.getElementById('install-hint').style.display='none';
+    });
+    window.addEventListener('appinstalled',()=>{deferredPrompt=null;document.getElementById('install-bar').style.display='none';});
+    function installPWA(){
+      if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('install-bar').style.display='none';});return;}
+      // Instrucoes manuais
+      const hint=document.getElementById('install-hint');
+      const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent);
+      if(isIOS){hint.textContent='No Safari: toque no botao Compartilhar (quadrado com seta) e depois "Adicionar a Tela de Inicio".';}
+      else{hint.textContent='No Chrome: toque nos 3 pontinhos (menu) e depois "Adicionar a tela inicial" ou "Instalar app".';}
+      hint.style.display='block';
+    }
+    // Esconder se ja esta instalado
+    if(window.matchMedia('(display-mode: standalone)').matches){document.getElementById('install-bar').style.display='none';}
+
+
+    // === BLOCK NOTIFICATIONS ===
+    if('Notification' in window&&Notification.permission==='default'){try{Notification.requestPermission(p=>{});}catch(e){}}
+    document.addEventListener('visibilitychange',()=>{});
+
+    // === LOCK ORIENTATION ===
+    function lockLandscape(){try{screen.orientation?.lock?.('landscape').catch(()=>{});}catch(e){}}
+
+    // === AUTH ===
+    async function loginGoogle(){
+      if(!sb)return;
+      const errEl=document.getElementById('login-error');
+      errEl.style.display='none';
+      try{
+        errEl.textContent='Redirecionando...';errEl.style.display='block';errEl.style.color='#60A5FA';
+        const{data,error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.href.split('#')[0].split('?')[0]}});
+        if(error){errEl.style.color='#EF4444';errEl.textContent='Erro: '+error.message;}
+        else if(data?.url)location.href=data.url;
+      }catch(e){errEl.style.color='#EF4444';errEl.textContent='Erro: '+e.message;}
+    }
+
+    function logout(){
+      // v4.5: marca como intencional pro listener saber que pode limpar state
+      _intentionalLogout=true;
+      // v4.34: limpa cache do referee record (proximo login revalida)
+      try { if (currentUser?.id) localStorage.removeItem(`fabd-ref-cache-${currentUser.id}`); } catch(e) {}
+      // v4.36 P1: cancela Realtime + heartbeat antes de signOut (evita leak de canais)
+      teardownRealtimeAll();
+      if(pollInterval){clearInterval(pollInterval);pollInterval=null;}
+      currentUser=null;currentMatch=null;isReadOnly=false;
+      sb?.auth.signOut();hideAll();
+      document.getElementById('page-login').style.display='flex';
+    }
+    function hideAll(){['page-login','page-federation','page-pending','page-matches','page-scorer','page-loading'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});}
+
+    // v4.32.2: timeout interno em queries do handleLogin pra nao pendurar a UI.
+    // createResilientFetch tem retry (2x com backoff) com timeout 15s — pior caso 45s.
+    // Aqui forcamos timeout AGRESSIVO de 6s por query: se falhar, segue adiante (queries
+    // sao auxiliares — registerReferee é só pra cadastro inicial; getMyRefereeRecord
+    // pode ser re-chamado pelo polling/Realtime).
+    function _withTimeout(p, ms, label) {
+      return Promise.race([
+        p,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout '+ms+'ms: '+label)), ms))
+      ]);
+    }
+    async function registerReferee(u){
+      try{
+        await _withTimeout(
+          sb.from('referees').upsert({id:u.id,name:u.name,email:u.email||'',photo:u.photo||'',updated_at:new Date().toISOString()},{onConflict:'id'}),
+          6000, 'registerReferee'
+        );
+      }catch(e){console.warn('[Auth] registerReferee:', e.message);}
+    }
+    async function getMyRefereeRecord(){
+      if(!currentUser)return null;
+      try{
+        const{data}=await _withTimeout(
+          sb.from('referees').select('id,name,status,federation_id').eq('id',currentUser.id).single(),
+          6000, 'getMyRefereeRecord'
+        );
+        return data||null;
+      }catch(e){console.warn('[Auth] getMyRefereeRecord:', e.message); return null;}
+    }
+    async function checkStatus(){const r=await getMyRefereeRecord();return r?.status||'pendente';}
+
+    async function loadFederationsIntoSelect(){
+      try{
+        const{data}=await sb.from('federations').select('id,slug,name,short_name,state').eq('active',true).order('short_name');
+        const sel=document.getElementById('fed-select');
+        if(!data?.length){sel.innerHTML='<option value="">Nenhuma federacao disponivel</option>';return;}
+        sel.innerHTML='<option value="">-- Escolha sua federacao --</option>'+data.map(f=>`<option value="${esc(f.id)}">${esc(f.short_name)} - ${esc(f.name)} (${esc(f.state)})</option>`).join('');
+      }catch(e){console.error('Erro ao carregar federacoes:',e);}
+    }
+
+    async function showFederationPicker(){
+      hideAll();
+      document.getElementById('page-federation').style.display='flex';
+      await loadFederationsIntoSelect();
+    }
+
+    async function confirmFederation(){
+      const sel=document.getElementById('fed-select');
+      const errEl=document.getElementById('fed-error');
+      const fid=sel.value;
+      if(!fid){errEl.textContent='Selecione uma federacao';errEl.style.display='block';return;}
+      errEl.style.display='none';
+      try{
+        const{error}=await sb.from('referees').update({federation_id:fid,updated_at:new Date().toISOString()}).eq('id',currentUser.id);
+        if(error)throw error;
+        currentUser.federation_id=fid;
+        const fresh = await getMyRefereeRecord();
+        if (fresh) _saveRefereeCache(currentUser.id, fresh);
+        const st = fresh?.status || await checkStatus();
+        if(st==='autorizado')showMatches();
+        else showPending();
+      }catch(e){
+        errEl.textContent='Erro: '+e.message;errEl.style.display='block';
+      }
+    }
+
+    // v4.34: cache do referee record em localStorage. Resolve 2 problemas:
+    //   (a) Se queries do Supabase pendurarem/falharem (timeout 6s), tinhamos que
+    //       assumir "primeiro login" e mostrar federation picker — incorreto pra
+    //       quem ja escolheu federacao antes.
+    //   (b) UX: cada login fazia 1-2s de query antes de mostrar tela. Cache leitura
+    //       sync = navegacao instantanea.
+    // Padrao stale-while-revalidate: usa cache pra navegar JA, em background atualiza
+    // e reage a mudancas (admin autorizou/revogou, federation mudou).
+    const _refereeCacheKey = (uid) => `fabd-ref-cache-${uid}`;
+    function _saveRefereeCache(uid, rec) {
+      try { localStorage.setItem(_refereeCacheKey(uid), JSON.stringify({rec, ts: Date.now()})); } catch(e) {}
+    }
+    function _loadRefereeCache(uid) {
+      try {
+        const raw = localStorage.getItem(_refereeCacheKey(uid));
+        if (!raw) return null;
+        const {rec, ts} = JSON.parse(raw);
+        // Cache valido por 30 dias (status mudancas raras + Realtime/polling pega mudancas online)
+        if (Date.now() - ts > 30*24*3600*1000) return null;
+        return rec;
+      } catch(e) { return null; }
+    }
+    function _navigateForRec(rec) {
+      if (!rec?.federation_id) { showFederationPicker(); return 'picker'; }
+      currentUser.federation_id = rec.federation_id;
+      if (rec.status === 'autorizado') { showMatches(); return 'matches'; }
+      else { showPending(); return 'pending'; }
+    }
+
+    // v4.36 P0: lock pra evitar handleLogin concorrente (listener + getSession
+    // + setSession-fallback + visibilitychange podem disparar 2-3x quase juntos).
+    let _handleLoginPromise=null;
+    function handleLogin(u){
+      if(_handleLoginPromise){
+        console.log('[Auth] handleLogin re-entry suprimido:', u?.email);
+        return _handleLoginPromise;
+      }
+      _handleLoginPromise=_handleLoginImpl(u).finally(()=>{_handleLoginPromise=null;});
+      return _handleLoginPromise;
+    }
+    async function _handleLoginImpl(u){
+      console.log('[Auth] handleLogin start:', u?.email);
+      // Se ja temos esse user logado, evita re-render
+      if(currentUser&&currentUser.id===u?.id){
+        console.log('[Auth] handleLogin skip: mesmo user ja logado');
+        currentUser.email=u.email||currentUser.email;
+        currentUser.name=u.name||currentUser.name;
+        return;
+      }
+      currentUser=u;
+
+      // 1. Cache hit → navega INSTANTANEAMENTE (zero query)
+      const cached = _loadRefereeCache(u.id);
+      if (cached) {
+        console.log('[Auth] cache hit:', cached);
+        const navTo = _navigateForRec(cached);
+        console.log('[Auth] navegou via cache para:', navTo);
+        // Background revalidate (nao bloqueia UI)
+        (async () => {
+          try {
+            await registerReferee(u);
+            const fresh = await getMyRefereeRecord();
+            if (!fresh) return; // query falhou — mantem cache
+            _saveRefereeCache(u.id, fresh);
+            // Se mudou status/federation, reage
+            if (fresh.status !== cached.status || fresh.federation_id !== cached.federation_id) {
+              console.log('[Auth] cache divergente do servidor, re-navegando:', fresh);
+              _navigateForRec(fresh);
+            }
+          } catch(e) { console.warn('[Auth] revalidate falhou:', e.message); }
+        })();
+        return;
+      }
+
+      // 2. Cache miss (1o login ou cache expirado) — fluxo classico com queries
+      console.log('[Auth] cache miss, consultando servidor');
+      await registerReferee(u);
+      console.log('[Auth] registerReferee OK');
+      const rec = await getMyRefereeRecord();
+      console.log('[Auth] getMyRefereeRecord:', rec);
+      if (rec) _saveRefereeCache(u.id, rec);
+      _navigateForRec(rec || {});
+    }
+    function showPending(){
+      hideAll();
+      document.getElementById('page-pending').style.display='flex';
+      if(pollInterval)clearInterval(pollInterval);
+      // Polling como fallback (30s em vez de 5s — Realtime cuida do tempo real)
+      pollInterval=setInterval(async()=>{if(await checkStatus()==='autorizado')showMatches();},30000);
+      // Realtime: atualizar imediatamente quando o status do referee muda
+      setupRealtimeForList(async()=>{
+        if(await checkStatus()==='autorizado')showMatches();
+      });
+    }
+
+    // v4.15: helper de diagnostico — preenche o <pre id="diag-info"> com info pra debug.
+    // v4.19: render imediato (sem await) + atualiza com getSession quando completar.
+    function _renderDiagSync(extra){
+      try {
+        const el=document.getElementById('diag-info');if(!el)return;
+        const ua=navigator.userAgent;
+        const standalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+        const lsKeys=Object.keys(localStorage||{});
+        const sbKey=lsKeys.find(k=>k.includes('sb-')&&k.includes('-auth-token'));
+        const tokenStr=sbKey?localStorage.getItem(sbKey):null;
+        let tokenInfo='AUSENTE';
+        if(tokenStr){
+          try{
+            const t=JSON.parse(tokenStr);
+            const exp=t?.expires_at?new Date(t.expires_at*1000).toISOString():'?';
+            const now=Math.floor(Date.now()/1000);
+            const expired=t?.expires_at&&t.expires_at<now;
+            tokenInfo='PRESENTE (user='+(t?.user?.email||'?')+', exp='+exp+', expirado='+(expired?'SIM':'nao')+')';
+          }catch{tokenInfo='PRESENTE mas malformado';}
+        }
+        const url=location.href;
+        const hasHashToken=url.includes('#access_token=')||url.includes('#refresh_token=');
+        const hasCode=url.includes('?code=')||url.includes('&code=');
+        const lines=[
+          'PWA standalone: '+(standalone?'SIM':'nao (browser tab)'),
+          'Storage key: '+(sbKey||'NENHUMA chave sb-*-auth-token'),
+          'Token storage: '+tokenInfo,
+          'getSession(): consultando...',
+          'URL hash #access_token: '+(hasHashToken?'SIM':'nao'),
+          'URL ?code: '+(hasCode?'SIM':'nao'),
+          'localStorage funciona: '+(typeof Storage!=='undefined'?'sim':'NAO'),
+          'localStorage keys: '+lsKeys.length,
+          'sb obj: '+(sb?'OK':'NULL'),
+          'UA: '+ua.substring(0,140),
+        ];
+        if(extra)lines.push('',extra);
+        el.textContent=lines.join('\n');
+      } catch(e){ try{document.getElementById('diag-info').textContent='diag-sync erro: '+(e?.message||e);}catch{} }
+    }
+    async function _renderDiagAsync(){
+      try{
+        const el=document.getElementById('diag-info');if(!el||!sb)return;
+        const{data:{session}}=await sb.auth.getSession();
+        const sessionState=session?.user?'PRESENTE ('+session.user.email+')':'AUSENTE';
+        const txt=el.textContent.replace('getSession(): consultando...', 'getSession(): '+sessionState);
+        el.textContent=txt;
+      } catch(e){
+        try{
+          const el=document.getElementById('diag-info');
+          if(el)el.textContent=el.textContent.replace('getSession(): consultando...', 'getSession(): ERRO '+(e?.message||e));
+        }catch{}
+      }
+    }
+    function _renderDiagInfo(extra){
+      _renderDiagSync(extra);
+      _renderDiagAsync();
+    }
+
+    async function checkAuth(){
+      if(!sb){const lo=document.getElementById('page-loading');if(lo)lo.style.display='none';document.getElementById('page-login').style.display='flex';_renderDiagInfo('sb=null (supabase-js nao carregou)');return;}
+
+      // v4.31 — Race condition do supabase-js v2.99+ no boot pos-F5:
+      //   1. createClient() retorna imediatamente, init e assincrono
+      //   2. getSession() pode retornar null ANTES do init terminar
+      //   3. INITIAL_SESSION dispara com user=(none) primeiro
+      //   4. SIGNED_IN dispara DEPOIS com user correto (1-3s depois)
+      //   PhysiqCalc nao sente isso porque usa signInWithPassword (sem PKCE).
+      //   Referee usa OAuth Google + flowType:pkce (default v2.42+).
+      // Solucao: NAO mostrar page-login imediatamente. Aguardar ate 5s pelo
+      // listener antes de desistir. Se sessao chega via listener, handleLogin
+      // troca a tela para matches/pending — user nem ve a tela de login.
+
+      // v4.31.1: loading fica visivel ATE uma pagina-fim aparecer (showMatches/showPending/
+      // showFederationPicker) ou ate handleLogin falhar/timeoutar. Antes, _hideLoading rodava
+      // no resolve, e se handleLogin pendurasse em query Supabase, tela ficava em branco.
+      window._hideLoading = () => { const el=document.getElementById('page-loading'); if(el) el.style.display='none'; };
+      const _showLoadingMsg = (txt) => { const p=document.querySelector('#page-loading p'); if(p) p.textContent=txt; };
+      let _resolved = false;
+      const _resolveWithSession = async (source, ses) => {
+        if (_resolved) return;
+        _resolved = true;
+        console.log('[Auth] resolved via '+source+': '+ses.user.email);
+        _showLoadingMsg('Carregando seus jogos...');
+        // Safety timeout: se handleLogin nao terminar em 20s, mostra login com erro
+        const timeoutId = setTimeout(() => {
+          console.warn('[Auth] handleLogin timeout 20s — mostrando login');
+          window._hideLoading();
+          const errEl = document.getElementById('login-error');
+          if (errEl) { errEl.style.color='#EF4444'; errEl.textContent='Tempo esgotado ao carregar. Verifique sua conexao e tente novamente.'; errEl.style.display='block'; }
+          document.getElementById('page-login').style.display='flex';
+          _renderDiagInfo();
+        }, 20000);
+        try {
+          await handleLogin({
+            name: ses.user.user_metadata?.full_name || ses.user.email,
+            id: ses.user.id,
+            email: ses.user.email,
+            photo: ses.user.user_metadata?.avatar_url
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      };
+      const _resolveNoSession = (source) => {
+        if (_resolved) return;
+        _resolved = true;
+        console.log('[Auth] resolved no-session via '+source+', mostrando login');
+        window._hideLoading();
+        document.getElementById('page-login').style.display='flex';
+        _renderDiagInfo();
+      };
+
+      // === Listener de auth (sempre registrado, antes do early return) ===
+      sb.auth.onAuthStateChange(async(ev,ses)=>{
+        console.log('[Auth] onAuthStateChange ev='+ev+' user='+(ses?.user?.email||'(none)')+' intentional='+_intentionalLogout);
+        if(ev==='SIGNED_OUT'){
+          if(_intentionalLogout){
+            _intentionalLogout=false;
+            currentUser=null;
+            if(pollInterval)clearInterval(pollInterval);
+            hideAll();
+            document.getElementById('page-login').style.display='flex';
+          }
+          return;
+        }
+        if((ev==='SIGNED_IN'||ev==='TOKEN_REFRESHED'||ev==='USER_UPDATED'||ev==='INITIAL_SESSION')&&ses?.user){
+          // Guard dupla chamada — se ja logado com mesmo user, so atualiza dados
+          if(currentUser&&currentUser.id===ses.user.id){
+            currentUser.email=ses.user.email;
+            currentUser.name=ses.user.user_metadata?.full_name||ses.user.email;
+            return;
+          }
+          await _resolveWithSession('listener-'+ev, ses);
+        }
+      });
+
+      // === Tenta getSession (rapido, se ja inicializou) ===
+      console.log('[Auth] checkAuth iniciando getSession');
+      try {
+        const{data:{session:s},error:sErr}=await sb.auth.getSession();
+        console.log('[Auth] getSession resultado:', sErr?'ERRO '+sErr.message:(s?.user?'OK '+s.user.email:'AUSENTE'));
+        if (s?.user) { await _resolveWithSession('getSession', s); return; }
+      } catch(e) { console.warn('[Auth] getSession falhou:',e?.message); }
+
+      // === FALLBACK imediato — se getSession AUSENTE mas storage tem token, forca setSession ===
+      try {
+        const sbKey = Object.keys(localStorage).find(k => k.startsWith('sb-')&&k.endsWith('-auth-token'));
+        if (sbKey) {
+          const raw = localStorage.getItem(sbKey);
+          const stored = raw ? JSON.parse(raw) : null;
+          const now = Math.floor(Date.now()/1000);
+          if (stored?.access_token && stored?.refresh_token && stored?.expires_at && stored.expires_at > now) {
+            console.log('[Auth] FALLBACK setSession: storage tem token valido (exp '+(stored.expires_at-now)+'s)');
+            const{data:{session:s2},error:err2} = await sb.auth.setSession({
+              access_token: stored.access_token,
+              refresh_token: stored.refresh_token
+            });
+            if (err2) console.warn('[Auth] setSession falhou:', err2.message);
+            else if (s2?.user) { await _resolveWithSession('setSession-fallback', s2); return; }
+          } else {
+            console.log('[Auth] storage check: token ausente/expirado/invalido');
+          }
+        } else {
+          console.log('[Auth] storage check: nenhuma chave sb-*-auth-token');
+        }
+      } catch(e) { console.warn('[Auth] fallback storage parse error:', e?.message); }
+
+      // === Listener-wait: 5s pra supabase-js terminar init e disparar SIGNED_IN ===
+      // Mostra um placeholder leve (overlay sobre login) — se listener resolver
+      // antes dos 5s, troca pra page-matches/pending sem flash de login.
+      console.log('[Auth] aguardando listener por ate 5s...');
+      setTimeout(() => { _resolveNoSession('timeout-5s'); }, 5000);
+    }
+
+    // === Re-checa sessao quando app volta ao foco (v4.5) ===
+    // Se user fechou o app por horas e voltou, pode ter token novo no storage
+    // (refresh em outra aba) — sincroniza state local sem deslogar.
+    document.addEventListener('visibilitychange', async () => {
+      if(document.visibilityState!=='visible'||!sb)return;
+      try {
+        const{data:{session:s}}=await sb.auth.getSession();
+        if(s?.user&&!currentUser){
+          await handleLogin({name:s.user.user_metadata?.full_name||s.user.email,id:s.user.id,email:s.user.email,photo:s.user.user_metadata?.avatar_url});
+        }
+      } catch {}
+    });
+
+    // === MATCHES ===
+    function showMatches(){
+      hideAll();
+      const p=document.getElementById('page-matches');
+      p.style.display='flex';
+      document.getElementById('user-name').textContent=currentUser.name;
+      loadMatches();
+      if(pollInterval)clearInterval(pollInterval);
+      // Polling como fallback (30s em vez de 5s — Realtime cuida do tempo real)
+      pollInterval=setInterval(loadMatches,30000);
+      // Realtime: recarregar lista quando jogos mudarem (entrar/sair de quadra, finalizar, etc.)
+      setupRealtimeForList(loadMatches);
+    }
+
+    let _lastMatchesUpdate = 0;
+    let _lastUpdateTimer = null;
+
+    function _updateLastUpdateLabel() {
+      const el = document.getElementById('ref-last-update');
+      if (!el || !_lastMatchesUpdate) return;
+      const sec = Math.max(0, Math.floor((Date.now() - _lastMatchesUpdate) / 1000));
+      const txt = sec < 5 ? 'Atualizado agora' : sec < 60 ? `Atualizado há ${sec}s` : `Atualizado há ${Math.floor(sec/60)}min`;
+      el.textContent = txt;
+    }
+
+    async function refreshMatches(){
+      const ic = document.getElementById('ref-refresh-icon');
+      if (ic) { ic.style.display='inline-block'; ic.style.animation='spin 0.5s linear'; setTimeout(()=>{ic.style.animation='';},500); }
+      await loadMatches();
+    }
+
+    async function loadMatches(){
+      try{
+        if(!currentUser?.federation_id){return;}
+        // Pega o torneio mais recente DA FEDERACAO do arbitro (inclui scoring)
+        const{data:ts}=await sb.from('tournaments').select('id,name,data,federations(short_name,primary_color)').eq('federation_id',currentUser.federation_id).order('updated_at',{ascending:false}).limit(1);
+        const content = document.getElementById('ref-jogos-content') || document.getElementById('ref-tab-jogos');
+        if(!ts?.length){content.innerHTML='<div class="empty"><div style="font-size:48px">&#128580;</div><p>Nenhum torneio ativo na sua federacao</p></div>';return;}
+        currentTournamentId=ts[0].id;
+        const fed=ts[0].federations;
+        document.getElementById('tournament-name').textContent=ts[0].name;
+        // Carrega scoring do tournament (default 21/30/3 se nao definido)
+        const tData=ts[0].data||{};
+        currentScoring=tData.scoring||{sets:3,points:21,maxPoints:30};
+        applyScoring(currentScoring);
+        // Aplica cor da federacao no header
+        if(fed?.primary_color){document.querySelector('.matches-page .header').style.background=fed.primary_color;}
+        // Jogos em quadra DESTA federacao + tournament
+        const{data:ms}=await sb.from('live_matches').select('*').eq('federation_id',currentUser.federation_id).eq('tournament_id',ts[0].id).eq('status','Em Quadra').order('court');
+        if(!ms?.length){content.innerHTML='<div class="empty"><div style="font-size:48px">&#9203;</div><p>Nenhum jogo em quadra.<br>Aguarde o organizador.</p></div>';}
+        else { let h='';ms.forEach(m=>{h+=`<div class="match-card" onclick="openScorer('${esc(m.id)}')"><div class="court">${esc(m.court)}</div><div class="players">${esc(m.player1)} vs ${esc(m.player2)}</div><div class="draw">${esc(m.draw_name)} - ${esc(m.round_name||'')}</div></div>`;}); content.innerHTML=h; }
+        // v4.1: indicador de "atualizado há Xs" + auto-tick
+        _lastMatchesUpdate = Date.now();
+        _updateLastUpdateLabel();
+        if (!_lastUpdateTimer) _lastUpdateTimer = setInterval(_updateLastUpdateLabel, 5000);
+      }catch(e){console.error(e); const el=document.getElementById('ref-last-update'); if(el) el.textContent='Erro ao atualizar - tente novamente';}
+    }
+
+    // === TABS ===
+    function setRefTab(tab){
+      document.querySelectorAll('.ref-tab').forEach((t,i)=>t.classList.toggle('active',['jogos','historico','arbitros','config'][i]===tab));
+      document.getElementById('ref-tab-jogos').style.display=tab==='jogos'?'block':'none';
+      document.getElementById('ref-tab-historico').style.display=tab==='historico'?'block':'none';
+      document.getElementById('ref-tab-arbitros').style.display=tab==='arbitros'?'block':'none';
+      document.getElementById('ref-tab-config').style.display=tab==='config'?'block':'none';
+      if(tab==='historico')loadHistory();
+      if(tab==='arbitros')loadArbitros();
+      if(tab==='config')updateConfigTab();
+    }
+
+    // === CONFIG TAB ===
+    function updateConfigTab(){
+      document.getElementById('cfg-points').textContent=PTS;
+      document.getElementById('cfg-max').textContent=MAX;
+      document.getElementById('cfg-sets').textContent=BEST;
+      document.getElementById('cfg-interval').textContent=intervalAt;
+      document.getElementById('cfg-tournament').textContent=document.getElementById('tournament-name').textContent||'-';
+      document.getElementById('cfg-federation').textContent=currentUser?.federation_name||'-';
+      document.getElementById('cfg-referee').textContent=currentUser?.name||'-';
+    }
+
+    let historyData=[];
+    async function loadHistory(){
+      if(!sb||!currentTournamentId||!currentUser?.federation_id)return;
+      try{
+        const{data:ms}=await sb.from('live_matches').select('*').eq('federation_id',currentUser.federation_id).eq('tournament_id',currentTournamentId).eq('status','Finalizada').order('updated_at',{ascending:false});
+        if(!ms?.length){document.getElementById('hist-list').innerHTML='<div class="empty"><div style="font-size:48px">&#127942;</div><p>Nenhuma partida finalizada</p></div>';return;}
+        const ids=ms.map(m=>m.id);
+        const{data:scores}=await sb.from('live_scores').select('*').in('match_id',ids);
+        const sm={};(scores||[]).forEach(s=>{sm[s.match_id]=s;});
+        historyData=ms.map(m=>({...m,score:sm[m.id]}));
+        renderHistory(historyData);
+      }catch(e){console.error(e);}
+    }
+
+    function renderHistory(data){
+      if(!data.length){document.getElementById('hist-list').innerHTML='<div class="empty"><div style="font-size:48px">&#127942;</div><p>Nenhuma partida</p></div>';return;}
+      let h='';
+      data.forEach(m=>{
+        const s=m.score;
+        const w=s?.winner;
+        const sP1=s?.sets_p1||[],sP2=s?.sets_p2||[];
+        const ump=s?.umpire_name||m.umpire||'';
+        let setsHtml='';
+        sP1.forEach((v,i)=>{setsHtml+=`<span style="background:#0F172A;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600">${v}-${sP2[i]}</span> `;});
+        h+=`<div class="match-card" style="border-left-color:${w?'#10B981':'#334155'};cursor:default">
+          <div class="court">${esc(m.court||'')} ${esc(m.draw_name)} - ${esc(m.round_name||'')}</div>
+          <div class="players" style="margin:6px 0">
+            <span style="${w===1?'color:#10B981':''}">${esc(m.player1)}</span>
+            <span style="color:#475569;margin:0 8px">vs</span>
+            <span style="${w===2?'color:#10B981':''}">${esc(m.player2)}</span>
+          </div>
+          <div style="margin:4px 0">${setsHtml||'-'}</div>
+          <div style="font-size:11px;color:#64748B">${ump?'Arbitro: '+esc(ump):''}</div>
+        </div>`;
+      });
+      document.getElementById('hist-list').innerHTML=h;
+    }
+
+    function filterHistory(){
+      const q=(document.getElementById('hist-search')?.value||'').toLowerCase();
+      if(!q){renderHistory(historyData);return;}
+      const filtered=historyData.filter(m=>{
+        const ump=(m.score?.umpire_name||m.umpire||'').toLowerCase();
+        const p1=(m.player1||'').toLowerCase();
+        const p2=(m.player2||'').toLowerCase();
+        const draw=(m.draw_name||'').toLowerCase();
+        return ump.includes(q)||p1.includes(q)||p2.includes(q)||draw.includes(q);
+      });
+      renderHistory(filtered);
+    }
+
+    async function loadArbitros(){
+      if(!sb||!currentTournamentId||!currentUser?.federation_id)return;
+      try{
+        const{data:ms}=await sb.from('live_matches').select('*').eq('federation_id',currentUser.federation_id).eq('tournament_id',currentTournamentId).eq('status','Finalizada');
+        if(!ms?.length){document.getElementById('arb-list').innerHTML='<div class="empty"><div style="font-size:48px">&#128100;</div><p>Nenhum arbitro registrado</p></div>';return;}
+        const ids=ms.map(m=>m.id);
+        const{data:scores}=await sb.from('live_scores').select('umpire_name,match_id').in('match_id',ids);
+        // Contar por arbitro
+        const stats={};
+        (scores||[]).forEach(s=>{
+          const name=s.umpire_name||'Sem arbitro';
+          if(!stats[name])stats[name]=0;
+          stats[name]++;
+        });
+        const sorted=Object.entries(stats).sort((a,b)=>b[1]-a[1]);
+        let h='<div style="padding:4px 0">';
+        sorted.forEach(([name,count])=>{
+          h+=`<div class="match-card" style="cursor:default;display:flex;align-items:center;justify-content:space-between">
+            <div><strong style="font-size:15px">${esc(name)}</strong></div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="background:#2563EB;color:#fff;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700">${count}</span>
+              <span style="font-size:12px;color:#64748B">jogo${count>1?'s':''}</span>
+            </div>
+          </div>`;
+        });
+        h+='</div>';
+        document.getElementById('arb-list').innerHTML=h;
+      }catch(e){console.error(e);}
+    }
+
+    // === SCORER ===
+    async function openScorer(matchId){
+      try{
+        const{data:match}=await sb.from('live_matches').select('*').eq('id',matchId).single();
+        if(!match){alert('Jogo nao encontrado');return;}
+        currentMatch=match;
+        // Carregar clubes E scoring do tournament (para exibir nos cantos da quadra e configurar pontuacao)
+        try{
+          const{data:td}=await sb.from('tournaments').select('data').eq('id',match.tournament_id).single();
+          const tData=td?.data||{};
+          clubMap=new Map(((tData.players)||[]).map(p=>[(p.name||'').trim(),p.club||'']));
+          applyScoring(tData.scoring);
+        }catch(e){clubMap=new Map();}
+        leftPlayer=1;rightPlayer=2;
+        state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
+        intervalAsked=false;
+
+        // Detectar duplas: primeiro verifica "/" nos nomes, se não encontrar verifica draw_name
+        isDoubles=false;
+        if(match.player1.includes('/')&&match.player2.includes('/')){
+          isDoubles=true;
+        }else if(/^D[MFX]/i.test(match.draw_name||'')){
+          isDoubles=true;
+        }
+        if(isDoubles){
+          const parts1=match.player1.split('/').map(n=>n.trim());
+          const parts2=match.player2.split('/').map(n=>n.trim());
+          p1a=parts1[0]||'';p1b=parts1[1]||'';
+          p2a=parts2[0]||'';p2b=parts2[1]||'';
+          // Posição inicial: p1a=direita(baixo), p1b=esquerda(cima) no lado azul
+          leftTopPlayer='p1b';leftBottomPlayer='p1a';
+          rightTopPlayer='p2a';rightBottomPlayer='p2b';
+          doublesServer='p1a'; // primeiro sacador
+          doublesReceiver='p2a'; // primeiro recebedor
+          canSwapInner=true;
+          setupDoublesUI();
+        }else{
+          teardownDoublesUI();
+        }
+
+        // Carregar score existente
+        const{data:sc}=await sb.from('live_scores').select('*').eq('match_id',matchId).single();
+        if(sc){state.set=sc.current_set||1;state.p1=sc.score_p1||0;state.p2=sc.score_p2||0;state.setsP1=sc.sets_p1||[];state.setsP2=sc.sets_p2||[];state.setsWonP1=sc.sets_won_p1||0;state.setsWonP2=sc.sets_won_p2||0;
+          if(isDoubles&&(state.p1>0||state.p2>0))canSwapInner=false;
+        }
+
+        // v4.36 P0: lock atômico via RPC claim_match (substitui check client-side
+        // sujeito a race entre 2 árbitros). RPC valida auth, status do árbitro,
+        // federação, status do jogo, e usa advisory lock no Postgres.
+        isReadOnly=false;
+        const lockTimeout=5*60*1000;
+        {
+          const{data:claim,error:claimErr}=await sb.rpc('claim_match',{p_match_id:matchId,p_lock_seconds:300});
+          if(claimErr){
+            console.error('[Referee] claim_match RPC error:',claimErr);
+            alert('Erro ao reservar o jogo: '+claimErr.message);
+            return;
+          }
+          if(!claim?.acquired){
+            const reason=claim?.reason||'unknown';
+            if(reason==='locked_by_other'){
+              const who=claim.current_umpire||'outro árbitro';
+              const ageSec=claim.age_seconds||0;
+              const remainSec=Math.max(0,(claim.lock_seconds||300)-ageSec);
+              const mm=Math.floor(remainSec/60),ss=remainSec%60;
+              // Modo leitura — o outro árbitro está ativo
+              isReadOnly=true;
+              console.log('[Referee] locked by',who,'(age',ageSec+'s, remain',remainSec+'s)');
+              alert('Jogo já está sendo arbitrado por '+who+'.\nVocê entra em modo visualização.\nLock libera em ~'+mm+'min'+(ss<10?'0':'')+ss+'s se ele sair.');
+            } else if(reason==='match_finished'){
+              alert('Este jogo já foi finalizado.');
+              return;
+            } else if(reason==='match_not_in_court'){
+              alert('Este jogo não está mais em quadra (status: '+(claim.status||'?')+').');
+              return;
+            } else if(reason==='wrong_federation'){
+              alert('Este jogo pertence a outra federação.');
+              return;
+            } else if(reason==='not_authorized'){
+              alert('Seu cadastro de árbitro ainda não foi autorizado.');
+              return;
+            } else {
+              alert('Não foi possível reservar o jogo ('+reason+').');
+              return;
+            }
+          }
+        }
+
+        hideAll();document.getElementById('page-scorer').style.display='flex';
+        if(pollInterval)clearInterval(pollInterval);
+        // Heartbeat: re-claim a cada 30s (RPC mantém lock ativo, libera após 5min sem heartbeat)
+        pollInterval=setInterval(async()=>{
+          if(!isReadOnly&&currentMatch&&currentUser?.name){
+            try{await sb.rpc('claim_match',{p_match_id:currentMatch.id,p_lock_seconds:300});}catch(e){}
+          }
+        },30000);
+        lockLandscape();
+        updateDisplay();
+        updateReadOnlyUI();
+      }catch(e){console.error(e);if(pollInterval){clearInterval(pollInterval);pollInterval=null;}alert('Erro');}
+    }
+
+    function setupDoublesUI(){
+      document.getElementById('court-singles').style.display='none';
+      document.getElementById('court-doubles').style.display='flex';
+    }
+    function teardownDoublesUI(){
+      document.getElementById('court-singles').style.display='flex';
+      document.getElementById('court-doubles').style.display='none';
+    }
+
+    function getDoublesName(key){
+      const map={p1a,p1b,p2a,p2b};
+      return map[key]||key;
+    }
+
+    function getClub(name){
+      return clubMap.get((name||'').trim())||'';
+    }
+
+    // Retorna até as 2 primeiras palavras do nome (ex.: "Pedro Henrique das Chagas" → "Pedro Henrique").
+    // Se só tem 1 palavra, retorna ela. Pra duplas (com '/'), aplicar em cada parte separadamente.
+    function firstTwoNames(name){
+      if(!name)return '';
+      const parts=String(name).trim().split(/\s+/);
+      return parts.slice(0,2).join(' ');
+    }
+
+    function swapInnerLeft(){
+      if(!canSwapInner)return;
+      const tmp=leftTopPlayer;leftTopPlayer=leftBottomPlayer;leftBottomPlayer=tmp;
+      // Atualizar sacador se é do time esquerdo
+      const serverTeam=doublesServer.startsWith('p1')?1:2;
+      if(serverTeam===leftPlayer){
+        doublesServer=leftBottomPlayer; // sacador = quem está na posição de saque (baixo = par)
+      }
+      updateDisplay();
+    }
+    function swapInnerRight(){
+      if(!canSwapInner)return;
+      const tmp=rightTopPlayer;rightTopPlayer=rightBottomPlayer;rightBottomPlayer=tmp;
+      // Atualizar sacador se é do time direito
+      const serverTeam=doublesServer.startsWith('p1')?1:2;
+      if(serverTeam!==leftPlayer){
+        doublesServer=rightTopPlayer; // lado direito espelhado: saque par = topo
+      }
+      updateDisplay();
+    }
+
+    function addPoint(side){
+      if(isReadOnly)return;
+      const player=side==='left'?leftPlayer:rightPlayer;
+      state.history.push({
+        set:state.set,p1:state.p1,p2:state.p2,server:state.server,
+        setsP1:[...state.setsP1],setsP2:[...state.setsP2],
+        setsWonP1:state.setsWonP1,setsWonP2:state.setsWonP2,
+        leftPlayer,rightPlayer,intervalAsked,
+        // Salvar estado de duplas para undo
+        doublesServer,doublesReceiver,
+        leftTopPlayer,leftBottomPlayer,rightTopPlayer,rightBottomPlayer,
+        canSwapInner
+      });
+      if(state.history.length>500)state.history.shift();
+      if(player===1)state.p1++;else state.p2++;
+      state.server=player;
+
+      // Duplas: lógica de posicionamento BWF
+      if(isDoubles){
+        canSwapInner=false; // setinhas somem após primeiro ponto
+        const scoringTeam=player; // 1=team1, 2=team2
+        const serverTeam=doublesServer.startsWith('p1')?1:2;
+        if(scoringTeam===serverTeam){
+          // Time sacador marcou ponto → sacador troca de lado na sua quadra
+          if(serverTeam===1){
+            if(leftPlayer===1){const tmp=leftTopPlayer;leftTopPlayer=leftBottomPlayer;leftBottomPlayer=tmp;}
+            else{const tmp=rightTopPlayer;rightTopPlayer=rightBottomPlayer;rightBottomPlayer=tmp;}
+          }else{
+            if(leftPlayer===2){const tmp=leftTopPlayer;leftTopPlayer=leftBottomPlayer;leftBottomPlayer=tmp;}
+            else{const tmp=rightTopPlayer;rightTopPlayer=rightBottomPlayer;rightBottomPlayer=tmp;}
+          }
+          // Mesmo sacador continua
+        }else{
+          // Time recebedor marcou ponto → ganha o saque
+          // Ninguém troca de lado, mas o sacador muda para quem está no lado correto
+          const recTeamScore=scoringTeam===1?state.p1:state.p2;
+          const isEven=recTeamScore%2===0;
+          // Quem está no lado correto do time recebedor saca
+          // Lado esquerdo: par=baixo, impar=cima
+          // Lado direito: ESPELHADO — par=cima, impar=baixo
+          if(scoringTeam===1){
+            if(leftPlayer===1){
+              doublesServer=isEven?leftBottomPlayer:leftTopPlayer;
+            }else{
+              doublesServer=isEven?rightTopPlayer:rightBottomPlayer;
+            }
+          }else{
+            if(leftPlayer===2){
+              doublesServer=isEven?leftBottomPlayer:leftTopPlayer;
+            }else{
+              doublesServer=isEven?rightTopPlayer:rightBottomPlayer;
+            }
+          }
+        }
+      }
+
+      checkSetEnd();
+      updateDisplay();
+      syncScore();
+    }
+
+    function undoPoint(){
+      if(isReadOnly||!state.history.length)return;
+      const prev=state.history.pop();
+      state.set=prev.set;state.p1=prev.p1;state.p2=prev.p2;state.server=prev.server;
+      state.setsP1=prev.setsP1;state.setsP2=prev.setsP2;
+      state.setsWonP1=prev.setsWonP1;state.setsWonP2=prev.setsWonP2;
+      leftPlayer=prev.leftPlayer;rightPlayer=prev.rightPlayer;
+      intervalAsked=prev.intervalAsked||false;
+      if(isDoubles){
+        doublesServer=prev.doublesServer||doublesServer;
+        doublesReceiver=prev.doublesReceiver||doublesReceiver;
+        leftTopPlayer=prev.leftTopPlayer||leftTopPlayer;
+        leftBottomPlayer=prev.leftBottomPlayer||leftBottomPlayer;
+        rightTopPlayer=prev.rightTopPlayer||rightTopPlayer;
+        rightBottomPlayer=prev.rightBottomPlayer||rightBottomPlayer;
+        canSwapInner=prev.canSwapInner!==undefined?prev.canSwapInner:canSwapInner;
+      }
+      updateDisplay();syncScore();
+    }
+
+    function swapSides(){
+      const tmp=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp;
+      if(isDoubles){
+        // Swap diagonal — quadra espelhada (vista de cima)
+        const tmpLT=leftTopPlayer,tmpLB=leftBottomPlayer;
+        leftTopPlayer=rightBottomPlayer;
+        leftBottomPlayer=rightTopPlayer;
+        rightTopPlayer=tmpLB;
+        rightBottomPlayer=tmpLT;
+      }
+      updateDisplay();
+    }
+
+    function swapServer(){
+      if(!canSwapInner)return; // só funciona antes do primeiro ponto de cada set
+      if(isDoubles){
+        // Trocar time que saca: se p1 saca, passa pra p2 e vice-versa
+        const serverTeam=doublesServer.startsWith('p1')?1:2;
+        if(serverTeam===1){
+          // Passar saque pro time 2 — quem está na posição correta (par=0, lado correto)
+          if(leftPlayer===2){doublesServer=leftBottomPlayer;}
+          else{doublesServer=rightTopPlayer;}
+        }else{
+          // Passar saque pro time 1
+          if(leftPlayer===1){doublesServer=leftBottomPlayer;}
+          else{doublesServer=rightTopPlayer;}
+        }
+      }else{
+        // Simples: trocar quem saca
+        state.server=state.server===1?2:1;
+      }
+      updateDisplay();
+    }
+
+    function checkSetEnd(){
+      const{p1,p2}=state;
+      const won=(hi,lo)=>(hi>=PTS&&hi-lo>=2)||(hi>=MAX&&hi>lo);
+      if(won(p1,p2)||won(p2,p1)){
+        state.setsP1.push(p1);state.setsP2.push(p2);
+        if(p1>p2)state.setsWonP1++;else state.setsWonP2++;
+        const need=Math.ceil(BEST/2);
+        if(state.setsWonP1>=need||state.setsWonP2>=need){
+          showConfirm(state.setsWonP1>=need?1:2);return;
+        }
+        // Proximo set: trocar lados, quem ganhou saca (BWF Lei 7.6)
+        const setWinner=p1>p2?1:2;
+        state.set++;state.p1=0;state.p2=0;
+        const tmp=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp;
+        state.server=setWinner;
+        intervalAsked=false;
+        if(isDoubles){
+          // Swap diagonal — quadra espelhada (vista de cima)
+          const tmpLT=leftTopPlayer,tmpLB=leftBottomPlayer;
+          leftTopPlayer=rightBottomPlayer;
+          leftBottomPlayer=rightTopPlayer;
+          rightTopPlayer=tmpLB;
+          rightBottomPlayer=tmpLT;
+          canSwapInner=true; // setinhas reaparecem no inicio do set
+          // Sacador do time vencedor — quem está na posição de saque (par=0)
+          if(setWinner===1){
+            if(leftPlayer===1){doublesServer=leftBottomPlayer;}
+            else{doublesServer=rightTopPlayer;} // espelhado
+          }else{
+            if(leftPlayer===2){doublesServer=leftBottomPlayer;}
+            else{doublesServer=rightTopPlayer;}
+          }
+        }
+        startInterval(120,'Intervalo entre Sets','Próximo set em:');
+        return;
+      }
+      // Intervalo no ponto medio: perguntar se quer descansar (BWF: 21->11, 15->8, 11->6)
+      if(!intervalAsked&&((p1===intervalAt&&p2<intervalAt)||(p2===intervalAt&&p1<intervalAt))){
+        intervalAsked=true;
+        // Trocar de lado no ponto médio (regra BWF)
+        // - Quem sacava continua sacando (doublesServer não muda)
+        // - Quadra espelhada: ao caminhar pro outro lado, posições invertem diagonalmente
+        //   Left-Top ↔ Right-Bottom, Left-Bottom ↔ Right-Top
+        if(state.set===3){
+          // Troca times de lado (1↔2)
+          const tmp2=leftPlayer;leftPlayer=rightPlayer;rightPlayer=tmp2;
+          if(isDoubles){
+            // Swap DIAGONAL — quadra é espelhada (vista de cima)
+            // Quem estava no top-esquerda vai pro bottom-direita e vice-versa
+            const tmpLT=leftTopPlayer,tmpLB=leftBottomPlayer;
+            leftTopPlayer=rightBottomPlayer;   // right-bottom → left-top
+            leftBottomPlayer=rightTopPlayer;    // right-top → left-bottom
+            rightTopPlayer=tmpLB;               // left-bottom → right-top
+            rightBottomPlayer=tmpLT;            // left-top → right-bottom
+            // doublesServer NÃO muda — sacador continua o mesmo jogador
+          }
+          // state.server NÃO muda — quem sacava continua sacando
+        }
+        document.getElementById('interval-pts').textContent=intervalAt;
+        document.getElementById('modal-ask-interval').classList.add('active');
+      }
+    }
+
+    // === INTERVALO / DESCANSO ===
+    function acceptInterval(){
+      document.getElementById('modal-ask-interval').classList.remove('active');
+      startInterval(60,'Intervalo - '+intervalAt+' pontos','');
+    }
+    function declineInterval(){
+      document.getElementById('modal-ask-interval').classList.remove('active');
+    }
+    function startInterval(seconds,title,msg){
+      intervalSeconds=seconds;
+      document.getElementById('interval-title').textContent=title;
+      document.getElementById('interval-msg').textContent=msg;
+      document.getElementById('interval-skip-btn').style.display='inline-block';
+      const timerEl=document.getElementById('interval-timer');
+      timerEl.classList.remove('warning');
+      updateIntervalDisplay();
+      document.getElementById('modal-interval').classList.add('active');
+      intervalTimer=setInterval(()=>{
+        intervalSeconds--;
+        if(intervalSeconds<=10)timerEl.classList.add('warning');
+        updateIntervalDisplay();
+        if(intervalSeconds<=0){
+          clearInterval(intervalTimer);intervalTimer=null;
+          // Vibrate + audio (silenciosos em iOS sem user gesture)
+          try{navigator.vibrate?.([300,100,300,100,300]);}catch(e){}
+          try{
+            const ctx=new(window.AudioContext||window.webkitAudioContext)();
+            const osc=ctx.createOscillator();osc.type='square';osc.frequency.value=880;
+            const gain=ctx.createGain();gain.gain.value=0.3;
+            osc.connect(gain);gain.connect(ctx.destination);
+            osc.start();setTimeout(()=>{osc.stop();ctx.close();},500);
+          }catch(e){}
+          // v4.36: fallback visual (iOS pode silenciar vibrate+audio).
+          // Flash forte + texto "FIM!" garante que arbitro percebe.
+          timerEl.textContent='FIM!';
+          timerEl.classList.add('warning');
+          document.getElementById('interval-title').textContent='Reiniciando jogo';
+          setTimeout(()=>{document.getElementById('modal-interval').classList.remove('active');timerEl.classList.remove('warning');},1500);
+        }
+      },1000);
+    }
+    function updateIntervalDisplay(){
+      const m=Math.floor(intervalSeconds/60);
+      const s=intervalSeconds%60;
+      document.getElementById('interval-timer').textContent=m+':'+String(s).padStart(2,'0');
+    }
+    function skipInterval(){
+      if(intervalTimer){clearInterval(intervalTimer);intervalTimer=null;}
+      document.getElementById('modal-interval').classList.remove('active');
+    }
+
+    function updateDisplay(){
+      if(!currentMatch)return;
+      const p1Name=currentMatch.player1,p2Name=currentMatch.player2;
+      const lName=leftPlayer===1?p1Name:p2Name;
+      const rName=leftPlayer===1?p2Name:p1Name;
+      const lScore=leftPlayer===1?state.p1:state.p2;
+      const rScore=leftPlayer===1?state.p2:state.p1;
+      const lSets=leftPlayer===1?state.setsWonP1:state.setsWonP2;
+      const rSets=leftPlayer===1?state.setsWonP2:state.setsWonP1;
+
+      // Comum
+      const elInfo=document.getElementById('scorer-info');if(elInfo)elInfo.textContent=currentMatch.draw_name+' - '+(currentMatch.round_name||'');
+      const elCourt=document.getElementById('scorer-court');if(elCourt)elCourt.textContent=currentMatch.court;
+      const elDrawInfo=document.getElementById('scorer-draw-info');if(elDrawInfo)elDrawInfo.textContent=`#${currentMatch.match_num} | ${currentMatch.draw_name}`;
+
+      // Historico de sets — R4: construir com DOM em vez de innerHTML.
+      // Dados vem do Supabase (live_scores.sets_p1/sets_p2 JSONB) e nao sao
+      // sanitizados no server; usar textContent evita XSS se campo for
+      // injetado upstream.
+      const px=isDoubles?'d':'s'; // prefixo dos IDs
+
+      document.getElementById(px+'-left-score').textContent=lScore;
+      document.getElementById(px+'-right-score').textContent=rScore;
+      document.getElementById(px+'-left-sets').textContent='Sets: '+lSets;
+      document.getElementById(px+'-right-sets').textContent='Sets: '+rSets;
+      document.getElementById(px+'-div-set').textContent='SET '+state.set;
+      const histEl=document.getElementById(px+'-div-history');
+      histEl.textContent='';
+      state.setsP1.forEach((s,i)=>{
+        const s1=leftPlayer===1?s:state.setsP2[i];
+        const s2=leftPlayer===1?state.setsP2[i]:s;
+        const line=document.createElement('div');
+        line.textContent=Number(s1)+'-'+Number(s2);
+        histEl.appendChild(line);
+      });
+
+      // Botão de trocar saque — só aparece antes do primeiro ponto de cada set
+      const swapServeBtn=document.getElementById(px+'-swap-serve');
+      if(swapServeBtn)swapServeBtn.style.display=canSwapInner?'flex':'none';
+
+      if(isDoubles){
+        // === DUPLAS ===
+        // Nomes nos cantos da quadra
+        const ltName=getDoublesName(leftTopPlayer);
+        const lbName=getDoublesName(leftBottomPlayer);
+        const rtName=getDoublesName(rightTopPlayer);
+        const rbName=getDoublesName(rightBottomPlayer);
+        document.getElementById('d-left-top').textContent=firstTwoNames(ltName);
+        document.getElementById('d-left-bottom').textContent=firstTwoNames(lbName);
+        document.getElementById('d-right-top').textContent=firstTwoNames(rtName);
+        document.getElementById('d-right-bottom').textContent=firstTwoNames(rbName);
+        // Clubes nos cantos (posicoes antigas dos nomes)
+        document.getElementById('d-left-top-club').textContent=getClub(ltName);
+        document.getElementById('d-left-bottom-club').textContent=getClub(lbName);
+        document.getElementById('d-right-top-club').textContent=getClub(rtName);
+        document.getElementById('d-right-bottom-club').textContent=getClub(rbName);
+        document.getElementById('d-left-name').textContent=lName;
+        document.getElementById('d-right-name').textContent=rName;
+        // Esconder nome principal central (já tem nos cantos)
+        document.getElementById('d-left-name').style.display='none';
+        document.getElementById('d-right-name').style.display='none';
+
+        // Peteca: sacador em duplas
+        const serverTeam=doublesServer.startsWith('p1')?1:2;
+        const serverSide=serverTeam===leftPlayer?'left':'right';
+        document.getElementById('d-shuttle-left').style.display=serverSide==='left'?'block':'none';
+        document.getElementById('d-shuttle-right').style.display=serverSide==='right'?'block':'none';
+        const serverScore=serverTeam===1?state.p1:state.p2;
+        const isEven=serverScore%2===0;
+        const shuttle=document.getElementById('d-shuttle-'+serverSide);
+        if(shuttle){
+          if(serverSide==='left'){shuttle.style.top=isEven?'65%':'35%';}
+          else{shuttle.style.top=isEven?'35%':'65%';}
+          shuttle.style[serverSide==='left'?'right':'left']='15px';
+          shuttle.style[serverSide==='left'?'left':'right']='auto';
+        }
+
+        // Nome do sacador nao aparece mais ao lado da peteca — ja aparece no centro da metade da quadra
+        document.getElementById('d-server-left').style.display='none';
+        document.getElementById('d-server-right').style.display='none';
+
+        // Setinhas internas — só no inicio de cada set
+        document.querySelectorAll('.swap-inner').forEach(el=>el.remove());
+        if(canSwapInner){
+          const courtDoubles=document.getElementById('court-doubles');
+          const sides=courtDoubles.querySelectorAll('.court-side');
+          sides.forEach((side,idx)=>{
+            const btn=document.createElement('button');
+            btn.className='swap-inner';btn.innerHTML='&#8645;';
+            btn.addEventListener('click',function(e){e.stopPropagation();e.preventDefault();idx===0?swapInnerLeft():swapInnerRight();});
+            btn.addEventListener('touchend',function(e){e.stopPropagation();e.preventDefault();idx===0?swapInnerLeft():swapInnerRight();},{passive:false});
+            btn.addEventListener('touchstart',function(e){e.stopPropagation();},{passive:false});
+            side.appendChild(btn);
+          });
+        }
+      }else{
+        // === SIMPLES ===
+        // v4.5: nome+sobrenome (igual em duplas) em vez de nome completo
+        document.getElementById('s-left-name').textContent=firstTwoNames(lName);
+        document.getElementById('s-right-name').textContent=firstTwoNames(rName);
+        // v4.1: clube nas laterais (igual em duplas)
+        document.getElementById('s-left-club').textContent=getClub(lName);
+        document.getElementById('s-right-club').textContent=getClub(rName);
+
+        const serverSide=state.server===leftPlayer?'left':'right';
+        document.getElementById('s-shuttle-left').style.display=serverSide==='left'?'block':'none';
+        document.getElementById('s-shuttle-right').style.display=serverSide==='right'?'block':'none';
+        const serverScore=state.server===1?state.p1:state.p2;
+        const isEven=serverScore%2===0;
+        const shuttle=document.getElementById('s-shuttle-'+serverSide);
+        if(shuttle){
+          if(serverSide==='left'){shuttle.style.top=isEven?'65%':'35%';}
+          else{shuttle.style.top=isEven?'35%':'65%';}
+          shuttle.style[serverSide==='left'?'right':'left']='15px';
+          shuttle.style[serverSide==='left'?'left':'right']='auto';
+        }
+
+        // Nome do servidor ao lado da peteca
+        const serverName=state.server===1?p1Name:p2Name;
+        document.getElementById('s-server-left').style.display=serverSide==='left'?'block':'none';
+        document.getElementById('s-server-right').style.display=serverSide==='right'?'block':'none';
+        const sNameEl=document.getElementById('s-server-'+serverSide);
+        sNameEl.textContent=firstTwoNames(serverName)+' ▸';
+        if(shuttle){
+          sNameEl.style.top=shuttle.style.top;
+          if(serverSide==='left'){sNameEl.style.right='48px';sNameEl.style.left='auto';}
+          else{sNameEl.style.left='48px';sNameEl.style.right='auto';}
+        }
+      }
+    }
+
+    let lastUmpireCheck=0; // timestamp da última verificação de umpire
+
+    async function syncScore(){
+      if(!currentMatch||!sb||isReadOnly)return;
+      try{
+        // Verificar se outro árbitro assumiu — mas só a cada 10s (evita latência em cada ponto)
+        const now=Date.now();
+        if(now-lastUmpireCheck>10000){
+          lastUmpireCheck=now;
+          const{data:check}=await sb.from('live_scores').select('umpire_name').eq('match_id',currentMatch.id).single();
+          if(check&&check.umpire_name&&check.umpire_name!==currentUser?.name){
+            isReadOnly=true;
+            updateReadOnlyUI();
+            alert('Outro árbitro assumiu este jogo ('+firstTwoNames(check.umpire_name)+').\nSeu placar está em modo visualização.');
+            return;
+          }
+        }
+        // R3: .select('match_id') detecta RLS silent-deny (arbitro nao
+        // autorizado ou federation_id mismatch -> 0 rows sem erro).
+        const {data,error}=await sb.from('live_scores').upsert({
+          match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,
+          federation_id:currentMatch.federation_id,
+          current_set:state.set,score_p1:state.p1,score_p2:state.p2,
+          sets_p1:state.setsP1,sets_p2:state.setsP2,
+          sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,
+          umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()
+        },{onConflict:'match_id'}).select('match_id');
+        if(error){throw error;}
+        if(!data||data.length===0){
+          throw new Error('Placar nao persistiu (RLS bloqueou ou arbitro nao autorizado). Verifique seu status.');
+        }
+        document.getElementById('sync-status').style.background='#10B981';
+      }catch(e){
+        console.error('[Referee] Sync error:',e?.message||e);
+        document.getElementById('sync-status').style.background='#EF4444';
+        try{localStorage.setItem('fabd_score_backup_'+currentMatch.id,JSON.stringify(state));}catch(le){}
+      }
+    }
+
+    function showConfirm(winner){
+      const scores=state.setsP1.map((s,i)=>s+'-'+state.setsP2[i]).join(' / ');
+      const wName=winner===1?currentMatch.player1:currentMatch.player2;
+      document.getElementById('confirm-score').textContent=scores;
+      document.getElementById('confirm-winner').textContent='Vencedor: '+wName;
+      const m=document.getElementById('modal-confirm');m.dataset.winner=winner;m.dataset.score=scores;m.classList.add('active');
+    }
+    function closeModal(){document.getElementById('modal-confirm').classList.remove('active');}
+
+    async function confirmResult(){
+      const m=document.getElementById('modal-confirm');
+      const winner=parseInt(m.dataset.winner),finalScore=m.dataset.score;
+      try{
+        // Verificar se o jogo ainda esta Em Quadra antes de finalizar
+        const {data:matchCheck}=await sb.from('live_matches').select('status').eq('id',currentMatch.id).single();
+        if(!matchCheck||matchCheck.status!=='Em Quadra'){alert('Este jogo nao esta mais em quadra. Saindo do placar.');closeModal();doExitScorer();return;}
+        const r1=await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,federation_id:currentMatch.federation_id,current_set:state.set,score_p1:state.p1,score_p2:state.p2,sets_p1:state.setsP1,sets_p2:state.setsP2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,winner,final_score:finalScore,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'});
+        const r2=await sb.from('live_matches').update({status:'Finalizada',umpire:currentUser?.name||''}).eq('id',currentMatch.id);
+        if(r1.error||r2.error){alert('Erro ao finalizar: '+(r1.error?.message||r2.error?.message));return;}
+        closeModal();alert('Placar registrado!');doExitScorer();
+      }catch(e){alert('Erro: '+e.message);}
+    }
+
+    function updateReadOnlyUI(){
+      const umpName=currentUser?.name||'';
+      document.getElementById('scorer-umpire').textContent=umpName?'Árbitro: '+firstTwoNames(umpName):'';
+      if(isReadOnly){
+        document.getElementById('readonly-badge').style.display='inline';
+        document.getElementById('btn-undo').style.display='none';
+        // Desabilitar cliques na quadra
+        document.querySelectorAll('.court-side').forEach(el=>{el.style.pointerEvents='none';el.style.opacity='0.85';});
+        document.querySelectorAll('.swap-btn,.swap-inner').forEach(el=>{el.style.display='none';});
+      }else{
+        document.getElementById('readonly-badge').style.display='none';
+        document.getElementById('btn-undo').style.display='inline-block';
+        document.querySelectorAll('.court-side').forEach(el=>{el.style.pointerEvents='auto';el.style.opacity='1';});
+      }
+    }
+
+    function requestExitScorer(){
+      // Mostrar confirmação antes de sair
+      document.getElementById('modal-exit').classList.add('active');
+    }
+
+    function closeExitModal(){
+      document.getElementById('modal-exit').classList.remove('active');
+    }
+
+    async function confirmExit(){
+      document.getElementById('modal-exit').classList.remove('active');
+      await doExitScorer();
+    }
+
+    async function doExitScorer(){
+      // v4.36: release_match RPC (idempotente — só limpa se for o dono e jogo não finalizado)
+      if(currentMatch&&!isReadOnly&&sb){
+        try{await sb.rpc('release_match',{p_match_id:currentMatch.id});}catch(e){}
+      }
+      // Cancelar heartbeat + score Realtime do jogo que saiu
+      if(pollInterval){clearInterval(pollInterval);pollInterval=null;}
+      if(realtimeScoreChannel){try{sb.removeChannel(realtimeScoreChannel);}catch(e){}realtimeScoreChannel=null;}
+      if(realtimeScoreRetry){clearInterval(realtimeScoreRetry);realtimeScoreRetry=null;}
+      hideAll();currentMatch=null;isReadOnly=false;showMatches();try{screen.orientation?.unlock?.();}catch(e){}
+    }
+    function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
+    // v4.19: popula diagnostico imediatamente (sync) ANTES de checkAuth — assim
+    // user que clicar no <details> ja ve estado mesmo se checkAuth ainda nao rodou
+    _renderDiagInfo();
+    checkAuth();
+  </script>
+</body>
+</html>
+<!-- Sun Mar 29 03:26:45     2026 -->
