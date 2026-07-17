@@ -994,9 +994,26 @@ ipcMain.handle('supabase:registerEmQuadra', async (_, tournamentId, ids) => {
         const wrongStatus = ids.filter(id => found.has(id) && found.get(id) !== 'Em Quadra');
         if (missing.length || wrongStatus.length) {
           log('WARN', 'Reconcile divergencia:', JSON.stringify({ missing, wrongStatus }));
+          // wrongStatus pode ser o REFEREE que finalizou o jogo enquanto o local
+          // ainda esta Em Quadra. Nesse caso ADOTA o resultado (re-envia o score
+          // final pro renderer) em vez de re-upsertar Em Quadra por cima — antes
+          // isso revertia a finalizacao do arbitro no site/referee.
+          let staleWrong = wrongStatus;
+          if (wrongStatus.length) {
+            try {
+              const { data: scores } = await supabase.from('live_scores')
+                .select('*').in('match_id', wrongStatus);
+              const finished = new Map((scores || []).filter(s => s.winner && s.final_score).map(s => [s.match_id, s]));
+              staleWrong = wrongStatus.filter(id => !finished.has(id));
+              finished.forEach(s => {
+                log('INFO', 'Reconcile: adotando resultado do referee p/', s.match_id);
+                if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('supabase:scoreUpdate', s);
+              });
+            } catch (e) { log('WARN', 'Reconcile adote-resultado falhou:', e.message); }
+          }
           // Notificar renderer pra re-sincronizar (re-emite supabaseUpsertMatch)
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('supabase:reconcile-needed', { missing, wrongStatus });
+          if ((missing.length || staleWrong.length) && mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('supabase:reconcile-needed', { missing, wrongStatus: staleWrong });
           }
         }
       } catch (e) { log('WARN', 'Reconcile erro:', e.message); }
