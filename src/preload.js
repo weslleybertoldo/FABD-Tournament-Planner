@@ -48,6 +48,8 @@ contextBridge.exposeInMainWorld('api', {
   supabaseRegisterEmQuadra: (tid, ids) => ipcRenderer.invoke('supabase:registerEmQuadra', tid, ids),
   onReconcileNeeded: (cb) => { ipcRenderer.removeAllListeners('supabase:reconcile-needed'); ipcRenderer.on('supabase:reconcile-needed', (_, data) => cb(data)); },
   supabaseCleanup: (tid) => ipcRenderer.invoke('supabase:cleanup', tid),
+  supabaseListLiveTournaments: () => ipcRenderer.invoke('supabase:listLiveTournaments'),
+  supabaseCloseLiveEvent: (tid) => ipcRenderer.invoke('supabase:closeLiveEvent', tid),
   supabaseIsOrganizer: () => ipcRenderer.invoke('supabase:isOrganizer'),
 
   // Auth (login OTP por email)

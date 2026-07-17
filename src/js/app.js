@@ -2628,6 +2628,10 @@ async function handleRealtimeScoreUpdate(data){
       m.liveScore='';
       try{propagateResultToDraws(m);}catch(e){console.warn('Erro ao propagar resultado:',e);showToast('Aviso: resultado recebido mas propagacao na chave falhou','warning');}
       await window.api.saveTournament(tournament);
+      // Tira o jogo do set de reconciliacao — sem isso o reconcile de 30s
+      // ficava re-adotando o mesmo resultado em loop infinito no log.
+      _registerEmQuadraIds();
+      if(!(tournament.matches||[]).some(x=>x.status==='Em Quadra')){window.api.supabaseUnsubscribe();console.log('Realtime desativado (nenhum jogo em quadra)');}
       // Supabase ja sincronizado acima, apenas log
       showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
     }
@@ -2964,11 +2968,38 @@ async function wizFinish() {
 function setSettingsTab(el, panelId) {
   document.querySelectorAll('#settings-tabs .tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['settings-general','settings-game','settings-umpires','settings-categories','settings-rankings'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=id===panelId?'':'none';});
+  ['settings-general','settings-game','settings-umpires','settings-categories','settings-rankings','settings-events'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=id===panelId?'':'none';});
   if(panelId==='settings-game')renderGameProfiles();
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
   if(panelId==='settings-rankings')renderScoringTables();
+  if(panelId==='settings-events')renderLiveEvents();
+}
+
+// Configuracoes > Eventos: torneios publicados no site ao vivo
+async function renderLiveEvents(){
+  const c=document.getElementById('settings-events-content');
+  if(!c)return;
+  c.innerHTML='<div style="padding:40px;text-align:center;color:var(--fabd-gray-400)">Carregando...</div>';
+  const r=await window.api.supabaseListLiveTournaments();
+  if(!r?.ok){c.innerHTML=`<div style="padding:20px;color:var(--fabd-red)">Erro ao listar: ${esc(r?.error||'desconhecido')}</div>`;return;}
+  if(!r.tournaments.length){c.innerHTML='<div style="padding:30px;text-align:center;color:var(--fabd-gray-400)">Nenhum evento publicado no site ao vivo.</div>';return;}
+  let h='<table class="table"><thead><tr><th>Evento</th><th>Ultima atualizacao</th><th></th></tr></thead><tbody>';
+  r.tournaments.forEach(t=>{
+    const dt=t.updated_at?new Date(t.updated_at).toLocaleString('pt-BR'):'-';
+    const ativo=tournament&&String(tournament.id)===String(t.id);
+    h+=`<tr><td><strong>${esc(t.name||t.id)}</strong>${ativo?' <span class="tag tag-blue">ativo no Planner</span>':''}</td><td style="font-size:12px">${esc(dt)}</td><td style="text-align:right"><button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA" data-action="closeLiveEvent" data-arg-1="${esc(String(t.id))}" data-arg-2="${esc(t.name||'')}">Fechar evento</button></td></tr>`;
+  });
+  h+='</tbody></table>';
+  c.innerHTML=h;
+}
+
+async function closeLiveEvent(tid,name){
+  if(!confirm(`Fechar o evento "${name}" no site ao vivo? Ele some da listagem publica. Se o torneio for aberto novamente no Planner, volta a aparecer.`))return;
+  const r=await window.api.supabaseCloseLiveEvent(tid);
+  if(r?.ok){showToast('Evento fechado no site ao vivo');}
+  else{showToast(`Erro ao fechar: ${r?.error||'desconhecido'}`,'error');}
+  renderLiveEvents();
 }
 const APP_VERSION='4.92';
 

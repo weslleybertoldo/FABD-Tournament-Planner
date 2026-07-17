@@ -73,8 +73,8 @@
         <div class="nav-section-title">Torneio Ativo</div>
         <div class="nav-item" data-page="roster"><span class="icon"><iconify-icon icon="lucide:clipboard-list"></iconify-icon></span><span>Inscritos</span></div>
         <div class="nav-item" data-page="draws"><span class="icon"><iconify-icon icon="lucide:list-tree"></iconify-icon></span><span>Chaves</span></div>
-        <div class="nav-item" data-page="matches"><span class="icon"><iconify-icon icon="mdi:badminton"></iconify-icon></span><span>Partidas</span></div>
         <div class="nav-item" data-page="schedule"><span class="icon"><iconify-icon icon="lucide:calendar"></iconify-icon></span><span>Agenda</span></div>
+        <div class="nav-item" data-page="matches"><span class="icon"><iconify-icon icon="mdi:badminton"></iconify-icon></span><span>Partidas</span></div>
         <div class="nav-section-title">Outros</div>
         <div class="nav-item" data-page="reports"><span class="icon"><iconify-icon icon="lucide:bar-chart-3"></iconify-icon></span><span>Relatorios</span></div>
         <div class="nav-item" id="nav-access" data-page="access" style="display:none"><span class="icon"><iconify-icon icon="lucide:lock-keyhole"></iconify-icon></span><span>Gerenciar Acessos</span></div>
@@ -366,6 +366,7 @@
             <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-umpires">Arbitros</div>
             <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-categories">Categorias</div>
             <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-rankings">Ranking</div>
+            <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-events">Eventos</div>
           </div>
           <div class="card" id="settings-general">
             <div class="card-header"><h3>Configuracoes Gerais</h3></div>
@@ -517,6 +518,13 @@
           <div class="card" id="settings-rankings" style="display:none">
             <div class="card-header"><h3>Rankings de Pontuação</h3></div>
             <div id="settings-rankings-content" style="min-height:200px">
+              <div style="padding:40px;text-align:center;color:var(--fabd-gray-400)">Carregando...</div>
+            </div>
+          </div>
+          <div class="card" id="settings-events" style="display:none">
+            <div class="card-header"><h3>Eventos no Site Ao Vivo</h3></div>
+            <p style="font-size:13px;color:var(--fabd-gray-500);margin:0 0 12px">Torneios publicados no site ao vivo. <strong>Fechar</strong> remove o evento da listagem pública — se o torneio for aberto novamente no Planner, ele volta a aparecer.</p>
+            <div id="settings-events-content" style="min-height:120px">
               <div style="padding:40px;text-align:center;color:var(--fabd-gray-400)">Carregando...</div>
             </div>
           </div>
