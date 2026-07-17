@@ -368,12 +368,13 @@
     async function getTournament(includeData){
       if (!tournamentId) return null;
       try{
-        const cols = includeData ? 'id,name,data' : 'id,name';
+        const cols = includeData ? 'id,name,data,updated_at' : 'id,name,updated_at';
         const { data, error } = await sb.from('tournaments').select(cols).eq('id', tournamentId).maybeSingle();
         if(error)throw error;
         if(data){
           if(includeData) tournamentData = data.data || null;
           document.getElementById('tournament-name').textContent = data.name;
+          _checkDataConvergence(data.updated_at);
           return data;
         }
         return null;
@@ -382,6 +383,26 @@
         document.getElementById('tournament-name').textContent='Erro ao carregar';
         return null;
       }
+    }
+
+    // ═══ Deteccao de pagina desatualizada (convergencia) ═══
+    // Finalizacao no realtime implica que o Planner re-publica tournaments.data
+    // instantes DEPOIS do evento (debounce ~500ms) — o fetch disparado pelo
+    // proprio evento pega dado velho e nao ha evento novo depois (a Tabela de
+    // Jogos ficava presa ate o F5). Guarda o timestamp do evento; enquanto o
+    // tournaments.updated_at buscado for ANTERIOR a ele, re-tenta em 3s (max 8x).
+    let _pendingDataSince=null,_pendingRetries=0,_pendingTimer=null;
+    function expectFreshData(ts){
+      const t=ts?new Date(ts).getTime():Date.now();
+      if(!_pendingDataSince||t>_pendingDataSince){_pendingDataSince=t;_pendingRetries=0;}
+    }
+    function _checkDataConvergence(updatedAt){
+      if(!_pendingDataSince)return;
+      const got=updatedAt?new Date(updatedAt).getTime():0;
+      if(got>=_pendingDataSince){_pendingDataSince=null;_pendingRetries=0;return;}
+      if(_pendingRetries>=8){console.warn('[Live] dado nao convergiu apos retries');_pendingDataSince=null;_pendingRetries=0;return;}
+      _pendingRetries++;
+      if(!_pendingTimer){_pendingTimer=setTimeout(()=>{_pendingTimer=null;refreshCurrent();},3000);}
     }
 
     // === HUB de torneios (listing) ===
@@ -982,7 +1003,14 @@
       if(realtimeChannelMatches){sb.removeChannel(realtimeChannelMatches);realtimeChannelMatches=null;}
       if(realtimeChannelScores){sb.removeChannel(realtimeChannelScores);realtimeChannelScores=null;}
 
-      const onChange=()=>{refreshCurrent();};
+      const onChange=(payload)=>{
+        // Finalizacao (winner+final_score no live_scores ou status Finalizada no
+        // live_matches) = Planner vai re-publicar tournaments.data em seguida —
+        // arma a checagem de convergencia pra nao ficar com a tabela velha.
+        const n=payload&&payload.new;
+        if(n&&((n.winner&&n.final_score)||n.status==='Finalizada'))expectFreshData(n.updated_at);
+        refreshCurrent();
+      };
 
       // Channel para live_scores (placares em tempo real)
       realtimeChannelScores=sb.channel('live_scores_'+Date.now())
