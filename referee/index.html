@@ -1000,10 +1000,15 @@
             h+=`<details class="court-folder" data-court="${esc(c)}"${openSet.has(c)?' open':''}><summary><span class="fname">&#128193; ${esc(c)}</span><span class="count">${list.length} ${list.length===1?'jogo':'jogos'}</span></summary><div class="folder-body">${cards}</div></details>`;
           });
           content.innerHTML=h;
-          // Acordeão: abrir uma pasta fecha as outras (só a quadra clicada fica visível)
-          content.querySelectorAll('details.court-folder').forEach(d=>{
-            d.addEventListener('toggle',()=>{
-              if(d.open)content.querySelectorAll('details.court-folder[open]').forEach(o=>{if(o!==d)o.open=false;});
+          // Acordeão: abrir uma pasta fecha as outras (só a quadra clicada fica visível).
+          // Via click+preventDefault (não 'toggle', que dispara assíncrono e pintava
+          // 1 frame com as duas pastas abertas — flicker na troca)
+          content.querySelectorAll('details.court-folder>summary').forEach(s=>{
+            s.addEventListener('click',ev=>{
+              ev.preventDefault();
+              const d=s.parentElement,willOpen=!d.open;
+              content.querySelectorAll('details.court-folder[open]').forEach(o=>{o.open=false;});
+              d.open=willOpen;
             });
           });
         }
