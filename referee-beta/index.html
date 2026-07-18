@@ -1000,6 +1000,12 @@
             h+=`<details class="court-folder" data-court="${esc(c)}"${openSet.has(c)?' open':''}><summary><span class="fname">&#128193; ${esc(c)}</span><span class="count">${list.length} ${list.length===1?'jogo':'jogos'}</span></summary><div class="folder-body">${cards}</div></details>`;
           });
           content.innerHTML=h;
+          // Acordeão: abrir uma pasta fecha as outras (só a quadra clicada fica visível)
+          content.querySelectorAll('details.court-folder').forEach(d=>{
+            d.addEventListener('toggle',()=>{
+              if(d.open)content.querySelectorAll('details.court-folder[open]').forEach(o=>{if(o!==d)o.open=false;});
+            });
+          });
         }
         // v4.1: indicador de "atualizado há Xs" + auto-tick
         _lastMatchesUpdate = Date.now();
