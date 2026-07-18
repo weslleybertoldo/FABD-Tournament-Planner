@@ -1,4 +1,4 @@
-const CACHE='fabd-referee-3feb850';
+const CACHE='fabd-referee-pastasq1';
 
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll([
