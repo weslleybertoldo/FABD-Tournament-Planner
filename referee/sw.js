@@ -1,4 +1,8 @@
+const CACHE='fabd-referee-pastasq4';
 const CACHE='fabd-referee-8ec327b';
+=======
+const CACHE='fabd-referee-pastasq4';
+>>>>>>> 0a39e87 (fix(referee): acordeao sem flicker na troca de quadra)
 
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll([
