@@ -968,11 +968,14 @@
       try{
         if(!currentUser?.federation_id){return;}
         // Pega o torneio mais recente DA FEDERACAO do arbitro (inclui scoring)
-        const{data:ts}=await sb.from('tournaments').select('id,name,data,federations(short_name,primary_color)').eq('federation_id',currentUser.federation_id).order('updated_at',{ascending:false}).limit(1);
+        // Sem embed federations(...): o schema staging nao tem FKs (LIKE INCLUDING ALL
+        // nao copia), e o embed derrubava a query inteira no beta (PGRST200)
+        const{data:ts}=await sb.from('tournaments').select('id,name,data,federation_id').eq('federation_id',currentUser.federation_id).order('updated_at',{ascending:false}).limit(1);
         const content = document.getElementById('ref-jogos-content') || document.getElementById('ref-tab-jogos');
         if(!ts?.length){content.innerHTML='<div class="empty"><div style="font-size:48px">&#128580;</div><p>Nenhum torneio ativo na sua federacao</p></div>';return;}
         currentTournamentId=ts[0].id;
-        const fed=ts[0].federations;
+        let fed=null;
+        try{const{data:fd}=await sb.from('federations').select('short_name,primary_color').eq('id',ts[0].federation_id).single();fed=fd;}catch(e){}
         document.getElementById('tournament-name').textContent=ts[0].name;
         // Carrega scoring do tournament (default 21/30/3 se nao definido)
         const tData=ts[0].data||{};
