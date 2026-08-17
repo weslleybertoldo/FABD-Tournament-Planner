@@ -532,6 +532,35 @@ ipcMain.handle('xlsx:export', async (_, playersData) => {
   } catch(e) { log('ERROR', 'xlsx:export:', e.message); return false; }
 });
 
+// Exporta relatorio generico do popup de relatorios: sheets = [{name, rows(AOA)}].
+// XLSX so existe no main process — renderer manda os dados prontos via IPC.
+ipcMain.handle('xlsx:exportReport', async (_, payload) => {
+  try {
+    const { fileName, sheets } = payload || {};
+    if (!Array.isArray(sheets) || !sheets.length || sheets.length > 60) return false;
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Exportar Relatorio (XLSX)',
+      defaultPath: String(fileName || 'relatorio-fabd.xlsx').replace(/[^\w.\- ]+/g, '_'),
+      filters: [{ name: 'Excel', extensions: ['xlsx'] }]
+    });
+    if (result.canceled || !result.filePath) return false;
+    const wb = XLSX.utils.book_new();
+    const used = new Set();
+    sheets.forEach((s, i) => {
+      if (!Array.isArray(s.rows) || !s.rows.length) return;
+      // Nome de sheet: max 31 chars no formato, sem \ / ? * [ ] : e sem duplicata
+      let nm = String(s.name || `Tabela ${i + 1}`).replace(/[\\/?*\[\]:]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 28) || `Tabela ${i + 1}`;
+      const base = nm; let n = 2;
+      while (used.has(nm.toLowerCase())) nm = `${base.slice(0, 25)} ${n++}`;
+      used.add(nm.toLowerCase());
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.rows), nm);
+    });
+    if (!wb.SheetNames.length) return false;
+    XLSX.writeFile(wb, result.filePath);
+    return true;
+  } catch(e) { log('ERROR', 'xlsx:exportReport:', e.message); return false; }
+});
+
 ipcMain.handle('xlsx:import', async () => {
   try {
     const result = await dialog.showOpenDialog(mainWindow, {
