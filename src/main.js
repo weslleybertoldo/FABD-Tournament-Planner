@@ -270,7 +270,17 @@ app.on('window-all-closed', () => {
   if(pollingInterval){clearInterval(pollingInterval);pollingInterval=null;}
   if(realtimeRetryInterval){clearInterval(realtimeRetryInterval);realtimeRetryInterval=null;}
   saveDatabaseSync(db);
-  if(process.platform!=='darwin')app.quit();
+  if(process.platform!=='darwin'){
+    // Com debounce de 15s pode haver upsert pendente ao fechar — flush antes de
+    // sair, senão a nuvem (Referee/Live) fica com o torneio desatualizado.
+    if(pendingUpsert){
+      if(upsertTimer){clearTimeout(upsertTimer);upsertTimer=null;}
+      flushUpsert().finally(()=>app.quit());
+      setTimeout(()=>app.quit(),5000); // failsafe: rede pendurada não segura o fechamento
+    } else {
+      app.quit();
+    }
+  }
 });
 app.on('activate', () => { if(!BrowserWindow.getAllWindows().length) createWindow(); });
 process.on('uncaughtException', (e) => { log('ERROR', 'Uncaught:', e.message); });
@@ -794,7 +804,7 @@ ipcMain.on('log', (_, level, msg) => { log(level, '[renderer]', msg); });
 let pendingUpsert = null;
 let upsertTimer = null;
 let pendingResolvers = []; // promessas aguardando o proximo flush
-const UPSERT_DEBOUNCE_MS = 500; // espera 500ms antes de enviar
+const UPSERT_DEBOUNCE_MS = 15000; // 15s: agrupa saves do JSON inteiro p/ poupar Disk IO do Supabase (Nano); ponto-a-ponto vai por live_scores e não passa aqui. Manter < retry de 24s do live/index.html
 // C4: telemetria real de sync. Antes o IPC retornava true imediatamente
 // sem saber se a escrita ocorreu. Agora renderer pode obter status real.
 let lastSyncStatus = { state: 'idle', at: 0, error: null };
