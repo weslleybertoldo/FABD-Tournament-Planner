@@ -247,6 +247,9 @@
               </select>
             </div>
 
+            <!-- PROGRESSO DO DIA (acompanha o filtro de dia) -->
+            <div id="matches-progress" class="matches-progress"></div>
+
             <!-- PAINEIS DE QUADRAS -->
             <div id="courts-panel" class="courts-panel"></div>
 
@@ -259,7 +262,6 @@
                     <div class="tab" data-action="setMatchesTab" data-arg-1="finished">Finalizadas</div>
                     <div class="tab" data-action="setMatchesTab" data-arg-1="umpires">Arbitros</div>
                   </div>
-                  <span id="matches-count" style="font-size:13px;color:var(--fabd-gray-500)"></span>
                 </div>
               </div>
               <div id="matches-tab-all">
@@ -779,9 +781,30 @@
     </div>
   </div>
 
+  <!-- MODAL: EDITAR JOGO FINALIZADO (lapis da aba Finalizadas) -->
+  <div class="modal-overlay" id="modal-edit-finished">
+    <div class="modal" style="width:520px">
+      <div class="modal-header"><h3>&#9998; Editar jogo finalizado</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-edit-finished">&times;</button></div>
+      <div class="modal-body">
+        <div style="text-align:center;margin-bottom:12px">
+          <strong id="edit-p1" style="color:var(--fabd-blue);font-size:15px"></strong>
+          <span style="color:var(--fabd-gray-500);margin:0 12px">vs</span>
+          <strong id="edit-p2" style="color:var(--fabd-red);font-size:15px"></strong>
+        </div>
+        <div class="score-sets" id="edit-sets-container"></div>
+        <p id="edit-sets-note" style="font-size:12px;color:var(--fabd-gray-600);margin-top:8px"></p>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group"><label>Quadra</label><select class="form-control" id="edit-court"></select></div>
+          <div class="form-group"><label>Arbitro</label><select class="form-control" id="edit-umpire"></select></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-edit-finished">Cancelar</button><button class="btn btn-primary" data-action="saveEditFinished">&#128190; Salvar</button></div>
+    </div>
+  </div>
+
   <!-- MODAL: CONFIGURACAO DO TORNEIO -->
   <div class="modal-overlay" id="modal-tournament-config">
-    <div class="modal" style="width:620px">
+    <div class="modal" style="width:960px">
       <div class="modal-header">
         <h3>&#9881; Configuracao do Torneio</h3>
         <button class="modal-close" data-action="closeModal" data-arg-1="modal-tournament-config">&times;</button>
@@ -1080,6 +1103,7 @@
   <script src="js/modules/umpires.js"></script>
   <script src="js/modules/players.js"></script>
   <script src="js/modules/draws-ui.js"></script>
+  <script src="js/modules/matches-forecast.js"></script>
   <script src="js/modules/matches-ui.js"></script>
   <script src="js/modules/schedule.js"></script>
   <script src="js/modules/reports.js"></script>

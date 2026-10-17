@@ -196,6 +196,22 @@ function computeGroupStandings(groupPlayers, matches) {
   return arr;
 }
 
+// Nome do classificado quando o grupo dele ja acabou, a partir do rotulo da
+// previa ("1o do Grupo A" -> quem ficou em 1o no Grupo A). Grupo em andamento
+// e os rotulos de melhor 3o ou de vencedor ("Venc. ...") voltam como estao: o
+// melhor 3o depende de todos os grupos e o vencedor vem do jogo. Usa os mesmos
+// jogos do grupo que o propagateGroupsToElimination, pra bater com a chave real.
+function resolveGroupQualifierLabel(d, label) {
+  const m = /^(\d+)o do (.+)$/.exec(String(label || ''));
+  if (!m || !d?.groupsData?.groups) return label;
+  const g = d.groupsData.groups.find(x => x.name === m[2]);
+  if (!g) return label;
+  const real = (g.matches || []).filter(x => x.player1 && x.player2 && x.player1 !== 'BYE' && x.player2 !== 'BYE');
+  if (!real.length || !real.every(x => x.winner !== undefined && x.winner !== null)) return label;
+  const s = computeGroupStandings(g.players || [], g.matches || [])[Number(m[1]) - 1];
+  return s ? s.name : label;
+}
+
 function areGroupsFinished(d) {
   if (!d.groupsData || !d.groupsData.groups) return false;
   return d.groupsData.groups.every(g => {

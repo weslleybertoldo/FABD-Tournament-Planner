@@ -27,32 +27,10 @@ function renderMatches() {
     }
     dayFilter.value=prevVal||'';
   }
-  const tb=document.getElementById('matches-table-body'),countEl=document.getElementById('matches-count');
+  const tb=document.getElementById('matches-table-body');
   const matches=tournament.matches||[];
-  const doneMatches=matches.filter(m=>m.status==='Finalizada'||m.status==='WO'||m.status==='Desistencia'||m.status==='Desqualificacao');
   const pendingMatches=matches.filter(m=>m.status!=='Finalizada'&&m.status!=='WO'&&m.status!=='Desistencia'&&m.status!=='Desqualificacao');
-  if(countEl){
-    let info=`${doneMatches.length}/${matches.length} finalizadas`;
-    // Tempo medio de jogo
-    const withDuration=doneMatches.filter(m=>m.startedAt&&m.finishedAt);
-    if(withDuration.length){
-      const totalSec=withDuration.reduce((s,m)=>s+Math.floor((new Date(m.finishedAt)-new Date(m.startedAt))/1000),0);
-      const avgSec=Math.floor(totalSec/withDuration.length);
-      const avgMin=Math.floor(avgSec/60),avgS=avgSec%60;
-      info+=` | Tempo medio: ${avgMin}min${avgS?` ${String(avgS).padStart(2,'0')}s`:''}`;
-      // Previsao de finalizacao
-      const remaining=pendingMatches.filter(m=>m.status!=='A definir').length;
-      const courts=tournament.courts||4;
-      const slotsNeeded=Math.ceil(remaining/courts);
-      const totalRemainingSec=slotsNeeded*avgSec;
-      const now=new Date();
-      const endEstimate=new Date(now.getTime()+totalRemainingSec*1000);
-      const endH=String(endEstimate.getHours()).padStart(2,'0'),endM=String(endEstimate.getMinutes()).padStart(2,'0');
-      const remMin=Math.floor(totalRemainingSec/60);
-      info+=` | Restante: ~${remMin}min | Previsao: ${endH}:${endM}`;
-    }
-    countEl.textContent=info;
-  }
+  renderMatchesProgress();
   if(!pendingMatches.length){tb.innerHTML=`<tr><td colspan="11" style="text-align:center;color:var(--fabd-gray-500);padding:40px">Todas as partidas foram finalizadas.</td></tr>`;return;}
   if(!matches.length){tb.innerHTML=`<tr><td colspan="11" style="text-align:center;color:var(--fabd-gray-500);padding:40px">Sem partidas.</td></tr>`;return;}
 
@@ -163,7 +141,11 @@ function renderMatches() {
       if(!name)return false;
       return name.split('/').some(n=>inCourt.has(n.trim()));
     };
-    const p1=esc(m.player1Display||m.player1||'A definir'),p2=esc(m.player2Display||m.player2||'A definir');
+    // Provisorio da eliminatoria: grupo que ja acabou mostra o nome do classificado
+    const _d=!m.player1||!m.player2?(tournament.draws||[]).find(x=>x.name===m.drawName):null;
+    const _disp=(raw,disp)=>raw?(disp||raw):resolveGroupQualifierLabel(_d,disp||'A definir');
+    const d1=_disp(m.player1,m.player1Display),d2=_disp(m.player2,m.player2Display);
+    const p1=esc(d1),p2=esc(d2);
     const alertIcon='<span title="Atleta em quadra" style="color:#F59E0B;font-weight:700;cursor:help;margin-left:4px">&#9888;</span>';
     const absentIcon='<span title="Ausente" style="color:#DC2626;font-weight:700;cursor:help;margin-left:4px">&#10071;</span>';
     const restBadge=(endsAt)=>{
@@ -216,7 +198,9 @@ function renderMatches() {
     const matchDay=getMatchDay(m);
     const dayLabel=matchDay?((d)=>{const o=new Date(d+'T00:00:00');return`${String(o.getDate()).padStart(2,'0')}/${String(o.getMonth()+1).padStart(2,'0')}`;})(matchDay.date):'-';
     const _hideRow=_dayDraws&&!_dayDraws.has(m.drawName||'')?'display:none;':'';
-    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${esc(m.time)||'-'}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" data-action="assignCourt" data-event="change" data-arg-1="${i}" data-arg-2="$value"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" data-action="updateMatchField" data-event="change" data-arg-1="${i}" data-arg-2="umpire" data-arg-3="$value"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" data-action="showScoreModal" data-arg-1="${i}">Placar</button>${resetBtn}`}</td></tr>`;
+    // Texto da busca: so o conteudo da linha (sem as opcoes das listas de quadra/arbitro)
+    const _search=normSearch([dayLabel,m.time,m.drawName,m.roundName||'R'+m.round,m.num,m.player1,m.player2,d1,d2,m.court,m.umpire,m.status].join(' '));
+    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" data-search="${esc(_search)}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${esc(m.time)||'-'}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" data-action="assignCourt" data-event="change" data-arg-1="${i}" data-arg-2="$value"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" data-action="updateMatchField" data-event="change" data-arg-1="${i}" data-arg-2="umpire" data-arg-3="$value"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" data-action="showScoreModal" data-arg-1="${i}">Placar</button>${resetBtn}`}</td></tr>`;
   });
   // Quadras livres do ultimo horario
   if (_lastMatchTime && _matchesAtTime < _nc) {
@@ -231,11 +215,74 @@ function renderMatches() {
   setTimeout(()=>filterMatches(),0);
 }
 
+// Painel de progresso do topo da aba: finalizadas, tempo medio, restante e
+// previsao de termino do dia escolhido no filtro (todos os dias = total +
+// previsao de cada dia). Numeros em matches-forecast.js.
+function renderMatchesProgress() {
+  const el=document.getElementById('matches-progress');
+  if(!el||!tournament)return;
+  const matches=tournament.matches||[];
+  const days=tournament.daySchedule||[];
+  const dayVal=document.getElementById('match-day-filter')?.value||'';
+  const nowMs=Date.now();
+  const allAvg=forecastAvgSec(matches);
+  const dayMs=(day,hhmm)=>new Date(`${day.date}T${hhmm}:00`).getTime();
+  const dayLabel=day=>{const i=days.indexOf(day);const d=new Date(day.date+'T00:00:00');return`Dia ${i+1} - ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;};
+  const summarize=(list,day)=>forecastSummary(list,{
+    nowMs,dayStartMs:day?dayMs(day,day.startTime||tournament.startTime||'08:00'):0,
+    courts:tournament.courts||4,restMin:tournament.restMinBetweenGames||0,
+    defaultMin:tournament.matchDuration||30,fallbackAvg:allAvg
+  });
+  const hm=ms=>{const d=new Date(ms);return`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
+  const dur=min=>min>=60?`${Math.floor(min/60)}h${String(min%60).padStart(2,'0')}`:`${min} min`;
+  const avgTxt=sec=>`${Math.floor(sec/60)}min${sec%60?` ${String(sec%60).padStart(2,'0')}s`:''}`;
+  const tile=(cls,icon,label,value,sub,extra='')=>`<div class="mp-tile ${cls}"><div class="mp-label"><span>${icon}</span>${label}</div><div class="mp-value">${value}</div>${extra}<div class="mp-sub">${sub}</div></div>`;
+  const statusSub=s=>[s.inCourt?`${s.inCourt} em quadra`:'',s.pending?`${s.pending} pendente${s.pending>1?'s':''}`:'',s.toDefine?`${s.toDefine} a definir`:''].filter(Boolean).join(' · ')||'nenhum jogo faltando';
+  const avgSub=a=>a.source==='dia'?`media de ${a.count} jogo${a.count>1?'s':''} do dia`:a.source==='torneio'?`media do torneio (${a.count} jogo${a.count>1?'s':''})`:'duracao configurada (sem jogo medido)';
+  const selDay=dayVal?days.find(d=>d.date===dayVal):null;
+  const list=selDay?matches.filter(m=>(selDay.draws||[]).includes(m.drawName)):matches;
+  const s=summarize(list,selDay);
+  const pct=s.total?Math.round(s.done/s.total*100):0;
+  let h=tile('green','&#9989;','Finalizadas',`${s.done}<small>/${s.total}</small>`,statusSub(s),`<div class="mp-bar"><span style="width:${pct}%"></span></div>`);
+  const avg=selDay?s.avg:(allAvg?{...allAvg,source:'torneio'}:s.avg);
+  h+=tile('','&#9201;','Tempo medio por jogo',avgTxt(avg.sec),avgSub(avg));
+  if(selDay||!days.length){
+    // Um dia (ou torneio sem agenda por dia)
+    const future=selDay&&s.startMs>nowMs;
+    h+=tile('yellow','&#9203;','Restante',s.remaining?`~${dur(s.remainingMin)}`:'0 min',s.remaining?`${s.remaining} jogo${s.remaining>1?'s':''}${future?` · a partir das ${hm(s.startMs)}`:''}`:'tudo finalizado');
+    if(s.remaining&&s.endMs){
+      const late=selDay&&selDay.endTime&&s.endMs>dayMs(selDay,selDay.endTime);
+      h+=tile(late?'red':'blue','&#127937;','Previsao de termino',hm(s.endMs),late?`&#9888; passa das ${esc(selDay.endTime)}`:(selDay?esc(dayLabel(selDay)):'quadras ocupadas ate esse horario'));
+    } else {
+      h+=tile('blue','&#127937;','Encerrado',s.lastFinishedMs?hm(s.lastFinishedMs):'-',selDay?esc(dayLabel(selDay)):'ultimo jogo finalizado');
+    }
+  } else {
+    // Todos os dias: o que falta no total + previsao de cada dia
+    const perDay=days.map(day=>({day,s:summarize(matches.filter(m=>(day.draws||[]).includes(m.drawName)),day)}));
+    // Uma linha por dia (o total sozinho confundia: somava os 2 dias)
+    const leftRows=perDay.map(({day,s:ds})=>`<div><span>${esc(dayLabel(day))}</span><strong>${ds.remaining?`${ds.remaining} jogo${ds.remaining>1?'s':''} · ~${dur(ds.remainingMin)}`:ds.total?'encerrado':'-'}</strong></div>`).join('');
+    h+=tile('yellow','&#9203;','Restante',`<div class="mp-days">${leftRows}</div>`,s.remaining?`${s.remaining} jogo${s.remaining>1?'s':''} no total`:'tudo finalizado');
+    const rows=perDay.map(({day,s:ds})=>`<div><span>${esc(dayLabel(day))}</span><strong>${ds.remaining&&ds.endMs?hm(ds.endMs):ds.total?'encerrado':'-'}</strong></div>`).join('');
+    h+=tile('blue','&#127937;','Previsao de termino',`<div class="mp-days">${rows}</div>`,'filtre o dia pra ver o detalhe');
+  }
+  el.innerHTML=h;
+}
+
+// Relogio do painel: a previsao anda com o tempo mesmo sem jogo novo
+if(typeof window!=='undefined'&&!window.__fabdProgressTicker){
+  window.__fabdProgressTicker=setInterval(()=>{try{renderMatchesProgress();}catch(e){console.warn('[progressTicker]',e);}},60000);
+}
+
+// Busca sem diferenciar maiusculas nem acento ("jose" acha "José")
+function normSearch(s){
+  return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+}
+
 let _filterMatchesTimer = null;
 function filterMatches() {
   if (_filterMatchesTimer) clearTimeout(_filterMatchesTimer);
   _filterMatchesTimer = setTimeout(() => {
-    const q=(document.getElementById('search-matches')?.value||'').toLowerCase();
+    const q=normSearch(document.getElementById('search-matches')?.value||'');
     const st=document.getElementById('match-status-filter')?.value||'';
     const dayVal=document.getElementById('match-day-filter')?.value||'';
     // Build set of draw names for selected day
@@ -247,7 +294,7 @@ function filterMatches() {
     // Primeiro: filtrar jogos normais
     const visibleTimes = new Set();
     document.querySelectorAll('#matches-table-body tr:not(.court-free-row)').forEach(r=>{
-      const matchQ=r.textContent.toLowerCase().includes(q);
+      const matchQ=!q||(r.dataset.search??normSearch(r.textContent)).includes(q);
       const matchSt=!st||(r.dataset.status||'')===st;
       const matchDay=!dayDraws||(dayDraws.has(r.dataset.draw||''));
       const visible = matchQ&&matchSt&&matchDay;
@@ -263,6 +310,8 @@ function filterMatches() {
       const matchDay = !dayDraws || (dayDraws.has(r.dataset.draw||''));
       r.style.display = matchDay ? '' : 'none';
     });
+    // Painel de progresso acompanha o dia escolhido
+    renderMatchesProgress();
   }, 150);
 }
 
@@ -270,9 +319,9 @@ let _filterFinishedTimer=null;
 function filterFinished(){
   if(_filterFinishedTimer)clearTimeout(_filterFinishedTimer);
   _filterFinishedTimer=setTimeout(()=>{
-    const q=(document.getElementById('search-finished')?.value||'').toLowerCase();
+    const q=normSearch(document.getElementById('search-finished')?.value||'');
     document.querySelectorAll('#finished-table-body tr').forEach(r=>{
-      r.style.display=r.textContent.toLowerCase().includes(q)?'':'none';
+      r.style.display=normSearch(r.textContent).includes(q)?'':'none';
     });
   },150);
 }
@@ -321,8 +370,9 @@ function renderFinishedMatches(){
     } else {
       scoreHtml=`<span style="color:var(--fabd-red);font-weight:700">${esc(m.score||'-')}</span>`;
     }
+    const editBtn=`<button class="btn btn-sm" style="background:#DBEAFE;color:#1E3A8A;border:1px solid #BFDBFE;padding:2px 6px;font-size:11px;margin-right:4px" data-action="showEditFinishedModal" data-arg-1="${i}" title="Editar placar, arbitro e quadra">&#9998;</button>`;
     const resetBtn=`<button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA;padding:2px 6px;font-size:11px" data-action="resetMatch" data-arg-1="${i}" title="Desfazer resultado">&#8635;</button>`;
-    h+=`<tr><td>${m.num}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td style="${p1Style}">${esc(m.player1||'')}</td><td style="text-align:center;font-weight:700;font-size:13px;white-space:nowrap">${scoreHtml}</td><td style="${p2Style}">${esc(m.player2||'')}</td><td>${esc(m.court||'-')}</td><td>${esc(m.umpire||'-')}</td><td>${startTime}</td><td>${endTime}</td><td>${duration}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${resetBtn}</td></tr>`;
+    h+=`<tr><td>${m.num}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td style="${p1Style}">${esc(m.player1||'')}</td><td style="text-align:center;font-weight:700;font-size:13px;white-space:nowrap">${scoreHtml}</td><td style="${p2Style}">${esc(m.player2||'')}</td><td>${esc(m.court||'-')}</td><td>${esc(m.umpire||'-')}</td><td>${startTime}</td><td>${endTime}</td><td>${duration}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td style="white-space:nowrap">${editBtn}${resetBtn}</td></tr>`;
   });
   tb.innerHTML=h;
 }

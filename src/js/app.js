@@ -1632,6 +1632,23 @@ async function generateSingleDraw(idx) {
 // bwfDistribuirNonSeedsComProtecaoClube + generateEliminationBracket
 // extraidos pra src/js/modules/bracket-elim.js (issue #14.J).
 
+// Caixa do CAMPEAO: dupla "A / B" vira um nome por linha. Linha que nao cabe
+// em maxWidth diminui a fonte (13 → 11) e, se ainda passar, e cortada com
+// reticencias. Mede no canvas com a mesma fonte do SVG da chave.
+let _champMeasureCtx = null;
+function fitChampionLines(name, maxWidth) {
+  if (!_champMeasureCtx) _champMeasureCtx = document.createElement('canvas').getContext('2d');
+  const width = (text, size) => { _champMeasureCtx.font = '800 ' + size + 'px "Segoe UI", sans-serif'; return _champMeasureCtx.measureText(text).width; };
+  const parts = String(name || '').split(' / ').map(s => s.trim()).filter(Boolean);
+  if (!parts.length) parts.push('A definir');
+  return parts.map(text => {
+    for (const size of [13, 12, 11]) if (width(text, size) <= maxWidth) return { text, size };
+    let cut = text;
+    while (cut.length > 1 && width(cut + '...', 11) > maxWidth) cut = cut.slice(0, -1);
+    return { text: cut.trimEnd() + '...', size: 11 };
+  });
+}
+
 function renderBracket(d) {
   const rounds = {};
   d.matches.forEach(m => { if (!rounds[m.round]) rounds[m.round] = []; rounds[m.round].push(m); });
@@ -1715,7 +1732,7 @@ function renderBracket(d) {
       const isBye = m.isBye;
       const p1 = getDisp(r, i, 1);
       const p2 = getDisp(r, i, 2);
-      const future = !m.player1 && !m.player2 && r > 1;
+      const future = (!m.player1 && !m.player2 && r > 1) || m.isPreview;
       const dash = (future || isBye) ? ' stroke-dasharray="5,3"' : '';
       const sc = isBye ? '#CED4DA' : '#343A40';
       const f1 = m.winner === 1 ? '#D1FAE5' : '#fff';
@@ -1775,10 +1792,16 @@ function renderBracket(d) {
     const cy = cp.cy + oY;
     h += '<line x1="'+((totalRounds-1)*(matchW+connW)+matchW)+'" y1="'+cy+'" x2="'+cx+'" y2="'+cy+'" stroke="#343A40" stroke-width="2"/>';
     const champW=250;
-    h += '<rect x="'+cx+'" y="'+(cy-28)+'" width="'+champW+'" height="56" rx="8" fill="#FEF3C7" stroke="#F59E0B" stroke-width="3"/>';
-    h += '<text x="'+(cx+champW/2)+'" y="'+(cy-8)+'" text-anchor="middle" fill="#92400E" font-size="10" font-weight="700">CAMPEAO</text>';
     const champ = finalM && finalM.winner === 1 ? finalM.player1 : finalM && finalM.winner === 2 ? finalM.player2 : 'A definir';
-    h += '<text x="'+(cx+champW/2)+'" y="'+(cy+14)+'" text-anchor="middle" fill="#92400E" font-size="13" font-weight="800">'+esc(champ)+'</text>';
+    // Dupla: um nome abaixo do outro, e a caixa cresce 17px por linha extra
+    const champLines = fitChampionLines(champ, champW - 20);
+    const champH = 56 + (champLines.length - 1) * 17;
+    const champTop = cy - champH / 2;
+    h += '<rect x="'+cx+'" y="'+champTop+'" width="'+champW+'" height="'+champH+'" rx="8" fill="#FEF3C7" stroke="#F59E0B" stroke-width="3"/>';
+    h += '<text x="'+(cx+champW/2)+'" y="'+(champTop+20)+'" text-anchor="middle" fill="#92400E" font-size="10" font-weight="700">CAMPEAO</text>';
+    champLines.forEach((ln, k) => {
+      h += '<text x="'+(cx+champW/2)+'" y="'+(champTop+42+k*17)+'" text-anchor="middle" fill="#92400E" font-size="'+ln.size+'" font-weight="800">'+esc(ln.text)+'</text>';
+    });
   }
 
   h += '</svg></div>';
@@ -1897,46 +1920,15 @@ function renderGroupsElimination(d) {
     const doneGM = groups.reduce((s, g) => s + g.matches.filter(m => m.winner !== undefined && m.winner !== null).length, 0);
     h += `<div style="padding:16px;background:var(--fabd-gray-100);border-radius:8px;margin-bottom:16px;text-align:center">
       <p style="color:var(--fabd-gray-600);font-weight:600">Fase de grupos: ${doneGM}/${totalGM} partidas concluidas</p>
-      <p style="color:var(--fabd-gray-500);font-size:12px;margin-top:4px">Os jogos abaixo serao preenchidos ao concluir os grupos.</p></div>`;
-    // Gerar preview dos confrontos da eliminatoria
-    const totalQualified = groups.length * qualifiers;
-    const elimSlots = Math.pow(2, Math.ceil(Math.log2(totalQualified)));
-    const semis = bestThirds ? 4 : elimSlots / 2;
-    const previewCard = (labelA, labelB) => `<div style="background:#fff;border:2px dashed var(--fabd-gray-300);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
-        <span style="font-weight:600;color:var(--fabd-blue)">${esc(labelA)}</span>
-        <span style="color:var(--fabd-gray-400);font-weight:700">VS</span>
-        <span style="font-weight:600;color:#DC2626">${esc(labelB)}</span>
-      </div>`;
-    const roundTitle = t => `<p style="font-weight:700;color:var(--fabd-gray-600);font-size:13px;margin-bottom:-4px">${t}</p>`;
-    h += `<div style="display:flex;flex-direction:column;gap:12px;max-width:500px;margin:0 auto">`;
-    if (bestThirds) {
-      // 3 grupos x 2 + os 2 melhores 3os = 8 nas quartas (bracket-best-thirds.js)
-      h += roundTitle('Quartas de final');
-      bestThirdsQuarterfinalLabels(groups.map(g => g.name)).forEach(([a, b]) => { h += previewCard(a, b); });
-      h += roundTitle('Semifinais');
-      h += previewCard('Venc. Quartas 1', 'Venc. Quartas 2');
-      h += previewCard('Venc. Quartas 3', 'Venc. Quartas 4');
-    } else {
-      for (let i = 0; i < semis; i++) {
-        const gIdxA = i % groups.length;
-        const gIdxB = (i + 1) % groups.length;
-        const posA = Math.floor(i / groups.length) + 1;
-        const posB = qualifiers - Math.floor(i / groups.length);
-        const labelA = `${posA}o do ${groups[gIdxA]?.name || 'Grupo '+(gIdxA+1)}`;
-        const labelB = `${posB}o do ${groups[gIdxB]?.name || 'Grupo '+(gIdxB+1)}`;
-        h += previewCard(labelA, labelB);
-      }
-    }
-    if (semis > 1) {
-      h += `<div style="background:#FEF3C7;border:2px dashed #F59E0B;border-radius:8px;padding:12px 16px;text-align:center">
-        <span style="font-weight:700;color:#92400E">FINAL</span>
-        <p style="font-size:12px;color:#92400E;margin-top:4px">Vencedores das semifinais</p>
-      </div>`;
-    }
+      <p style="color:var(--fabd-gray-500);font-size:12px;margin-top:4px">Grupo encerrado ja mostra os classificados. O resto entra quando os grupos acabarem.</p></div>`;
+    // Previa no formato de chave (igual a chave real), com rotulos no lugar dos nomes
+    const previewMatches = buildGroupsElimPreview(groups, qualifiers);
+    // Grupo que ja acabou: o rotulo vira o nome do classificado
+    previewMatches.forEach(pm => { pm.player1 = resolveGroupQualifierLabel(d, pm.player1); pm.player2 = resolveGroupQualifierLabel(d, pm.player2); });
+    if (previewMatches.length) h += renderBracket({ matches: previewMatches });
     if (bestThirds) {
       h += `<p style="font-size:12px;color:var(--fabd-gray-500);text-align:center">Melhor 3o: mais vitorias, depois saldo de pontos, depois pontos feitos.<br>Se um 3o cair contra o 1o do proprio grupo, os dois 3os trocam de lugar.</p>`;
     }
-    h += `</div>`;
   }
   h += '</div>';
 
@@ -2378,6 +2370,7 @@ async function syncMatchesWithDraws() {
       existing.isDefinida = !!(s.player1 && s.player2);
       if (existing.isDefinida) existing.status = 'Pendente';
       if (s.roundName) existing.roundName = s.roundName;
+      if (s.round != null) existing.round = s.round;
       existing.drawMatchIdx = s.drawMatchIdx; // atualizar idx
       existing._updated = true; // marcar pra nao reusar no fallback
     }
@@ -2392,10 +2385,14 @@ async function syncMatchesWithDraws() {
   // Encontrar novos jogos
   let added = 0;
   shouldExist.forEach(s => {
-    // Verificar por drawMatchIdx primeiro, depois por chave tradicional
-    if (s.drawMatchIdx!=null && existingByIdx.has(`${s.drawName}|${s.drawMatchIdx}`)) return;
-    const key = `${s.drawName}|${s.round}|${s.player1}|${s.player2}`;
-    if (existingByKey.has(key)) return;
+    // Com drawMatchIdx so ele decide: os provisorios tem jogadores vazios e a
+    // chave round+jogadores colide entre jogos diferentes da mesma rodada
+    if (s.drawMatchIdx!=null) {
+      if (existingByIdx.has(`${s.drawName}|${s.drawMatchIdx}`)) return;
+    } else {
+      const key = `${s.drawName}|${s.round}|${s.player1}|${s.player2}`;
+      if (existingByKey.has(key)) return;
+    }
     // Verificar se ja existe um match neste drawName+round (evitar duplicatas de rounds futuros)
     const existingInRound = tournament.matches.find(m=>m.drawName===s.drawName&&m.round===s.round&&m.drawMatchIdx===s.drawMatchIdx);
     if (existingInRound) return;
@@ -2507,10 +2504,11 @@ async function regenerateSchedule() {
       const dsCount = new Array(daySlots.length).fill(0);
       definidos.forEach(m => { if(m.time){ const si=daySlots.indexOf(timeToMin(m.time)); if(si>=0) dsCount[si]++; }});
 
-      elimAdefs.sort((a,b) => a.drawName===b.drawName ? (a.round||0)-(b.round||0) : 0);
+      elimAdefs.sort((a,b) => scheduleStageOf(a) - scheduleStageOf(b));
       elimAdefs.forEach(m => {
-        const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time).map(d => timeToMin(d.time));
-        const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && d !== m).map(d => timeToMin(d.time));
+        // So a fase anterior da chave empurra o horario: a mesma rodada divide o slot
+        const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
+        const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
         const allTimes = [...sameDrawGroupTimes, ...sameDrawAdefTimes];
         if (allTimes.length) {
           const lastMin = Math.max(...allTimes);
@@ -2566,10 +2564,10 @@ async function regenerateSchedule() {
     }
     const ndCount = new Array(ndSlots.length).fill(0);
     definidos.forEach(m => { if(m.time){ const si=ndSlots.indexOf(timeToMin(m.time)); if(si>=0) ndCount[si]++; }});
-    elimAdefs.sort((a,b) => a.drawName===b.drawName ? (a.round||0)-(b.round||0) : 0);
+    elimAdefs.sort((a,b) => scheduleStageOf(a) - scheduleStageOf(b));
     elimAdefs.forEach(m => {
-      const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time).map(d => timeToMin(d.time));
-      const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && d !== m).map(d => timeToMin(d.time));
+      const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
+      const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
       const allTimes = [...sameDrawGroupTimes, ...sameDrawAdefTimes];
       if (allTimes.length) {
         const lastMin = Math.max(...allTimes);
@@ -2825,6 +2823,73 @@ async function saveScore() {
     _registerEmQuadraIds(); // v3.97
     if(!(tournament.matches||[]).some(x=>x.status==='Em Quadra')){window.api.supabaseUnsubscribe();console.log('Realtime desativado (nenhum jogo em quadra)');}
     closeModal('modal-score');renderMatches();showToast('Placar salvo!');
+  }catch(e){console.error(e);showToast('Erro: '+e.message,'error');}
+}
+
+// Editar jogo finalizado (lapis da aba Finalizadas): placar, arbitro e quadra.
+// O vencedor nao muda por aqui: trocar o vencedor mexe em quem avancou na
+// chave, e isso continua pelo desfazer (↻) + placar novo.
+let editingMatchIdx=null;
+const _isSpecialScore=m=>!m.score||m.score==='W.O.'||m.score==='DSQ'||m.score==='RET';
+function showEditFinishedModal(idx){
+  const m=tournament?.matches?.[idx];if(!m)return;editingMatchIdx=idx;
+  document.getElementById('edit-p1').textContent=m.player1Display||m.player1||'';
+  document.getElementById('edit-p2').textContent=m.player2Display||m.player2||'';
+  const special=_isSpecialScore(m);
+  let h='';
+  if(!special){
+    const cur=m.score.split('/').map(x=>x.trim().split('-').map(y=>y.trim()));
+    h+=`<div class="score-row score-row-header"><div class="score-cell-name" style="color:var(--fabd-blue);font-weight:700">${esc(m.player1||'')}</div><div class="score-cell-label"></div><div class="score-cell-name" style="color:var(--fabd-red);font-weight:700">${esc(m.player2||'')}</div></div>`;
+    for(let s=1;s<=(tournament?.scoring?.sets||3);s++){
+      const v=cur[s-1]||['',''];
+      h+=`<div class="score-row"><div class="score-cell"><input type="number" id="edit-set-${s}-p1" min="0" max="30" value="${esc(v[0]||'')}" placeholder="0"></div><div class="score-cell-label">SET ${s}</div><div class="score-cell"><input type="number" id="edit-set-${s}-p2" min="0" max="30" value="${esc(v[1]||'')}" placeholder="0"></div></div>`;
+    }
+  }
+  document.getElementById('edit-sets-container').innerHTML=h;
+  document.getElementById('edit-sets-note').textContent=special
+    ?`Placar ${m.score||'-'}: aqui da pra trocar so a quadra e o arbitro.`
+    :'O vencedor nao muda por aqui. Pra trocar o vencedor, use o desfazer (↻) e lance o placar de novo.';
+  document.getElementById('edit-court').innerHTML=`<option value="">-</option>${getCourtOptions(m.court)}`;
+  document.getElementById('edit-umpire').innerHTML=`<option value="">-</option>${getUmpireOptions(m.umpire)}`;
+  openModal('modal-edit-finished');
+}
+
+async function saveEditFinished(){
+  try{
+    const m=tournament?.matches?.[editingMatchIdx];if(!m)return;
+    const special=_isSpecialScore(m);
+    const scores=[];
+    if(!special){
+      const numSets=tournament?.scoring?.sets||3,pts=tournament?.scoring?.points||21,maxP=tournament?.scoring?.maxPoints||30;
+      let w1=0,w2=0;
+      for(let s=1;s<=numSets;s++){
+        const p1=parseInt(document.getElementById(`edit-set-${s}-p1`)?.value),p2=parseInt(document.getElementById(`edit-set-${s}-p2`)?.value);
+        if(isNaN(p1)||isNaN(p2))continue;
+        const v=validateBadmintonSet(p1,p2,pts,maxP);if(!v.valid){alert(`Set ${s}: ${v.error}`);return;}
+        scores.push(`${p1}-${p2}`);if(p1>p2)w1++;else if(p2>p1)w2++;
+      }
+      if(!scores.length){alert('Insira placar');return;}
+      if(m.status==='Finalizada'){
+        const newWinner=w1>w2?1:w2>w1?2:0;
+        if(!newWinner){alert('O placar precisa ter um vencedor.');return;}
+        if(newWinner!==m.winner){alert('Esse placar troca o vencedor. Pra trocar o vencedor, use o desfazer (↻) e lance o placar de novo.');return;}
+      }
+      m.score=scores.join(' / ');
+    }
+    m.court=document.getElementById('edit-court').value;
+    m.umpire=document.getElementById('edit-umpire').value;
+    if(!special)propagateResultToDraws(m);
+    await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
+    // Placar corrigido tambem no site Ao Vivo
+    if(!special){
+      try{
+        const setsP1=[],setsP2=[];let setsWonP1=0,setsWonP2=0;
+        for(const sc of scores){const [a,b]=sc.split('-').map(n=>parseInt(n));setsP1.push(a);setsP2.push(b);if(a>b)setsWonP1++;else if(b>a)setsWonP2++;}
+        const last=scores[scores.length-1].split('-').map(n=>parseInt(n));
+        await window.api.supabaseFinalizeMatch(tournament.id,m,{winner:m.winner,final_score:m.score,umpire_name:m.umpire||'',current_set:scores.length,score_p1:last[0]||0,score_p2:last[1]||0,sets_p1:setsP1,sets_p2:setsP2,sets_won_p1:setsWonP1,sets_won_p2:setsWonP2});
+      }catch(e){console.warn('finalizeMatch (edicao):',e);}
+    }
+    closeModal('modal-edit-finished');renderFinishedMatches();renderMatches();showToast('Jogo atualizado');
   }catch(e){console.error(e);showToast('Erro: '+e.message,'error');}
 }
 

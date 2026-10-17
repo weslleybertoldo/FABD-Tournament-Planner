@@ -454,6 +454,8 @@ select, textarea {
 
 .tab:hover { color: var(--fabd-blue); }
 .tab.active { color: var(--fabd-blue); border-bottom-color: var(--fabd-blue); }
+/* Configuracao do Torneio: as 7 abas numa linha so, sem quebrar o nome */
+#tc-tabs .tab { white-space: nowrap; flex-shrink: 0; }
 
 /* === TAGS === */
 .tag {
@@ -826,6 +828,58 @@ select, textarea {
   text-transform: uppercase;
   min-width: 40px;
   text-align: center;
+}
+
+/* === PROGRESSO DO DIA (aba Partidas) === */
+.matches-progress {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.mp-tile {
+  background: var(--fabd-white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  border-top: 4px solid var(--fabd-blue);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mp-tile.green { border-top-color: #10B981; }
+.mp-tile.yellow { border-top-color: #F59E0B; }
+.mp-tile.red { border-top-color: var(--fabd-red); }
+
+.mp-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--fabd-gray-600);
+}
+
+.mp-value { font-size: 26px; font-weight: 800; color: var(--fabd-blue); line-height: 1.15; }
+.mp-tile.green .mp-value { color: #059669; }
+.mp-tile.red .mp-value { color: var(--fabd-red); }
+.mp-value small { font-size: 15px; font-weight: 700; color: var(--fabd-gray-500); margin-left: 2px; }
+.mp-sub { font-size: 12px; color: var(--fabd-gray-600); }
+
+.mp-bar { height: 8px; border-radius: 4px; background: var(--fabd-gray-200); overflow: hidden; }
+.mp-bar > span { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #34D399, #059669); }
+
+.mp-days { display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 600; color: var(--fabd-gray-700); }
+.mp-days > div { display: flex; justify-content: space-between; gap: 8px; }
+.mp-days strong { color: var(--fabd-blue); font-size: 15px; }
+
+@media (max-width: 1100px) {
+  .matches-progress { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* === COURTS PANEL (aba Partidas) === */
