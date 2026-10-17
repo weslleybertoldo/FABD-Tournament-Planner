@@ -4,6 +4,8 @@
 //
 // propagateGroupsToElimination(d): apos grupos completos, gera matches
 //   de eliminatoria com cruzamento oficial (1o de A vs 2o de B, etc).
+// buildGroupsElimPreview(groups, qualifiers): os mesmos jogos com rotulos,
+//   pra previa em formato de chave enquanto os grupos rolam.
 // repropagateAllResults(): re-sincroniza bidirecionalmente draws[].matches
 //   e tournament.matches, propaga advancers em eliminatoria, infere BYEs,
 //   atribui drawMatchIdx, salva tournament.
@@ -11,13 +13,60 @@
 // Deps globais (mutaveis):
 // - tournament (mutavel)
 // - areGroupsFinished, findTournamentMatch (modulos)
-// - usesBestThirds, buildBestThirdsQuarterfinals (bracket-best-thirds)
+// - usesBestThirds, buildBestThirdsQuarterfinals, bestThirdsQuarterfinalLabels
+//   (bracket-best-thirds)
 // - updateEliminationMatchesInList (bracket-mutators)
 // - fillMissingTimesByDay (regenerate-schedule.js)
 // - window.api.saveTournament (IPC)
 //
 // Issue #14 sub-tarefa 14.M — auditoria 2026-05-09.
 // =====================================================================
+
+// 1a rodada da eliminatoria a partir dos classificados de cada grupo, no
+// cruzamento oficial: grupos em duplas (A,B), (C,D)... com A1 x B2 e B1 x A2.
+// byGroup[grupo] = classificados em ordem (nomes reais ou rotulos da previa).
+function pairGroupsFirstRound(groupKeys, byGroup) {
+  const firstRound = [];
+  for (let g = 0; g < groupKeys.length; g += 2) {
+    const gA = byGroup[groupKeys[g]] || [];
+    const gB = byGroup[groupKeys[g + 1] || groupKeys[(g + 1) % groupKeys.length]] || [];
+    // A1 vs B2
+    if (gA[0] && gB[1]) firstRound.push({ player1: gA[0], player2: gB[1] });
+    else if (gA[0]) firstRound.push({ player1: gA[0], player2: '' });
+    // B1 vs A2
+    if (gB[0] && gA[1]) firstRound.push({ player1: gB[0], player2: gA[1] });
+    else if (gB[0]) firstRound.push({ player1: gB[0], player2: '' });
+  }
+  return firstRound;
+}
+
+// Previa da eliminatoria com os grupos em andamento: os mesmos jogos que o
+// propagateGroupsToElimination vai gerar, com rotulos ("1o do Grupo A",
+// "Melhor 3o colocado") no lugar dos nomes. As rodadas seguintes ficam vazias
+// e o renderBracket mostra "Vencedor Jogo NN".
+function buildGroupsElimPreview(groups, qualifiers) {
+  let firstRound;
+  if (usesBestThirds(groups, qualifiers)) {
+    firstRound = bestThirdsQuarterfinalLabels(groups.map(g => g.name)).map(([player1, player2]) => ({ player1, player2 }));
+  } else {
+    const byGroup = {};
+    groups.forEach(g => {
+      const n = Math.min(qualifiers, (g.players || []).length);
+      if (n > 0) byGroup[g.name] = Array.from({ length: n }, (_, i) => `${i + 1}o do ${g.name}`);
+    });
+    firstRound = pairGroupsFirstRound(Object.keys(byGroup), byGroup);
+  }
+  const matches = firstRound.map(p => ({ round: 1, player1: p.player1, player2: p.player2, isPreview: true }));
+  let prevCount = firstRound.length;
+  let round = 2;
+  while (prevCount > 1) {
+    const numMatches = Math.floor(prevCount / 2);
+    for (let i = 0; i < numMatches; i++) matches.push({ round, player1: '', player2: '', isPreview: true });
+    prevCount = numMatches;
+    round++;
+  }
+  return matches;
+}
 
 function propagateGroupsToElimination(d) {
   if (!areGroupsFinished(d)) return false;
@@ -54,17 +103,7 @@ function propagateGroupsToElimination(d) {
   if (usesBestThirds(d.groupsData.groups, qualifiers)) {
     semis.push(...buildBestThirdsQuarterfinals(d.groupsData.groups));
   } else {
-    // Gerar semifinais: parear grupos em duplas (A,B), (C,D), etc.
-    for (let g = 0; g < groupKeys.length; g += 2) {
-      const gA = byGroup[groupKeys[g]] || [];
-      const gB = byGroup[groupKeys[g + 1] || groupKeys[(g + 1) % groupKeys.length]] || [];
-      // A1 vs B2
-      if (gA[0] && gB[1]) semis.push({ player1: gA[0], player2: gB[1] });
-      else if (gA[0]) semis.push({ player1: gA[0], player2: '' });
-      // B1 vs A2
-      if (gB[0] && gA[1]) semis.push({ player1: gB[0], player2: gA[1] });
-      else if (gB[0]) semis.push({ player1: gB[0], player2: '' });
-    }
+    semis.push(...pairGroupsFirstRound(groupKeys, byGroup));
   }
 
   // R1: semifinais

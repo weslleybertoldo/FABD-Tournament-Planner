@@ -138,3 +138,35 @@ describe('propagateGroupsToElimination', () => {
     expect(d.groupsData.eliminationMatches.length).toBeGreaterThan(0);
   });
 });
+
+describe('buildGroupsElimPreview — previa em formato de chave', () => {
+  function loadPreview(mocks = {}) {
+    return loadModule('src/js/modules/bracket-reconcile.js', {
+      tournament: null,
+      usesBestThirds: mocks.usesBestThirds || (() => false),
+      bestThirdsQuarterfinalLabels: mocks.bestThirdsQuarterfinalLabels || (() => []),
+    });
+  }
+
+  it('2 grupos x 2: A1 x B2 e B1 x A2 + final vazia (igual a chave real)', () => {
+    const { buildGroupsElimPreview } = loadPreview();
+    const groups = [{ name: 'Grupo A', players: ['a1', 'a2', 'a3'] }, { name: 'Grupo B', players: ['b1', 'b2', 'b3'] }];
+    const m = buildGroupsElimPreview(groups, 2);
+    expect(m.map(x => [x.round, x.player1, x.player2])).toEqual([
+      [1, '1o do Grupo A', '2o do Grupo B'],
+      [1, '1o do Grupo B', '2o do Grupo A'],
+      [2, '', ''],
+    ]);
+    expect(m.every(x => x.isPreview)).toBe(true);
+  });
+
+  it('3 grupos x 2 (melhores 3os): quartas com os rotulos, semis e final vazias', () => {
+    const labels = [['1o do Grupo A', '2o melhor 3o colocado'], ['2o do Grupo B', '2o do Grupo C'], ['1o do Grupo C', '2o do Grupo A'], ['1o do Grupo B', 'Melhor 3o colocado']];
+    const { buildGroupsElimPreview } = loadPreview({ usesBestThirds: () => true, bestThirdsQuarterfinalLabels: () => labels });
+    const groups = ['A', 'B', 'C'].map(g => ({ name: `Grupo ${g}`, players: ['x', 'y', 'z', 'w'] }));
+    const m = buildGroupsElimPreview(groups, 2);
+    expect(m.filter(x => x.round === 1).map(x => [x.player1, x.player2])).toEqual(labels);
+    expect(m.filter(x => x.round === 2).length).toBe(2);
+    expect(m.filter(x => x.round === 3).length).toBe(1);
+  });
+});
