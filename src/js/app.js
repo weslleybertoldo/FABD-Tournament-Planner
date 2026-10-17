@@ -1632,6 +1632,23 @@ async function generateSingleDraw(idx) {
 // bwfDistribuirNonSeedsComProtecaoClube + generateEliminationBracket
 // extraidos pra src/js/modules/bracket-elim.js (issue #14.J).
 
+// Caixa do CAMPEAO: dupla "A / B" vira um nome por linha. Linha que nao cabe
+// em maxWidth diminui a fonte (13 → 11) e, se ainda passar, e cortada com
+// reticencias. Mede no canvas com a mesma fonte do SVG da chave.
+let _champMeasureCtx = null;
+function fitChampionLines(name, maxWidth) {
+  if (!_champMeasureCtx) _champMeasureCtx = document.createElement('canvas').getContext('2d');
+  const width = (text, size) => { _champMeasureCtx.font = '800 ' + size + 'px "Segoe UI", sans-serif'; return _champMeasureCtx.measureText(text).width; };
+  const parts = String(name || '').split(' / ').map(s => s.trim()).filter(Boolean);
+  if (!parts.length) parts.push('A definir');
+  return parts.map(text => {
+    for (const size of [13, 12, 11]) if (width(text, size) <= maxWidth) return { text, size };
+    let cut = text;
+    while (cut.length > 1 && width(cut + '...', 11) > maxWidth) cut = cut.slice(0, -1);
+    return { text: cut.trimEnd() + '...', size: 11 };
+  });
+}
+
 function renderBracket(d) {
   const rounds = {};
   d.matches.forEach(m => { if (!rounds[m.round]) rounds[m.round] = []; rounds[m.round].push(m); });
@@ -1775,10 +1792,16 @@ function renderBracket(d) {
     const cy = cp.cy + oY;
     h += '<line x1="'+((totalRounds-1)*(matchW+connW)+matchW)+'" y1="'+cy+'" x2="'+cx+'" y2="'+cy+'" stroke="#343A40" stroke-width="2"/>';
     const champW=250;
-    h += '<rect x="'+cx+'" y="'+(cy-28)+'" width="'+champW+'" height="56" rx="8" fill="#FEF3C7" stroke="#F59E0B" stroke-width="3"/>';
-    h += '<text x="'+(cx+champW/2)+'" y="'+(cy-8)+'" text-anchor="middle" fill="#92400E" font-size="10" font-weight="700">CAMPEAO</text>';
     const champ = finalM && finalM.winner === 1 ? finalM.player1 : finalM && finalM.winner === 2 ? finalM.player2 : 'A definir';
-    h += '<text x="'+(cx+champW/2)+'" y="'+(cy+14)+'" text-anchor="middle" fill="#92400E" font-size="13" font-weight="800">'+esc(champ)+'</text>';
+    // Dupla: um nome abaixo do outro, e a caixa cresce 17px por linha extra
+    const champLines = fitChampionLines(champ, champW - 20);
+    const champH = 56 + (champLines.length - 1) * 17;
+    const champTop = cy - champH / 2;
+    h += '<rect x="'+cx+'" y="'+champTop+'" width="'+champW+'" height="'+champH+'" rx="8" fill="#FEF3C7" stroke="#F59E0B" stroke-width="3"/>';
+    h += '<text x="'+(cx+champW/2)+'" y="'+(champTop+20)+'" text-anchor="middle" fill="#92400E" font-size="10" font-weight="700">CAMPEAO</text>';
+    champLines.forEach((ln, k) => {
+      h += '<text x="'+(cx+champW/2)+'" y="'+(champTop+42+k*17)+'" text-anchor="middle" fill="#92400E" font-size="'+ln.size+'" font-weight="800">'+esc(ln.text)+'</text>';
+    });
   }
 
   h += '</svg></div>';
