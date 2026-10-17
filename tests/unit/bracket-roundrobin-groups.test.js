@@ -180,3 +180,28 @@ describe('areGroupsFinished', () => {
     expect(areGroupsFinished(d)).toBe(true);
   });
 });
+
+describe('resolveGroupQualifierLabel — nome do classificado de grupo encerrado', () => {
+  const mk = (winnerYZ) => ({
+    groupsData: { groups: [{ name: 'Grupo A', players: ['X', 'Y', 'Z'], matches: [
+      { player1: 'X', player2: 'Y', winner: 1, score1: '15 15', score2: '5 5' },
+      { player1: 'X', player2: 'Z', winner: 1, score1: '15 15', score2: '7 7' },
+      { player1: 'Y', player2: 'Z', winner: winnerYZ, score1: '15 15', score2: '9 9' },
+    ] }] },
+  });
+
+  it('grupo encerrado: 1o e 2o viram os nomes', () => {
+    const { resolveGroupQualifierLabel } = loadBracketRR();
+    const d = mk(1);
+    expect(resolveGroupQualifierLabel(d, '1o do Grupo A')).toBe('X');
+    expect(resolveGroupQualifierLabel(d, '2o do Grupo A')).toBe('Y');
+  });
+
+  it('grupo em andamento, melhor 3o e vencedor de jogo continuam como rotulo', () => {
+    const { resolveGroupQualifierLabel } = loadBracketRR();
+    expect(resolveGroupQualifierLabel(mk(undefined), '1o do Grupo A')).toBe('1o do Grupo A');
+    expect(resolveGroupQualifierLabel(mk(1), 'Melhor 3o colocado')).toBe('Melhor 3o colocado');
+    expect(resolveGroupQualifierLabel(mk(1), 'Venc. Semifinal 1')).toBe('Venc. Semifinal 1');
+    expect(resolveGroupQualifierLabel(mk(1), '1o do Grupo B')).toBe('1o do Grupo B');
+  });
+});

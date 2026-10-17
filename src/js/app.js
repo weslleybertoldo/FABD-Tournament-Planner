@@ -1897,9 +1897,11 @@ function renderGroupsElimination(d) {
     const doneGM = groups.reduce((s, g) => s + g.matches.filter(m => m.winner !== undefined && m.winner !== null).length, 0);
     h += `<div style="padding:16px;background:var(--fabd-gray-100);border-radius:8px;margin-bottom:16px;text-align:center">
       <p style="color:var(--fabd-gray-600);font-weight:600">Fase de grupos: ${doneGM}/${totalGM} partidas concluidas</p>
-      <p style="color:var(--fabd-gray-500);font-size:12px;margin-top:4px">Os jogos abaixo serao preenchidos ao concluir os grupos.</p></div>`;
+      <p style="color:var(--fabd-gray-500);font-size:12px;margin-top:4px">Grupo encerrado ja mostra os classificados. O resto entra quando os grupos acabarem.</p></div>`;
     // Previa no formato de chave (igual a chave real), com rotulos no lugar dos nomes
     const previewMatches = buildGroupsElimPreview(groups, qualifiers);
+    // Grupo que ja acabou: o rotulo vira o nome do classificado
+    previewMatches.forEach(pm => { pm.player1 = resolveGroupQualifierLabel(d, pm.player1); pm.player2 = resolveGroupQualifierLabel(d, pm.player2); });
     if (previewMatches.length) h += renderBracket({ matches: previewMatches });
     if (bestThirds) {
       h += `<p style="font-size:12px;color:var(--fabd-gray-500);text-align:center">Melhor 3o: mais vitorias, depois saldo de pontos, depois pontos feitos.<br>Se um 3o cair contra o 1o do proprio grupo, os dois 3os trocam de lugar.</p>`;
