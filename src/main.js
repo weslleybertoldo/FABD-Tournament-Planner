@@ -270,7 +270,17 @@ app.on('window-all-closed', () => {
   if(pollingInterval){clearInterval(pollingInterval);pollingInterval=null;}
   if(realtimeRetryInterval){clearInterval(realtimeRetryInterval);realtimeRetryInterval=null;}
   saveDatabaseSync(db);
-  if(process.platform!=='darwin')app.quit();
+  if(process.platform!=='darwin'){
+    // Com debounce de 15s pode haver upsert pendente ao fechar — flush antes de
+    // sair, senão a nuvem (Referee/Live) fica com o torneio desatualizado.
+    if(pendingUpsert){
+      if(upsertTimer){clearTimeout(upsertTimer);upsertTimer=null;}
+      flushUpsert().finally(()=>app.quit());
+      setTimeout(()=>app.quit(),5000); // failsafe: rede pendurada não segura o fechamento
+    } else {
+      app.quit();
+    }
+  }
 });
 app.on('activate', () => { if(!BrowserWindow.getAllWindows().length) createWindow(); });
 process.on('uncaughtException', (e) => { log('ERROR', 'Uncaught:', e.message); });
@@ -532,6 +542,35 @@ ipcMain.handle('xlsx:export', async (_, playersData) => {
   } catch(e) { log('ERROR', 'xlsx:export:', e.message); return false; }
 });
 
+// Exporta relatorio generico do popup de relatorios: sheets = [{name, rows(AOA)}].
+// XLSX so existe no main process — renderer manda os dados prontos via IPC.
+ipcMain.handle('xlsx:exportReport', async (_, payload) => {
+  try {
+    const { fileName, sheets } = payload || {};
+    if (!Array.isArray(sheets) || !sheets.length || sheets.length > 60) return false;
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Exportar Relatorio (XLSX)',
+      defaultPath: String(fileName || 'relatorio-fabd.xlsx').replace(/[^\w.\- ]+/g, '_'),
+      filters: [{ name: 'Excel', extensions: ['xlsx'] }]
+    });
+    if (result.canceled || !result.filePath) return false;
+    const wb = XLSX.utils.book_new();
+    const used = new Set();
+    sheets.forEach((s, i) => {
+      if (!Array.isArray(s.rows) || !s.rows.length) return;
+      // Nome de sheet: max 31 chars no formato, sem \ / ? * [ ] : e sem duplicata
+      let nm = String(s.name || `Tabela ${i + 1}`).replace(/[\\/?*\[\]:]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 28) || `Tabela ${i + 1}`;
+      const base = nm; let n = 2;
+      while (used.has(nm.toLowerCase())) nm = `${base.slice(0, 25)} ${n++}`;
+      used.add(nm.toLowerCase());
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.rows), nm);
+    });
+    if (!wb.SheetNames.length) return false;
+    XLSX.writeFile(wb, result.filePath);
+    return true;
+  } catch(e) { log('ERROR', 'xlsx:exportReport:', e.message); return false; }
+});
+
 ipcMain.handle('xlsx:import', async () => {
   try {
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -765,7 +804,7 @@ ipcMain.on('log', (_, level, msg) => { log(level, '[renderer]', msg); });
 let pendingUpsert = null;
 let upsertTimer = null;
 let pendingResolvers = []; // promessas aguardando o proximo flush
-const UPSERT_DEBOUNCE_MS = 500; // espera 500ms antes de enviar
+const UPSERT_DEBOUNCE_MS = 15000; // 15s: agrupa saves do JSON inteiro p/ poupar Disk IO do Supabase (Nano); ponto-a-ponto vai por live_scores e não passa aqui. Manter < retry de 24s do live/index.html
 // C4: telemetria real de sync. Antes o IPC retornava true imediatamente
 // sem saber se a escrita ocorreu. Agora renderer pode obter status real.
 let lastSyncStatus = { state: 'idle', at: 0, error: null };

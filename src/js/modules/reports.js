@@ -43,7 +43,7 @@ function printReport(type){
     <h1>${tName}</h1>
     <p>${tDate} | ${tLocation}</p>
   </div>`;
-  const printBtn='<div class="no-print" style="text-align:center"><button data-action="print" style="padding:10px 24px;font-size:14px;background:#1E3A8A;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">Imprimir</button> <button data-action="close" style="padding:10px 24px;font-size:14px;background:#6B7280;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-left:8px">Fechar</button></div>';
+  const printBtn='<div class="no-print" style="text-align:center"><button data-action="print" style="padding:10px 24px;font-size:14px;background:#1E3A8A;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">Imprimir</button> <button data-action="xlsx" style="padding:10px 24px;font-size:14px;background:#059669;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-left:8px">Exportar</button> <button data-action="close" style="padding:10px 24px;font-size:14px;background:#6B7280;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-left:8px">Fechar</button></div>';
 
   let body='';
   switch(type){
@@ -74,8 +74,72 @@ function printReport(type){
     if (!el) return;
     const action = el.getAttribute('data-action');
     if (action === 'print') w.print();
+    else if (action === 'xlsx') exportReportXlsx(type, w);
     else if (action === 'close') w.close();
   });
+}
+
+// === EXPORTAR RELATORIO EM PLANILHA (XLSX) ===
+// Linhas estruturadas dos relatorios de ranking (contrato fabd-ranking-v1,
+// importado pela aba Rankings do admin do site FABD). reassign=true aplica a
+// regra do Ranking Federados (_reassignFederados); false = Classificacao Geral.
+function buildRankingExportRows(reassign){
+  const draws=tournament.draws||[];
+  const scoringTable=getCurrentScoringTable();
+  let adimSet=new Set();
+  if(reassign){
+    const cs=tournament.clubStatuses||{};
+    adimSet=new Set(Object.keys(cs).filter(k=>cs[k]==='adimplente').map(c=>_normalizeClubKey(c)));
+  }
+  const ordered=[..._sortDrawsByCatThenMod(draws.filter(d=>d.event==='SM'||d.event==='SF')),
+                 ..._sortDrawsByCatThenMod(draws.filter(d=>d.event==='DM'||d.event==='DF'||d.event==='DX'))];
+  const rows=[['Chave','TipoChave','Categoria','Modalidade','Pos','Atleta','Clube','V','D','Pontos','Obs']];
+  ordered.forEach(d=>{
+    let cls=computeFullClassification(d);
+    if(!cls.length)return;
+    const isDoubles=d.event==='DM'||d.event==='DF'||d.event==='DX';
+    if(reassign)cls=_reassignFederados(cls,scoringTable,isDoubles,adimSet);
+    cls.forEach(c=>{
+      if(!(c.pos>=1))return;
+      const pts=c.points!=null?c.points:pointsForPosition(c.pos,scoringTable);
+      const obs=reassign&&c.originalPos&&c.originalPos!==c.pos?`Era ${c.originalPos}o na chave`:(c.note||'');
+      rows.push([d.name,d.type,_categoryFromDrawName(d.name),d.event,c.pos,c.name,
+        _clubForClassificationEntry(c.name,isDoubles),c.wins!=null?c.wins:'',c.losses!=null?c.losses:'',pts,obs]);
+    });
+  });
+  return rows;
+}
+
+async function exportReportXlsx(type,w){
+  if(!tournament){showToast('Nenhum torneio ativo','warning');return;}
+  const isRanking=type==='classification'||type==='rankingFederados';
+  const sheets=[];
+  if(isRanking){
+    const rows=buildRankingExportRows(type==='rankingFederados');
+    if(rows.length<2){showToast('Nenhuma chave com classificacao para exportar','warning');return;}
+    const scoringTable=getCurrentScoringTable();
+    sheets.push({name:'Evento',rows:[
+      ['Formato','fabd-ranking-v1'],['Relatorio',type],['Evento',tournament.name||''],
+      ['Inicio',tournament.startDate||''],['Fim',tournament.endDate||tournament.startDate||''],
+      ['Local',tournament.location||''],['Cidade',tournament.city||''],
+      ['Pontuacao',scoringTable.name||''],['GeradoEm',new Date().toISOString()]]});
+    sheets.push({name:'Ranking',rows});
+  } else {
+    // Dump generico: cada <table> do popup vira uma sheet, nomeada pelo
+    // .cat-title anterior (relatorios com bracket SVG nao tem tabela).
+    const tables=w.document.querySelectorAll('table');
+    tables.forEach((tb,i)=>{
+      let name=`Tabela ${i+1}`;
+      let el=tb.previousElementSibling;
+      while(el){if(el.classList&&el.classList.contains('cat-title')){name=el.textContent.trim();break;}el=el.previousElementSibling;}
+      const rows=[...tb.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('th,td')].map(c=>c.textContent.trim()));
+      if(rows.length)sheets.push({name,rows});
+    });
+    if(!sheets.length){showToast('Este relatorio nao tem tabelas para exportar','warning');return;}
+  }
+  const slug=(tournament.name||'torneio').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,50)||'torneio';
+  const ok=await window.api.xlsxExportReport({fileName:`${slug}-${type}.xlsx`,sheets});
+  if(ok)showToast('Planilha exportada!');
 }
 
 function reportEntries(){

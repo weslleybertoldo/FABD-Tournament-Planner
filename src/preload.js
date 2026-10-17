@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Excel (XLSX)
   xlsxExport: (data) => ipcRenderer.invoke('xlsx:export', data),
+  xlsxExportReport: (payload) => ipcRenderer.invoke('xlsx:exportReport', payload),
   xlsxImport: () => ipcRenderer.invoke('xlsx:import'),
 
   // Supabase Realtime
