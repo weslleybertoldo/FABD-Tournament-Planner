@@ -1843,18 +1843,24 @@ function renderGroupsElimination(d) {
   h += `</div>`;
 
   // Paineis dos grupos
-  groups.forEach((g, gi) => {
+  groups.forEach(g => {
     const gLabel = (g.name || 'Grupo').replace('Grupo ', '');
     const groupMatches = d.matches.filter(m => m.group === gLabel && m.phase === 'group');
     g.matches = groupMatches.length ? groupMatches : g.matches;
+  });
+  const bestThirds = usesBestThirds(groups, qualifiers);
+  // Com os grupos encerrados, os 2 melhores 3os tambem aparecem como classificados
+  const bestThirdNames = bestThirds && groupsFinished ? new Set(rankGroupThirds(groups).slice(0, 2).map(t => t.name)) : new Set();
+  groups.forEach((g, gi) => {
     const standings = computeGroupStandings(g.players, g.matches);
 
     h += `<div class="ge-panel" id="ge-panel-${gi}" style="${gi > 0 ? 'display:none' : ''}">`;
     // Classificacao
     h += '<div class="table-container"><table><thead><tr><th style="text-align:center;width:40px">Pos</th><th>Jogador</th><th style="text-align:center">V</th><th style="text-align:center">D</th><th style="text-align:center">Pts+</th><th style="text-align:center">Pts-</th><th style="text-align:center">Diff</th></tr></thead><tbody>';
     standings.forEach((s, i) => {
-      const isQ = i < qualifiers;
-      h += `<tr style="background:${isQ ? '#D1FAE5' : i % 2 === 0 ? '#fff' : '#f8f9fa'}"><td style="text-align:center;font-weight:${isQ ? '700' : '400'};color:${isQ ? '#065F46' : '#1a1a1a'}">${i + 1}o</td><td style="font-weight:${isQ ? '700' : '400'}">${esc(s.name)}${isQ ? ' <span style="background:#10B981;color:white;font-size:10px;padding:1px 6px;border-radius:10px">Classif.</span>' : ''}</td><td style="text-align:center">${s.wins}</td><td style="text-align:center">${s.losses}</td><td style="text-align:center">${s.ptsFor}</td><td style="text-align:center">${s.ptsAgainst}</td><td style="text-align:center;font-weight:700;color:${s.ptsDiff > 0 ? '#059669' : s.ptsDiff < 0 ? '#DC2626' : '#666'}">${s.ptsDiff > 0 ? '+' : ''}${s.ptsDiff}</td></tr>`;
+      const isQ = i < qualifiers || bestThirdNames.has(s.name);
+      const badge = i < qualifiers ? 'Classif.' : 'Classif. (melhor 3o)';
+      h += `<tr style="background:${isQ ? '#D1FAE5' : i % 2 === 0 ? '#fff' : '#f8f9fa'}"><td style="text-align:center;font-weight:${isQ ? '700' : '400'};color:${isQ ? '#065F46' : '#1a1a1a'}">${i + 1}o</td><td style="font-weight:${isQ ? '700' : '400'}">${esc(s.name)}${isQ ? ` <span style="background:#10B981;color:white;font-size:10px;padding:1px 6px;border-radius:10px">${badge}</span>` : ''}</td><td style="text-align:center">${s.wins}</td><td style="text-align:center">${s.losses}</td><td style="text-align:center">${s.ptsFor}</td><td style="text-align:center">${s.ptsAgainst}</td><td style="text-align:center;font-weight:700;color:${s.ptsDiff > 0 ? '#059669' : s.ptsDiff < 0 ? '#DC2626' : '#666'}">${s.ptsDiff > 0 ? '+' : ''}${s.ptsDiff}</td></tr>`;
     });
     h += '</tbody></table></div>';
     // Confrontos
@@ -1895,26 +1901,40 @@ function renderGroupsElimination(d) {
     // Gerar preview dos confrontos da eliminatoria
     const totalQualified = groups.length * qualifiers;
     const elimSlots = Math.pow(2, Math.ceil(Math.log2(totalQualified)));
-    const semis = elimSlots / 2;
-    h += `<div style="display:flex;flex-direction:column;gap:12px;max-width:500px;margin:0 auto">`;
-    for (let i = 0; i < semis; i++) {
-      const gIdxA = i % groups.length;
-      const gIdxB = (i + 1) % groups.length;
-      const posA = Math.floor(i / groups.length) + 1;
-      const posB = qualifiers - Math.floor(i / groups.length);
-      const labelA = `${posA}o do ${groups[gIdxA]?.name || 'Grupo '+(gIdxA+1)}`;
-      const labelB = `${posB}o do ${groups[gIdxB]?.name || 'Grupo '+(gIdxB+1)}`;
-      h += `<div style="background:#fff;border:2px dashed var(--fabd-gray-300);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
+    const semis = bestThirds ? 4 : elimSlots / 2;
+    const previewCard = (labelA, labelB) => `<div style="background:#fff;border:2px dashed var(--fabd-gray-300);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
         <span style="font-weight:600;color:var(--fabd-blue)">${esc(labelA)}</span>
         <span style="color:var(--fabd-gray-400);font-weight:700">VS</span>
         <span style="font-weight:600;color:#DC2626">${esc(labelB)}</span>
       </div>`;
+    const roundTitle = t => `<p style="font-weight:700;color:var(--fabd-gray-600);font-size:13px;margin-bottom:-4px">${t}</p>`;
+    h += `<div style="display:flex;flex-direction:column;gap:12px;max-width:500px;margin:0 auto">`;
+    if (bestThirds) {
+      // 3 grupos x 2 + os 2 melhores 3os = 8 nas quartas (bracket-best-thirds.js)
+      h += roundTitle('Quartas de final');
+      bestThirdsQuarterfinalLabels(groups.map(g => g.name)).forEach(([a, b]) => { h += previewCard(a, b); });
+      h += roundTitle('Semifinais');
+      h += previewCard('Venc. Quartas 1', 'Venc. Quartas 2');
+      h += previewCard('Venc. Quartas 3', 'Venc. Quartas 4');
+    } else {
+      for (let i = 0; i < semis; i++) {
+        const gIdxA = i % groups.length;
+        const gIdxB = (i + 1) % groups.length;
+        const posA = Math.floor(i / groups.length) + 1;
+        const posB = qualifiers - Math.floor(i / groups.length);
+        const labelA = `${posA}o do ${groups[gIdxA]?.name || 'Grupo '+(gIdxA+1)}`;
+        const labelB = `${posB}o do ${groups[gIdxB]?.name || 'Grupo '+(gIdxB+1)}`;
+        h += previewCard(labelA, labelB);
+      }
     }
     if (semis > 1) {
       h += `<div style="background:#FEF3C7;border:2px dashed #F59E0B;border-radius:8px;padding:12px 16px;text-align:center">
         <span style="font-weight:700;color:#92400E">FINAL</span>
         <p style="font-size:12px;color:#92400E;margin-top:4px">Vencedores das semifinais</p>
       </div>`;
+    }
+    if (bestThirds) {
+      h += `<p style="font-size:12px;color:var(--fabd-gray-500);text-align:center">Melhor 3o: mais vitorias, depois saldo de pontos, depois pontos feitos.<br>Se um 3o cair contra o 1o do proprio grupo, os dois 3os trocam de lugar.</p>`;
     }
     h += `</div>`;
   }
@@ -2024,7 +2044,16 @@ function rebuildGroupsElimMatches(d, allM) {
       // Gerar semifinais e final
       const elimPlaceholders = [];
 
-      if (totalClassificados >= 4) {
+      if (usesBestThirds(d.groupsData.groups, qual)) {
+        // 3 grupos x 2 + os 2 melhores 3os = 8 nas quartas, na mesma ordem que
+        // propagateGroupsToElimination gera (o drawMatchIdx casa com o jogo real)
+        bestThirdsQuarterfinalLabels(groupNames.map(n => `Grupo ${n}`)).forEach(([d1, d2]) => {
+          elimPlaceholders.push({ round: 1, d1, d2, rn: 'Quartas' });
+        });
+        elimPlaceholders.push({ round: 2, d1: 'Venc. Quartas 1', d2: 'Venc. Quartas 2', rn: 'Semifinal' });
+        elimPlaceholders.push({ round: 2, d1: 'Venc. Quartas 3', d2: 'Venc. Quartas 4', rn: 'Semifinal' });
+        elimPlaceholders.push({ round: 3, d1: 'Venc. Semifinal 1', d2: 'Venc. Semifinal 2', rn: 'Final' });
+      } else if (totalClassificados >= 4) {
         // Semifinais: 1oA vs 2oB, 1oB vs 2oA (padrao cruzamento)
         elimPlaceholders.push({ round: 1, d1: `1o do Grupo ${groupNames[0]||'A'}`, d2: `2o do Grupo ${groupNames[1]||'B'}`, rn: 'Semifinal' });
         elimPlaceholders.push({ round: 1, d1: `1o do Grupo ${groupNames[1]||'B'}`, d2: `2o do Grupo ${groupNames[0]||'A'}`, rn: 'Semifinal' });

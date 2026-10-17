@@ -10,6 +10,8 @@ function loadReconcile(tournament, mocks = {}) {
     updateEliminationMatchesInList: mocks.updateEliminationMatchesInList || (() => {}),
     assignAutoTimes: mocks.assignAutoTimes || (() => {}),
     computeGroupStandings: mocks.computeGroupStandings || (() => []),
+    usesBestThirds: mocks.usesBestThirds || (() => false),
+    buildBestThirdsQuarterfinals: mocks.buildBestThirdsQuarterfinals || (() => []),
     window: { api: { saveTournament: mocks.saveTournament || (() => Promise.resolve()) } },
   };
   return loadModule('src/js/modules/bracket-reconcile.js', ctx);
