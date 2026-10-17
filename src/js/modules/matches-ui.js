@@ -253,8 +253,9 @@ function renderMatchesProgress() {
   } else {
     // Todos os dias: o que falta no total + previsao de cada dia
     const perDay=days.map(day=>({day,s:summarize(matches.filter(m=>(day.draws||[]).includes(m.drawName)),day)}));
-    const withLeft=perDay.filter(x=>x.s.remaining);
-    h+=tile('yellow','&#9203;','Restante',`${s.remaining} <small>jogo${s.remaining===1?'':'s'}</small>`,withLeft.length?`em ${withLeft.length} dia${withLeft.length>1?'s':''}`:'tudo finalizado');
+    // Uma linha por dia (o total sozinho confundia: somava os 2 dias)
+    const leftRows=perDay.map(({day,s:ds})=>`<div><span>${esc(dayLabel(day))}</span><strong>${ds.remaining?`${ds.remaining} jogo${ds.remaining>1?'s':''} · ~${dur(ds.remainingMin)}`:ds.total?'encerrado':'-'}</strong></div>`).join('');
+    h+=tile('yellow','&#9203;','Restante',`<div class="mp-days">${leftRows}</div>`,s.remaining?`${s.remaining} jogo${s.remaining>1?'s':''} no total`:'tudo finalizado');
     const rows=perDay.map(({day,s:ds})=>`<div><span>${esc(dayLabel(day))}</span><strong>${ds.remaining&&ds.endMs?hm(ds.endMs):ds.total?'encerrado':'-'}</strong></div>`).join('');
     h+=tile('blue','&#127937;','Previsao de termino',`<div class="mp-days">${rows}</div>`,'filtre o dia pra ver o detalhe');
   }
