@@ -454,6 +454,8 @@ select, textarea {
 
 .tab:hover { color: var(--fabd-blue); }
 .tab.active { color: var(--fabd-blue); border-bottom-color: var(--fabd-blue); }
+/* Configuracao do Torneio: as 7 abas numa linha so, sem quebrar o nome */
+#tc-tabs .tab { white-space: nowrap; flex-shrink: 0; }
 
 /* === TAGS === */
 .tag {
