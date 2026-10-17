@@ -47,6 +47,7 @@ function buildCtx(tournament) {
 const MODULES = [
   'src/js/modules/bracket-elim.js',
   'src/js/modules/bracket-roundrobin-groups.js',
+  'src/js/modules/bracket-best-thirds.js',
   'src/js/modules/bracket-mutators.js',
   'src/js/modules/bracket-reconcile.js',
   'src/js/modules/regenerate-schedule.js',
