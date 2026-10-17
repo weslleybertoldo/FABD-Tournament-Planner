@@ -781,6 +781,27 @@
     </div>
   </div>
 
+  <!-- MODAL: EDITAR JOGO FINALIZADO (lapis da aba Finalizadas) -->
+  <div class="modal-overlay" id="modal-edit-finished">
+    <div class="modal" style="width:520px">
+      <div class="modal-header"><h3>&#9998; Editar jogo finalizado</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-edit-finished">&times;</button></div>
+      <div class="modal-body">
+        <div style="text-align:center;margin-bottom:12px">
+          <strong id="edit-p1" style="color:var(--fabd-blue);font-size:15px"></strong>
+          <span style="color:var(--fabd-gray-500);margin:0 12px">vs</span>
+          <strong id="edit-p2" style="color:var(--fabd-red);font-size:15px"></strong>
+        </div>
+        <div class="score-sets" id="edit-sets-container"></div>
+        <p id="edit-sets-note" style="font-size:12px;color:var(--fabd-gray-600);margin-top:8px"></p>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group"><label>Quadra</label><select class="form-control" id="edit-court"></select></div>
+          <div class="form-group"><label>Arbitro</label><select class="form-control" id="edit-umpire"></select></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-edit-finished">Cancelar</button><button class="btn btn-primary" data-action="saveEditFinished">&#128190; Salvar</button></div>
+    </div>
+  </div>
+
   <!-- MODAL: CONFIGURACAO DO TORNEIO -->
   <div class="modal-overlay" id="modal-tournament-config">
     <div class="modal" style="width:620px">

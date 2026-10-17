@@ -2801,6 +2801,73 @@ async function saveScore() {
   }catch(e){console.error(e);showToast('Erro: '+e.message,'error');}
 }
 
+// Editar jogo finalizado (lapis da aba Finalizadas): placar, arbitro e quadra.
+// O vencedor nao muda por aqui: trocar o vencedor mexe em quem avancou na
+// chave, e isso continua pelo desfazer (↻) + placar novo.
+let editingMatchIdx=null;
+const _isSpecialScore=m=>!m.score||m.score==='W.O.'||m.score==='DSQ'||m.score==='RET';
+function showEditFinishedModal(idx){
+  const m=tournament?.matches?.[idx];if(!m)return;editingMatchIdx=idx;
+  document.getElementById('edit-p1').textContent=m.player1Display||m.player1||'';
+  document.getElementById('edit-p2').textContent=m.player2Display||m.player2||'';
+  const special=_isSpecialScore(m);
+  let h='';
+  if(!special){
+    const cur=m.score.split('/').map(x=>x.trim().split('-').map(y=>y.trim()));
+    h+=`<div class="score-row score-row-header"><div class="score-cell-name" style="color:var(--fabd-blue);font-weight:700">${esc(m.player1||'')}</div><div class="score-cell-label"></div><div class="score-cell-name" style="color:var(--fabd-red);font-weight:700">${esc(m.player2||'')}</div></div>`;
+    for(let s=1;s<=(tournament?.scoring?.sets||3);s++){
+      const v=cur[s-1]||['',''];
+      h+=`<div class="score-row"><div class="score-cell"><input type="number" id="edit-set-${s}-p1" min="0" max="30" value="${esc(v[0]||'')}" placeholder="0"></div><div class="score-cell-label">SET ${s}</div><div class="score-cell"><input type="number" id="edit-set-${s}-p2" min="0" max="30" value="${esc(v[1]||'')}" placeholder="0"></div></div>`;
+    }
+  }
+  document.getElementById('edit-sets-container').innerHTML=h;
+  document.getElementById('edit-sets-note').textContent=special
+    ?`Placar ${m.score||'-'}: aqui da pra trocar so a quadra e o arbitro.`
+    :'O vencedor nao muda por aqui. Pra trocar o vencedor, use o desfazer (↻) e lance o placar de novo.';
+  document.getElementById('edit-court').innerHTML=`<option value="">-</option>${getCourtOptions(m.court)}`;
+  document.getElementById('edit-umpire').innerHTML=`<option value="">-</option>${getUmpireOptions(m.umpire)}`;
+  openModal('modal-edit-finished');
+}
+
+async function saveEditFinished(){
+  try{
+    const m=tournament?.matches?.[editingMatchIdx];if(!m)return;
+    const special=_isSpecialScore(m);
+    const scores=[];
+    if(!special){
+      const numSets=tournament?.scoring?.sets||3,pts=tournament?.scoring?.points||21,maxP=tournament?.scoring?.maxPoints||30;
+      let w1=0,w2=0;
+      for(let s=1;s<=numSets;s++){
+        const p1=parseInt(document.getElementById(`edit-set-${s}-p1`)?.value),p2=parseInt(document.getElementById(`edit-set-${s}-p2`)?.value);
+        if(isNaN(p1)||isNaN(p2))continue;
+        const v=validateBadmintonSet(p1,p2,pts,maxP);if(!v.valid){alert(`Set ${s}: ${v.error}`);return;}
+        scores.push(`${p1}-${p2}`);if(p1>p2)w1++;else if(p2>p1)w2++;
+      }
+      if(!scores.length){alert('Insira placar');return;}
+      if(m.status==='Finalizada'){
+        const newWinner=w1>w2?1:w2>w1?2:0;
+        if(!newWinner){alert('O placar precisa ter um vencedor.');return;}
+        if(newWinner!==m.winner){alert('Esse placar troca o vencedor. Pra trocar o vencedor, use o desfazer (↻) e lance o placar de novo.');return;}
+      }
+      m.score=scores.join(' / ');
+    }
+    m.court=document.getElementById('edit-court').value;
+    m.umpire=document.getElementById('edit-umpire').value;
+    if(!special)propagateResultToDraws(m);
+    await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
+    // Placar corrigido tambem no site Ao Vivo
+    if(!special){
+      try{
+        const setsP1=[],setsP2=[];let setsWonP1=0,setsWonP2=0;
+        for(const sc of scores){const [a,b]=sc.split('-').map(n=>parseInt(n));setsP1.push(a);setsP2.push(b);if(a>b)setsWonP1++;else if(b>a)setsWonP2++;}
+        const last=scores[scores.length-1].split('-').map(n=>parseInt(n));
+        await window.api.supabaseFinalizeMatch(tournament.id,m,{winner:m.winner,final_score:m.score,umpire_name:m.umpire||'',current_set:scores.length,score_p1:last[0]||0,score_p2:last[1]||0,sets_p1:setsP1,sets_p2:setsP2,sets_won_p1:setsWonP1,sets_won_p2:setsWonP2});
+      }catch(e){console.warn('finalizeMatch (edicao):',e);}
+    }
+    closeModal('modal-edit-finished');renderFinishedMatches();renderMatches();showToast('Jogo atualizado');
+  }catch(e){console.error(e);showToast('Erro: '+e.message,'error');}
+}
+
 // propagateResultToDraws extraida pra src/js/modules/bracket-mutators.js (issue #14.L)
 function autoDetectWinner(){
   const numSets=tournament?.scoring?.sets||3;
