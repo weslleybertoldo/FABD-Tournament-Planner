@@ -11,6 +11,7 @@
 // Deps globais (mutaveis):
 // - tournament (mutavel)
 // - areGroupsFinished, findTournamentMatch (modulos)
+// - usesBestThirds, buildBestThirdsQuarterfinals (bracket-best-thirds)
 // - updateEliminationMatchesInList (bracket-mutators)
 // - assignAutoTimes (app.js)
 // - window.api.saveTournament (IPC)
@@ -47,17 +48,23 @@ function propagateGroupsToElimination(d) {
   // (sem usar generateEliminationBracket que reordena com seed positions)
   const elimMatches = [];
 
-  // Gerar semifinais: parear grupos em duplas (A,B), (C,D), etc.
+  // 3 grupos x 2: os 6 nao fecham chave — puxa os 2 melhores 3os e fecha 8
+  // nas quartas (bracket-best-thirds.js)
   const semis = [];
-  for (let g = 0; g < groupKeys.length; g += 2) {
-    const gA = byGroup[groupKeys[g]] || [];
-    const gB = byGroup[groupKeys[g + 1] || groupKeys[(g + 1) % groupKeys.length]] || [];
-    // A1 vs B2
-    if (gA[0] && gB[1]) semis.push({ player1: gA[0], player2: gB[1] });
-    else if (gA[0]) semis.push({ player1: gA[0], player2: '' });
-    // B1 vs A2
-    if (gB[0] && gA[1]) semis.push({ player1: gB[0], player2: gA[1] });
-    else if (gB[0]) semis.push({ player1: gB[0], player2: '' });
+  if (usesBestThirds(d.groupsData.groups, qualifiers)) {
+    semis.push(...buildBestThirdsQuarterfinals(d.groupsData.groups));
+  } else {
+    // Gerar semifinais: parear grupos em duplas (A,B), (C,D), etc.
+    for (let g = 0; g < groupKeys.length; g += 2) {
+      const gA = byGroup[groupKeys[g]] || [];
+      const gB = byGroup[groupKeys[g + 1] || groupKeys[(g + 1) % groupKeys.length]] || [];
+      // A1 vs B2
+      if (gA[0] && gB[1]) semis.push({ player1: gA[0], player2: gB[1] });
+      else if (gA[0]) semis.push({ player1: gA[0], player2: '' });
+      // B1 vs A2
+      if (gB[0] && gA[1]) semis.push({ player1: gB[0], player2: gA[1] });
+      else if (gB[0]) semis.push({ player1: gB[0], player2: '' });
+    }
   }
 
   // R1: semifinais
