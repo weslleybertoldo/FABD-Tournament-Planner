@@ -247,6 +247,9 @@
               </select>
             </div>
 
+            <!-- PROGRESSO DO DIA (acompanha o filtro de dia) -->
+            <div id="matches-progress" class="matches-progress"></div>
+
             <!-- PAINEIS DE QUADRAS -->
             <div id="courts-panel" class="courts-panel"></div>
 
@@ -259,7 +262,6 @@
                     <div class="tab" data-action="setMatchesTab" data-arg-1="finished">Finalizadas</div>
                     <div class="tab" data-action="setMatchesTab" data-arg-1="umpires">Arbitros</div>
                   </div>
-                  <span id="matches-count" style="font-size:13px;color:var(--fabd-gray-500)"></span>
                 </div>
               </div>
               <div id="matches-tab-all">
@@ -1080,6 +1082,7 @@
   <script src="js/modules/umpires.js"></script>
   <script src="js/modules/players.js"></script>
   <script src="js/modules/draws-ui.js"></script>
+  <script src="js/modules/matches-forecast.js"></script>
   <script src="js/modules/matches-ui.js"></script>
   <script src="js/modules/schedule.js"></script>
   <script src="js/modules/reports.js"></script>

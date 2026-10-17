@@ -178,3 +178,63 @@ describe('regenerateDrawSchedule — Grupos + Eliminatoria', () => {
     expect(t.matches.find(m => m.drawName === 'SM Sub11').group).toBe('A');
   });
 });
+
+describe('regenerateDrawSchedule — eliminatoria provisoria por rodada', () => {
+  it('quartas dividem o horario, semis depois e a final por ultimo (sem herdar horario antigo)', async () => {
+    const t = {
+      id: 't1', courts: 4, matchDuration: 30, restMinBetweenGames: 20,
+      startTime: '08:00', endTime: '18:00', breakStart: '00:00', breakEnd: '00:00',
+      draws: [{ id: 'd1', name: 'SM Principal', type: 'Grupos + Eliminatoria', event: 'SM', matches: [{ round: 1 }], groupsData: { groups: [] } }],
+      matches: [
+        { drawName: 'SM Principal', drawMatchIdx: 0, player1: 'A', player2: 'B', round: 1, phase: 'group', status: 'Finalizada', time: '08:00', score: '21-10', winner: 1 },
+        { drawName: 'SM Principal', drawMatchIdx: 1, player1: 'C', player2: 'D', round: 1, phase: 'group', status: 'Pendente', time: '08:50' },
+        // Final provisoria antiga num horario ANTES das quartas (o bug do 50 -> 51)
+        { drawName: 'SM Principal', drawMatchIdx: 8, player1: '', player2: '', round: 3, phase: 'elimination', status: 'A definir', time: '09:40' },
+      ],
+    };
+    const elim = [[2, 1, 'Quartas'], [3, 1, 'Quartas'], [4, 1, 'Quartas'], [5, 1, 'Quartas'], [6, 2, 'Semifinal'], [7, 2, 'Semifinal'], [8, 3, 'Final']];
+    const { regenerateDrawSchedule } = loadRegen(t, {
+      rebuildGroupsElimMatches: (d, arr) => {
+        arr.push({ drawMatchIdx: 0, player1: 'A', player2: 'B', round: 1, group: 'A', phase: 'group' });
+        arr.push({ drawMatchIdx: 1, player1: 'C', player2: 'D', round: 1, group: 'A', phase: 'group' });
+        elim.forEach(([idx, round, roundName]) => arr.push({ drawMatchIdx: idx, player1: '', player2: '', round, roundName, phase: 'elimination' }));
+      },
+    });
+    await regenerateDrawSchedule(0, true);
+    const byIdx = idx => t.matches.find(m => m.drawMatchIdx === idx);
+    expect([2, 3, 4, 5].map(i => byIdx(i).time)).toEqual(['09:40', '09:40', '09:40', '09:40']);
+    expect([6, 7].map(i => byIdx(i).time)).toEqual(['10:30', '10:30']);
+    expect(byIdx(8).time).toBe('11:20');
+    expect(t.matches.filter(m => m.phase === 'elimination').length).toBe(7);
+  });
+});
+
+describe('fillMissingTimesByDay — torneio de 2 dias', () => {
+  it('da horario so ao definido sem horario, no proprio dia, sem mexer nos outros', () => {
+    const t = {
+      courts: 2, matchDuration: 30, restMinBetweenGames: 20,
+      startTime: '10:30', endTime: '18:00', breakStart: '00:00', breakEnd: '00:00',
+      daySchedule: [
+        { date: '2026-10-17', startTime: '10:30', endTime: '18:00', breakStart: '00:00', breakEnd: '00:00', draws: ['DX'] },
+        { date: '2026-10-18', startTime: '08:00', endTime: '18:00', breakStart: '00:00', breakEnd: '00:00', draws: ['SM'] },
+      ],
+      matches: [
+        { drawName: 'DX', player1: 'A', player2: 'B', status: 'Finalizada', time: '10:30' },
+        { drawName: 'SM', player1: 'C', player2: 'D', status: 'Pendente', time: '08:00' },
+        { drawName: 'SM', player1: 'E', player2: 'F', status: 'Pendente', time: '08:00' },
+        { drawName: 'SM', player1: 'C', player2: 'E', status: 'Pendente', time: '' },
+        { drawName: 'SM', player1: '', player2: '', status: 'A definir', isDefinida: false, time: '' },
+      ],
+    };
+    const { fillMissingTimesByDay } = loadRegen(t);
+    expect(fillMissingTimesByDay()).toBe(true);
+    // Os horarios de amanha que ja existiam ficam (08:00 esta fora dos slots do torneio, que comeca 10:30)
+    expect(t.matches.map(m => m.time)).toEqual(['10:30', '08:00', '08:00', '08:50', '']);
+  });
+
+  it('nao faz nada quando todos os definidos ja tem horario', () => {
+    const t = { matches: [{ drawName: 'X', player1: 'A', player2: 'B', status: 'Pendente', time: '09:00' }] };
+    const { fillMissingTimesByDay } = loadRegen(t);
+    expect(fillMissingTimesByDay()).toBe(false);
+  });
+});

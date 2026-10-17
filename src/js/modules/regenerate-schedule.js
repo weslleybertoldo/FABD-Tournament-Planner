@@ -4,6 +4,7 @@
 // desta chave. Encaixa novos jogos em slots livres do dia da chave.
 //
 // regenerateDrawSchedule(drawIdx, skipConfirm): async. Mutador pesado.
+// fillMissingTimesByDay(): da horario so aos definidos sem horario, por dia.
 //
 // Deps globais:
 // - tournament (mutavel)
@@ -17,6 +18,62 @@
 // Issue #14 sub-tarefa 14.N — auditoria 2026-05-09.
 // Cobertura: tests/unit/regenerate-schedule.test.js
 // =====================================================================
+
+// Ordem das fases dentro de uma chave: grupos (0) e depois as rodadas da
+// eliminatoria (1, 2, 3...). Usada tambem pelo regenerateSchedule (app.js).
+function scheduleStageOf(m) {
+  return m.phase === 'group' ? 0 : (m.round || 1);
+}
+
+// Da horario so a jogo DEFINIDO que esta sem, no slot do proprio dia, sem
+// mexer em nenhum horario que ja existe: ocupacao das quadras e descanso
+// contam os jogos do mesmo dia que ja tem horario. Usada depois de propagar
+// resultados (repropagateAllResults). Antes era o assignAutoTimes com TODOS
+// os jogos e os slots do torneio: num torneio de 2 dias ele apagava ou
+// trocava os horarios do outro dia (17/10/2026, II Festival, ao fechar o
+// grupo do DX). Retorna true se deu horario a algum jogo.
+function fillMissingTimesByDay() {
+  const all = tournament?.matches || [];
+  const missing = all.filter(m => !m.time && m.isDefinida !== false && m.status !== 'A definir');
+  if (!missing.length) return false;
+  ensureDayScheduleDraws();
+  const days = tournament.daySchedule?.length ? tournament.daySchedule : [null];
+  const dur = tournament.matchDuration || 30, rest = tournament.restMinBetweenGames || 20;
+  const courts = tournament.courts || 4;
+  const playersOf = m => [m.player1, m.player2].flatMap(n => String(n || '').split('/')).map(x => x.trim()).filter(Boolean);
+  let changed = false;
+  days.forEach(day => {
+    const inDay = m => !day || (day.draws || []).includes(m.drawName);
+    const start = timeToMin(day?.startTime || tournament.startTime || '08:00');
+    const end = timeToMin(day?.endTime || tournament.endTime || '18:00');
+    const bS = timeToMin(day?.breakStart || tournament.breakStart || '12:00');
+    const bE = timeToMin(day?.breakEnd || tournament.breakEnd || '13:30');
+    const slots = [];
+    let cur = start;
+    while (cur + dur <= end) {
+      if (cur >= bS && cur < bE) { cur = bE; continue; }
+      if (cur + dur > bS && cur < bS) { cur = bE; continue; }
+      slots.push(cur);
+      cur += dur + rest;
+    }
+    const count = new Array(slots.length).fill(0);
+    const lastSlot = {};
+    const take = (m, si) => { count[si]++; playersOf(m).forEach(p => { lastSlot[p] = Math.max(lastSlot[p] ?? -1, si); }); };
+    all.filter(m => m.time && inDay(m)).forEach(m => {
+      const si = slots.indexOf(timeToMin(m.time));
+      if (si >= 0) take(m, si);
+    });
+    missing.filter(inDay).forEach(m => {
+      let si = slots.findIndex((_, i) => count[i] < courts && playersOf(m).every(p => lastSlot[p] == null || i > lastSlot[p]));
+      if (si < 0) si = slots.findIndex((_, i) => count[i] < courts);
+      if (si < 0) return;
+      m.time = minToTime(slots[si]);
+      take(m, si);
+      changed = true;
+    });
+  });
+  return changed;
+}
 
 async function regenerateDrawSchedule(drawIdx, skipConfirm) {
   const draws = tournament.draws || [];
@@ -115,8 +172,9 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
       match.startedAt = existing.startedAt;
       match.finishedAt = existing.finishedAt;
     }
-    // Reutilizar horario do slot antigo se existia (mesmo numero de jogos = mesmo horario)
-    else if (existing && existing.time) {
+    // Reutilizar horario do slot antigo se existia (mesmo numero de jogos = mesmo horario).
+    // Provisorio da eliminatoria nao herda: e reencaixado por rodada mais abaixo
+    else if (existing && existing.time && match.status !== 'A definir') {
       match.time = existing.time;
       match.court = existing.court || '';
       match.umpire = existing.umpire || '';
@@ -199,10 +257,11 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
     }
   });
 
-  // Encaixar jogos "A definir" apos ultimo jogo definido da mesma chave (respeitando quadras)
-  newDrawMatches.forEach(m => {
+  // Encaixar jogos "A definir" apos a fase anterior da mesma chave (respeitando quadras):
+  // a mesma rodada divide o horario e a final fica por ultimo
+  [...newDrawMatches].sort((a, b) => scheduleStageOf(a) - scheduleStageOf(b)).forEach(m => {
     if (m.time || m.status !== 'A definir') return;
-    const sameDrawTimes = newDrawMatches.filter(x => x.drawName === m.drawName && x.time).map(x => timeToMin(x.time));
+    const sameDrawTimes = newDrawMatches.filter(x => x.drawName === m.drawName && x.time && scheduleStageOf(x) < scheduleStageOf(m)).map(x => timeToMin(x.time));
     if (!sameDrawTimes.length) return;
     const lastMin = Math.max(...sameDrawTimes);
     for (let si = 0; si < _slots.length; si++) {

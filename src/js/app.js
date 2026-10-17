@@ -1715,7 +1715,7 @@ function renderBracket(d) {
       const isBye = m.isBye;
       const p1 = getDisp(r, i, 1);
       const p2 = getDisp(r, i, 2);
-      const future = !m.player1 && !m.player2 && r > 1;
+      const future = (!m.player1 && !m.player2 && r > 1) || m.isPreview;
       const dash = (future || isBye) ? ' stroke-dasharray="5,3"' : '';
       const sc = isBye ? '#CED4DA' : '#343A40';
       const f1 = m.winner === 1 ? '#D1FAE5' : '#fff';
@@ -1898,45 +1898,12 @@ function renderGroupsElimination(d) {
     h += `<div style="padding:16px;background:var(--fabd-gray-100);border-radius:8px;margin-bottom:16px;text-align:center">
       <p style="color:var(--fabd-gray-600);font-weight:600">Fase de grupos: ${doneGM}/${totalGM} partidas concluidas</p>
       <p style="color:var(--fabd-gray-500);font-size:12px;margin-top:4px">Os jogos abaixo serao preenchidos ao concluir os grupos.</p></div>`;
-    // Gerar preview dos confrontos da eliminatoria
-    const totalQualified = groups.length * qualifiers;
-    const elimSlots = Math.pow(2, Math.ceil(Math.log2(totalQualified)));
-    const semis = bestThirds ? 4 : elimSlots / 2;
-    const previewCard = (labelA, labelB) => `<div style="background:#fff;border:2px dashed var(--fabd-gray-300);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
-        <span style="font-weight:600;color:var(--fabd-blue)">${esc(labelA)}</span>
-        <span style="color:var(--fabd-gray-400);font-weight:700">VS</span>
-        <span style="font-weight:600;color:#DC2626">${esc(labelB)}</span>
-      </div>`;
-    const roundTitle = t => `<p style="font-weight:700;color:var(--fabd-gray-600);font-size:13px;margin-bottom:-4px">${t}</p>`;
-    h += `<div style="display:flex;flex-direction:column;gap:12px;max-width:500px;margin:0 auto">`;
-    if (bestThirds) {
-      // 3 grupos x 2 + os 2 melhores 3os = 8 nas quartas (bracket-best-thirds.js)
-      h += roundTitle('Quartas de final');
-      bestThirdsQuarterfinalLabels(groups.map(g => g.name)).forEach(([a, b]) => { h += previewCard(a, b); });
-      h += roundTitle('Semifinais');
-      h += previewCard('Venc. Quartas 1', 'Venc. Quartas 2');
-      h += previewCard('Venc. Quartas 3', 'Venc. Quartas 4');
-    } else {
-      for (let i = 0; i < semis; i++) {
-        const gIdxA = i % groups.length;
-        const gIdxB = (i + 1) % groups.length;
-        const posA = Math.floor(i / groups.length) + 1;
-        const posB = qualifiers - Math.floor(i / groups.length);
-        const labelA = `${posA}o do ${groups[gIdxA]?.name || 'Grupo '+(gIdxA+1)}`;
-        const labelB = `${posB}o do ${groups[gIdxB]?.name || 'Grupo '+(gIdxB+1)}`;
-        h += previewCard(labelA, labelB);
-      }
-    }
-    if (semis > 1) {
-      h += `<div style="background:#FEF3C7;border:2px dashed #F59E0B;border-radius:8px;padding:12px 16px;text-align:center">
-        <span style="font-weight:700;color:#92400E">FINAL</span>
-        <p style="font-size:12px;color:#92400E;margin-top:4px">Vencedores das semifinais</p>
-      </div>`;
-    }
+    // Previa no formato de chave (igual a chave real), com rotulos no lugar dos nomes
+    const previewMatches = buildGroupsElimPreview(groups, qualifiers);
+    if (previewMatches.length) h += renderBracket({ matches: previewMatches });
     if (bestThirds) {
       h += `<p style="font-size:12px;color:var(--fabd-gray-500);text-align:center">Melhor 3o: mais vitorias, depois saldo de pontos, depois pontos feitos.<br>Se um 3o cair contra o 1o do proprio grupo, os dois 3os trocam de lugar.</p>`;
     }
-    h += `</div>`;
   }
   h += '</div>';
 
@@ -2378,6 +2345,7 @@ async function syncMatchesWithDraws() {
       existing.isDefinida = !!(s.player1 && s.player2);
       if (existing.isDefinida) existing.status = 'Pendente';
       if (s.roundName) existing.roundName = s.roundName;
+      if (s.round != null) existing.round = s.round;
       existing.drawMatchIdx = s.drawMatchIdx; // atualizar idx
       existing._updated = true; // marcar pra nao reusar no fallback
     }
@@ -2392,10 +2360,14 @@ async function syncMatchesWithDraws() {
   // Encontrar novos jogos
   let added = 0;
   shouldExist.forEach(s => {
-    // Verificar por drawMatchIdx primeiro, depois por chave tradicional
-    if (s.drawMatchIdx!=null && existingByIdx.has(`${s.drawName}|${s.drawMatchIdx}`)) return;
-    const key = `${s.drawName}|${s.round}|${s.player1}|${s.player2}`;
-    if (existingByKey.has(key)) return;
+    // Com drawMatchIdx so ele decide: os provisorios tem jogadores vazios e a
+    // chave round+jogadores colide entre jogos diferentes da mesma rodada
+    if (s.drawMatchIdx!=null) {
+      if (existingByIdx.has(`${s.drawName}|${s.drawMatchIdx}`)) return;
+    } else {
+      const key = `${s.drawName}|${s.round}|${s.player1}|${s.player2}`;
+      if (existingByKey.has(key)) return;
+    }
     // Verificar se ja existe um match neste drawName+round (evitar duplicatas de rounds futuros)
     const existingInRound = tournament.matches.find(m=>m.drawName===s.drawName&&m.round===s.round&&m.drawMatchIdx===s.drawMatchIdx);
     if (existingInRound) return;
@@ -2507,10 +2479,11 @@ async function regenerateSchedule() {
       const dsCount = new Array(daySlots.length).fill(0);
       definidos.forEach(m => { if(m.time){ const si=daySlots.indexOf(timeToMin(m.time)); if(si>=0) dsCount[si]++; }});
 
-      elimAdefs.sort((a,b) => a.drawName===b.drawName ? (a.round||0)-(b.round||0) : 0);
+      elimAdefs.sort((a,b) => scheduleStageOf(a) - scheduleStageOf(b));
       elimAdefs.forEach(m => {
-        const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time).map(d => timeToMin(d.time));
-        const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && d !== m).map(d => timeToMin(d.time));
+        // So a fase anterior da chave empurra o horario: a mesma rodada divide o slot
+        const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
+        const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
         const allTimes = [...sameDrawGroupTimes, ...sameDrawAdefTimes];
         if (allTimes.length) {
           const lastMin = Math.max(...allTimes);
@@ -2566,10 +2539,10 @@ async function regenerateSchedule() {
     }
     const ndCount = new Array(ndSlots.length).fill(0);
     definidos.forEach(m => { if(m.time){ const si=ndSlots.indexOf(timeToMin(m.time)); if(si>=0) ndCount[si]++; }});
-    elimAdefs.sort((a,b) => a.drawName===b.drawName ? (a.round||0)-(b.round||0) : 0);
+    elimAdefs.sort((a,b) => scheduleStageOf(a) - scheduleStageOf(b));
     elimAdefs.forEach(m => {
-      const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time).map(d => timeToMin(d.time));
-      const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && d !== m).map(d => timeToMin(d.time));
+      const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
+      const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
       const allTimes = [...sameDrawGroupTimes, ...sameDrawAdefTimes];
       if (allTimes.length) {
         const lastMin = Math.max(...allTimes);
