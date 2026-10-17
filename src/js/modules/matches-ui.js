@@ -27,32 +27,10 @@ function renderMatches() {
     }
     dayFilter.value=prevVal||'';
   }
-  const tb=document.getElementById('matches-table-body'),countEl=document.getElementById('matches-count');
+  const tb=document.getElementById('matches-table-body');
   const matches=tournament.matches||[];
-  const doneMatches=matches.filter(m=>m.status==='Finalizada'||m.status==='WO'||m.status==='Desistencia'||m.status==='Desqualificacao');
   const pendingMatches=matches.filter(m=>m.status!=='Finalizada'&&m.status!=='WO'&&m.status!=='Desistencia'&&m.status!=='Desqualificacao');
-  if(countEl){
-    let info=`${doneMatches.length}/${matches.length} finalizadas`;
-    // Tempo medio de jogo
-    const withDuration=doneMatches.filter(m=>m.startedAt&&m.finishedAt);
-    if(withDuration.length){
-      const totalSec=withDuration.reduce((s,m)=>s+Math.floor((new Date(m.finishedAt)-new Date(m.startedAt))/1000),0);
-      const avgSec=Math.floor(totalSec/withDuration.length);
-      const avgMin=Math.floor(avgSec/60),avgS=avgSec%60;
-      info+=` | Tempo medio: ${avgMin}min${avgS?` ${String(avgS).padStart(2,'0')}s`:''}`;
-      // Previsao de finalizacao
-      const remaining=pendingMatches.filter(m=>m.status!=='A definir').length;
-      const courts=tournament.courts||4;
-      const slotsNeeded=Math.ceil(remaining/courts);
-      const totalRemainingSec=slotsNeeded*avgSec;
-      const now=new Date();
-      const endEstimate=new Date(now.getTime()+totalRemainingSec*1000);
-      const endH=String(endEstimate.getHours()).padStart(2,'0'),endM=String(endEstimate.getMinutes()).padStart(2,'0');
-      const remMin=Math.floor(totalRemainingSec/60);
-      info+=` | Restante: ~${remMin}min | Previsao: ${endH}:${endM}`;
-    }
-    countEl.textContent=info;
-  }
+  renderMatchesProgress();
   if(!pendingMatches.length){tb.innerHTML=`<tr><td colspan="11" style="text-align:center;color:var(--fabd-gray-500);padding:40px">Todas as partidas foram finalizadas.</td></tr>`;return;}
   if(!matches.length){tb.innerHTML=`<tr><td colspan="11" style="text-align:center;color:var(--fabd-gray-500);padding:40px">Sem partidas.</td></tr>`;return;}
 
@@ -231,6 +209,63 @@ function renderMatches() {
   setTimeout(()=>filterMatches(),0);
 }
 
+// Painel de progresso do topo da aba: finalizadas, tempo medio, restante e
+// previsao de termino do dia escolhido no filtro (todos os dias = total +
+// previsao de cada dia). Numeros em matches-forecast.js.
+function renderMatchesProgress() {
+  const el=document.getElementById('matches-progress');
+  if(!el||!tournament)return;
+  const matches=tournament.matches||[];
+  const days=tournament.daySchedule||[];
+  const dayVal=document.getElementById('match-day-filter')?.value||'';
+  const nowMs=Date.now();
+  const allAvg=forecastAvgSec(matches);
+  const dayMs=(day,hhmm)=>new Date(`${day.date}T${hhmm}:00`).getTime();
+  const dayLabel=day=>{const i=days.indexOf(day);const d=new Date(day.date+'T00:00:00');return`Dia ${i+1} - ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;};
+  const summarize=(list,day)=>forecastSummary(list,{
+    nowMs,dayStartMs:day?dayMs(day,day.startTime||tournament.startTime||'08:00'):0,
+    courts:tournament.courts||4,restMin:tournament.restMinBetweenGames||0,
+    defaultMin:tournament.matchDuration||30,fallbackAvg:allAvg
+  });
+  const hm=ms=>{const d=new Date(ms);return`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
+  const dur=min=>min>=60?`${Math.floor(min/60)}h${String(min%60).padStart(2,'0')}`:`${min} min`;
+  const avgTxt=sec=>`${Math.floor(sec/60)}min${sec%60?` ${String(sec%60).padStart(2,'0')}s`:''}`;
+  const tile=(cls,icon,label,value,sub,extra='')=>`<div class="mp-tile ${cls}"><div class="mp-label"><span>${icon}</span>${label}</div><div class="mp-value">${value}</div>${extra}<div class="mp-sub">${sub}</div></div>`;
+  const statusSub=s=>[s.inCourt?`${s.inCourt} em quadra`:'',s.pending?`${s.pending} pendente${s.pending>1?'s':''}`:'',s.toDefine?`${s.toDefine} a definir`:''].filter(Boolean).join(' · ')||'nenhum jogo faltando';
+  const avgSub=a=>a.source==='dia'?`media de ${a.count} jogo${a.count>1?'s':''} do dia`:a.source==='torneio'?`media do torneio (${a.count} jogo${a.count>1?'s':''})`:'duracao configurada (sem jogo medido)';
+  const selDay=dayVal?days.find(d=>d.date===dayVal):null;
+  const list=selDay?matches.filter(m=>(selDay.draws||[]).includes(m.drawName)):matches;
+  const s=summarize(list,selDay);
+  const pct=s.total?Math.round(s.done/s.total*100):0;
+  let h=tile('green','&#9989;','Finalizadas',`${s.done}<small>/${s.total}</small>`,statusSub(s),`<div class="mp-bar"><span style="width:${pct}%"></span></div>`);
+  const avg=selDay?s.avg:(allAvg?{...allAvg,source:'torneio'}:s.avg);
+  h+=tile('','&#9201;','Tempo medio por jogo',avgTxt(avg.sec),avgSub(avg));
+  if(selDay||!days.length){
+    // Um dia (ou torneio sem agenda por dia)
+    const future=selDay&&s.startMs>nowMs;
+    h+=tile('yellow','&#9203;','Restante',s.remaining?`~${dur(s.remainingMin)}`:'0 min',s.remaining?`${s.remaining} jogo${s.remaining>1?'s':''}${future?` · a partir das ${hm(s.startMs)}`:''}`:'tudo finalizado');
+    if(s.remaining&&s.endMs){
+      const late=selDay&&selDay.endTime&&s.endMs>dayMs(selDay,selDay.endTime);
+      h+=tile(late?'red':'blue','&#127937;','Previsao de termino',hm(s.endMs),late?`&#9888; passa das ${esc(selDay.endTime)}`:(selDay?esc(dayLabel(selDay)):'quadras ocupadas ate esse horario'));
+    } else {
+      h+=tile('blue','&#127937;','Encerrado',s.lastFinishedMs?hm(s.lastFinishedMs):'-',selDay?esc(dayLabel(selDay)):'ultimo jogo finalizado');
+    }
+  } else {
+    // Todos os dias: o que falta no total + previsao de cada dia
+    const perDay=days.map(day=>({day,s:summarize(matches.filter(m=>(day.draws||[]).includes(m.drawName)),day)}));
+    const withLeft=perDay.filter(x=>x.s.remaining);
+    h+=tile('yellow','&#9203;','Restante',`${s.remaining} <small>jogo${s.remaining===1?'':'s'}</small>`,withLeft.length?`em ${withLeft.length} dia${withLeft.length>1?'s':''}`:'tudo finalizado');
+    const rows=perDay.map(({day,s:ds})=>`<div><span>${esc(dayLabel(day))}</span><strong>${ds.remaining&&ds.endMs?hm(ds.endMs):ds.total?'encerrado':'-'}</strong></div>`).join('');
+    h+=tile('blue','&#127937;','Previsao de termino',`<div class="mp-days">${rows}</div>`,'filtre o dia pra ver o detalhe');
+  }
+  el.innerHTML=h;
+}
+
+// Relogio do painel: a previsao anda com o tempo mesmo sem jogo novo
+if(typeof window!=='undefined'&&!window.__fabdProgressTicker){
+  window.__fabdProgressTicker=setInterval(()=>{try{renderMatchesProgress();}catch(e){console.warn('[progressTicker]',e);}},60000);
+}
+
 let _filterMatchesTimer = null;
 function filterMatches() {
   if (_filterMatchesTimer) clearTimeout(_filterMatchesTimer);
@@ -263,6 +298,8 @@ function filterMatches() {
       const matchDay = !dayDraws || (dayDraws.has(r.dataset.draw||''));
       r.style.display = matchDay ? '' : 'none';
     });
+    // Painel de progresso acompanha o dia escolhido
+    renderMatchesProgress();
   }, 150);
 }
 
