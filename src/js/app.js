@@ -2378,6 +2378,7 @@ async function syncMatchesWithDraws() {
       existing.isDefinida = !!(s.player1 && s.player2);
       if (existing.isDefinida) existing.status = 'Pendente';
       if (s.roundName) existing.roundName = s.roundName;
+      if (s.round != null) existing.round = s.round;
       existing.drawMatchIdx = s.drawMatchIdx; // atualizar idx
       existing._updated = true; // marcar pra nao reusar no fallback
     }
@@ -2392,10 +2393,14 @@ async function syncMatchesWithDraws() {
   // Encontrar novos jogos
   let added = 0;
   shouldExist.forEach(s => {
-    // Verificar por drawMatchIdx primeiro, depois por chave tradicional
-    if (s.drawMatchIdx!=null && existingByIdx.has(`${s.drawName}|${s.drawMatchIdx}`)) return;
-    const key = `${s.drawName}|${s.round}|${s.player1}|${s.player2}`;
-    if (existingByKey.has(key)) return;
+    // Com drawMatchIdx so ele decide: os provisorios tem jogadores vazios e a
+    // chave round+jogadores colide entre jogos diferentes da mesma rodada
+    if (s.drawMatchIdx!=null) {
+      if (existingByIdx.has(`${s.drawName}|${s.drawMatchIdx}`)) return;
+    } else {
+      const key = `${s.drawName}|${s.round}|${s.player1}|${s.player2}`;
+      if (existingByKey.has(key)) return;
+    }
     // Verificar se ja existe um match neste drawName+round (evitar duplicatas de rounds futuros)
     const existingInRound = tournament.matches.find(m=>m.drawName===s.drawName&&m.round===s.round&&m.drawMatchIdx===s.drawMatchIdx);
     if (existingInRound) return;
@@ -2507,10 +2512,11 @@ async function regenerateSchedule() {
       const dsCount = new Array(daySlots.length).fill(0);
       definidos.forEach(m => { if(m.time){ const si=daySlots.indexOf(timeToMin(m.time)); if(si>=0) dsCount[si]++; }});
 
-      elimAdefs.sort((a,b) => a.drawName===b.drawName ? (a.round||0)-(b.round||0) : 0);
+      elimAdefs.sort((a,b) => scheduleStageOf(a) - scheduleStageOf(b));
       elimAdefs.forEach(m => {
-        const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time).map(d => timeToMin(d.time));
-        const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && d !== m).map(d => timeToMin(d.time));
+        // So a fase anterior da chave empurra o horario: a mesma rodada divide o slot
+        const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
+        const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
         const allTimes = [...sameDrawGroupTimes, ...sameDrawAdefTimes];
         if (allTimes.length) {
           const lastMin = Math.max(...allTimes);
@@ -2566,10 +2572,10 @@ async function regenerateSchedule() {
     }
     const ndCount = new Array(ndSlots.length).fill(0);
     definidos.forEach(m => { if(m.time){ const si=ndSlots.indexOf(timeToMin(m.time)); if(si>=0) ndCount[si]++; }});
-    elimAdefs.sort((a,b) => a.drawName===b.drawName ? (a.round||0)-(b.round||0) : 0);
+    elimAdefs.sort((a,b) => scheduleStageOf(a) - scheduleStageOf(b));
     elimAdefs.forEach(m => {
-      const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time).map(d => timeToMin(d.time));
-      const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && d !== m).map(d => timeToMin(d.time));
+      const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
+      const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
       const allTimes = [...sameDrawGroupTimes, ...sameDrawAdefTimes];
       if (allTimes.length) {
         const lastMin = Math.max(...allTimes);

@@ -9,6 +9,7 @@ function loadReconcile(tournament, mocks = {}) {
     findTournamentMatch: mocks.findTournamentMatch || ((draw, idx, dm) => null),
     updateEliminationMatchesInList: mocks.updateEliminationMatchesInList || (() => {}),
     assignAutoTimes: mocks.assignAutoTimes || (() => {}),
+    fillMissingTimesByDay: mocks.fillMissingTimesByDay || (() => false),
     computeGroupStandings: mocks.computeGroupStandings || (() => []),
     usesBestThirds: mocks.usesBestThirds || (() => false),
     buildBestThirdsQuarterfinals: mocks.buildBestThirdsQuarterfinals || (() => []),

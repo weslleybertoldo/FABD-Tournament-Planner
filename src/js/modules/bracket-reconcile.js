@@ -13,7 +13,7 @@
 // - areGroupsFinished, findTournamentMatch (modulos)
 // - usesBestThirds, buildBestThirdsQuarterfinals (bracket-best-thirds)
 // - updateEliminationMatchesInList (bracket-mutators)
-// - assignAutoTimes (app.js)
+// - fillMissingTimesByDay (regenerate-schedule.js)
 // - window.api.saveTournament (IPC)
 //
 // Issue #14 sub-tarefa 14.M — auditoria 2026-05-09.
@@ -301,13 +301,9 @@ function repropagateAllResults(){
     // Atualizar matches de eliminatoria na lista
     updateEliminationMatchesInList();
 
-    // Atribuir horarios a matches que ficaram sem
-    const all=tournament.matches;
-    if(all.some(m=>!m.time)){
-      const defs=all.filter(m=>m.isDefinida!==false&&m.status!=='A definir');
-      const adefs=all.filter(m=>m.isDefinida===false||m.status==='A definir');
-      assignAutoTimes([...defs,...adefs]);
-    }
+    // Dar horario so a jogo definido que ficou sem, no proprio dia (o
+    // assignAutoTimes com todos os jogos apagava os horarios do outro dia)
+    fillMissingTimesByDay();
     window.api.saveTournament(tournament);
   }
 }

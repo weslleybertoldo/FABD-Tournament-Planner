@@ -12,6 +12,7 @@ function loadAll() {
     findTournamentMatch: () => null,
     updateEliminationMatchesInList: () => {},
     assignAutoTimes: () => {},
+    fillMissingTimesByDay: () => false,
     window: { api: { saveTournament: () => Promise.resolve() } },
   });
 }
