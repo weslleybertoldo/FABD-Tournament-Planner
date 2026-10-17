@@ -125,7 +125,10 @@ function renderScheduleMatch(m){
   const done=m.status==='Finalizada'||m.status==='WO',eq=m.status==='Em Quadra',adef=m.status==='A definir';
   let bg='#fff';if(eq)bg='#FFF3E0';if(done)bg='#D1FAE5';if(adef)bg='#F9FAFB';
   const border=done?'#10B981':eq?'#F59E0B':adef?'var(--fabd-gray-300)':'var(--fabd-blue)';
-  const p1=esc(m.player1Display||m.player1||'A definir'),p2=esc(m.player2Display||m.player2||'A definir');
+  // Provisorio da eliminatoria: grupo que ja acabou mostra o nome do classificado
+  const _d=!m.player1||!m.player2?(tournament.draws||[]).find(x=>x.name===m.drawName):null;
+  const _disp=(raw,disp)=>raw?(disp||raw):resolveGroupQualifierLabel(_d,disp||'A definir');
+  const p1=esc(_disp(m.player1,m.player1Display)),p2=esc(_disp(m.player2,m.player2Display));
   const p1Style=m.winner===1?'color:#10B981;font-weight:700':'font-weight:600';
   const p2Style=m.winner===2?'color:#10B981;font-weight:700':'font-weight:600';
   let scoreHtml='';

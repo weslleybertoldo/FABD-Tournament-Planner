@@ -141,7 +141,11 @@ function renderMatches() {
       if(!name)return false;
       return name.split('/').some(n=>inCourt.has(n.trim()));
     };
-    const p1=esc(m.player1Display||m.player1||'A definir'),p2=esc(m.player2Display||m.player2||'A definir');
+    // Provisorio da eliminatoria: grupo que ja acabou mostra o nome do classificado
+    const _d=!m.player1||!m.player2?(tournament.draws||[]).find(x=>x.name===m.drawName):null;
+    const _disp=(raw,disp)=>raw?(disp||raw):resolveGroupQualifierLabel(_d,disp||'A definir');
+    const d1=_disp(m.player1,m.player1Display),d2=_disp(m.player2,m.player2Display);
+    const p1=esc(d1),p2=esc(d2);
     const alertIcon='<span title="Atleta em quadra" style="color:#F59E0B;font-weight:700;cursor:help;margin-left:4px">&#9888;</span>';
     const absentIcon='<span title="Ausente" style="color:#DC2626;font-weight:700;cursor:help;margin-left:4px">&#10071;</span>';
     const restBadge=(endsAt)=>{
@@ -195,7 +199,7 @@ function renderMatches() {
     const dayLabel=matchDay?((d)=>{const o=new Date(d+'T00:00:00');return`${String(o.getDate()).padStart(2,'0')}/${String(o.getMonth()+1).padStart(2,'0')}`;})(matchDay.date):'-';
     const _hideRow=_dayDraws&&!_dayDraws.has(m.drawName||'')?'display:none;':'';
     // Texto da busca: so o conteudo da linha (sem as opcoes das listas de quadra/arbitro)
-    const _search=normSearch([dayLabel,m.time,m.drawName,m.roundName||'R'+m.round,m.num,m.player1,m.player2,m.player1Display,m.player2Display,m.court,m.umpire,m.status].join(' '));
+    const _search=normSearch([dayLabel,m.time,m.drawName,m.roundName||'R'+m.round,m.num,m.player1,m.player2,d1,d2,m.court,m.umpire,m.status].join(' '));
     h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" data-search="${esc(_search)}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${esc(m.time)||'-'}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" data-action="assignCourt" data-event="change" data-arg-1="${i}" data-arg-2="$value"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" data-action="updateMatchField" data-event="change" data-arg-1="${i}" data-arg-2="umpire" data-arg-3="$value"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" data-action="showScoreModal" data-arg-1="${i}">Placar</button>${resetBtn}`}</td></tr>`;
   });
   // Quadras livres do ultimo horario
