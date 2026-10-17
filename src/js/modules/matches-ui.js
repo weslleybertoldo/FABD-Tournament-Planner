@@ -194,7 +194,9 @@ function renderMatches() {
     const matchDay=getMatchDay(m);
     const dayLabel=matchDay?((d)=>{const o=new Date(d+'T00:00:00');return`${String(o.getDate()).padStart(2,'0')}/${String(o.getMonth()+1).padStart(2,'0')}`;})(matchDay.date):'-';
     const _hideRow=_dayDraws&&!_dayDraws.has(m.drawName||'')?'display:none;':'';
-    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${esc(m.time)||'-'}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" data-action="assignCourt" data-event="change" data-arg-1="${i}" data-arg-2="$value"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" data-action="updateMatchField" data-event="change" data-arg-1="${i}" data-arg-2="umpire" data-arg-3="$value"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" data-action="showScoreModal" data-arg-1="${i}">Placar</button>${resetBtn}`}</td></tr>`;
+    // Texto da busca: so o conteudo da linha (sem as opcoes das listas de quadra/arbitro)
+    const _search=normSearch([dayLabel,m.time,m.drawName,m.roundName||'R'+m.round,m.num,m.player1,m.player2,m.player1Display,m.player2Display,m.court,m.umpire,m.status].join(' '));
+    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" data-search="${esc(_search)}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${esc(m.time)||'-'}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" data-action="assignCourt" data-event="change" data-arg-1="${i}" data-arg-2="$value"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" data-action="updateMatchField" data-event="change" data-arg-1="${i}" data-arg-2="umpire" data-arg-3="$value"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" data-action="showScoreModal" data-arg-1="${i}">Placar</button>${resetBtn}`}</td></tr>`;
   });
   // Quadras livres do ultimo horario
   if (_lastMatchTime && _matchesAtTime < _nc) {
@@ -267,11 +269,16 @@ if(typeof window!=='undefined'&&!window.__fabdProgressTicker){
   window.__fabdProgressTicker=setInterval(()=>{try{renderMatchesProgress();}catch(e){console.warn('[progressTicker]',e);}},60000);
 }
 
+// Busca sem diferenciar maiusculas nem acento ("jose" acha "José")
+function normSearch(s){
+  return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+}
+
 let _filterMatchesTimer = null;
 function filterMatches() {
   if (_filterMatchesTimer) clearTimeout(_filterMatchesTimer);
   _filterMatchesTimer = setTimeout(() => {
-    const q=(document.getElementById('search-matches')?.value||'').toLowerCase();
+    const q=normSearch(document.getElementById('search-matches')?.value||'');
     const st=document.getElementById('match-status-filter')?.value||'';
     const dayVal=document.getElementById('match-day-filter')?.value||'';
     // Build set of draw names for selected day
@@ -283,7 +290,7 @@ function filterMatches() {
     // Primeiro: filtrar jogos normais
     const visibleTimes = new Set();
     document.querySelectorAll('#matches-table-body tr:not(.court-free-row)').forEach(r=>{
-      const matchQ=r.textContent.toLowerCase().includes(q);
+      const matchQ=!q||(r.dataset.search??normSearch(r.textContent)).includes(q);
       const matchSt=!st||(r.dataset.status||'')===st;
       const matchDay=!dayDraws||(dayDraws.has(r.dataset.draw||''));
       const visible = matchQ&&matchSt&&matchDay;
@@ -308,9 +315,9 @@ let _filterFinishedTimer=null;
 function filterFinished(){
   if(_filterFinishedTimer)clearTimeout(_filterFinishedTimer);
   _filterFinishedTimer=setTimeout(()=>{
-    const q=(document.getElementById('search-finished')?.value||'').toLowerCase();
+    const q=normSearch(document.getElementById('search-finished')?.value||'');
     document.querySelectorAll('#finished-table-body tr').forEach(r=>{
-      r.style.display=r.textContent.toLowerCase().includes(q)?'':'none';
+      r.style.display=normSearch(r.textContent).includes(q)?'':'none';
     });
   },150);
 }
@@ -359,8 +366,9 @@ function renderFinishedMatches(){
     } else {
       scoreHtml=`<span style="color:var(--fabd-red);font-weight:700">${esc(m.score||'-')}</span>`;
     }
+    const editBtn=`<button class="btn btn-sm" style="background:#DBEAFE;color:#1E3A8A;border:1px solid #BFDBFE;padding:2px 6px;font-size:11px;margin-right:4px" data-action="showEditFinishedModal" data-arg-1="${i}" title="Editar placar, arbitro e quadra">&#9998;</button>`;
     const resetBtn=`<button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA;padding:2px 6px;font-size:11px" data-action="resetMatch" data-arg-1="${i}" title="Desfazer resultado">&#8635;</button>`;
-    h+=`<tr><td>${m.num}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td style="${p1Style}">${esc(m.player1||'')}</td><td style="text-align:center;font-weight:700;font-size:13px;white-space:nowrap">${scoreHtml}</td><td style="${p2Style}">${esc(m.player2||'')}</td><td>${esc(m.court||'-')}</td><td>${esc(m.umpire||'-')}</td><td>${startTime}</td><td>${endTime}</td><td>${duration}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${resetBtn}</td></tr>`;
+    h+=`<tr><td>${m.num}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td style="${p1Style}">${esc(m.player1||'')}</td><td style="text-align:center;font-weight:700;font-size:13px;white-space:nowrap">${scoreHtml}</td><td style="${p2Style}">${esc(m.player2||'')}</td><td>${esc(m.court||'-')}</td><td>${esc(m.umpire||'-')}</td><td>${startTime}</td><td>${endTime}</td><td>${duration}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td style="white-space:nowrap">${editBtn}${resetBtn}</td></tr>`;
   });
   tb.innerHTML=h;
 }
