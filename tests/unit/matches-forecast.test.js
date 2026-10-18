@@ -22,16 +22,13 @@ describe('forecastAvgSec', () => {
     expect(forecastAvgSec([{ status: 'Pendente' }])).toBeNull();
   });
 
-  it('jogo com menos de 5 min em quadra nao entra (posto em quadra so pra lancar o resultado)', () => {
+  it('todo jogo medido entra na media, inclusive o curto', () => {
     const at = (hhmm, s) => new Date(T(hhmm) + s * 1000).toISOString();
     const ms = [
-      { status: 'Finalizada', startedAt: iso('09:10'), finishedAt: at('09:10', 23) },
-      { status: 'Finalizada', startedAt: iso('09:11'), finishedAt: at('09:11', 86) },
-      { status: 'Finalizada', startedAt: iso('09:14'), finishedAt: at('09:14', 299) },
-      { status: 'Finalizada', startedAt: iso('09:14'), finishedAt: iso('09:29') },
-      { status: 'Finalizada', startedAt: iso('10:00'), finishedAt: iso('10:05') }, // 5 min: entra
+      { status: 'Finalizada', startedAt: iso('09:10'), finishedAt: at('09:10', 60) },
+      { status: 'Finalizada', startedAt: iso('09:14'), finishedAt: iso('09:43') },
     ];
-    expect(forecastAvgSec(ms)).toEqual({ sec: 10 * 60, count: 2 });
+    expect(forecastAvgSec(ms)).toEqual({ sec: 15 * 60, count: 2 });
   });
 });
 
@@ -76,24 +73,25 @@ describe('forecastDayEndMs', () => {
 });
 
 describe('forecastSummary', () => {
-  it('conta o dia e usa a media do dia', () => {
+  it('conta o dia e usa a media do torneio, nao a do dia', () => {
     const ms = [
-      { status: 'Finalizada', startedAt: iso('13:00'), finishedAt: iso('13:20'), player1: 'A', player2: 'B' },
+      { status: 'Finalizada', startedAt: iso('13:00'), finishedAt: iso('13:05'), player1: 'A', player2: 'B' },
       { status: 'Em Quadra', startedAt: iso('13:55'), player1: 'C', player2: 'D' },
       { status: 'Pendente', player1: 'E', player2: 'F' },
       { drawName: 'X', phase: 'elimination', round: 1, status: 'A definir' },
     ];
-    const s = forecastSummary(ms, { nowMs: T('14:00'), courts: 4, restMin: 0, defaultMin: 30, fallbackAvg: null });
+    // o dia tem 1 jogo de 5 min; a media do torneio (21 min, 25 jogos) manda
+    const s = forecastSummary(ms, { nowMs: T('14:00'), courts: 4, restMin: 0, defaultMin: 30, tournamentAvg: { sec: 21 * 60, count: 25 } });
     expect([s.total, s.done, s.inCourt, s.pending, s.toDefine, s.remaining]).toEqual([4, 1, 1, 1, 1, 3]);
-    expect(s.avg).toEqual({ sec: 20 * 60, count: 1, source: 'dia' });
-    expect(s.endMs).toBe(T('14:20'));
-    expect(s.remainingMin).toBe(20);
+    expect(s.avg).toEqual({ sec: 21 * 60, count: 25, source: 'torneio' });
+    expect(s.endMs).toBe(T('14:21'));
+    expect(s.remainingMin).toBe(21);
   });
 
-  it('dia sem jogo medido usa a media do torneio', () => {
-    const s = forecastSummary([{ status: 'Pendente', player1: 'A', player2: 'B' }], { nowMs: T('14:00'), courts: 4, restMin: 0, defaultMin: 30, fallbackAvg: { sec: 1500, count: 13 } });
-    expect(s.avg.source).toBe('torneio');
-    expect(s.remainingMin).toBe(25);
+  it('torneio sem jogo medido usa a duracao configurada', () => {
+    const s = forecastSummary([{ status: 'Pendente', player1: 'A', player2: 'B' }], { nowMs: T('14:00'), courts: 4, restMin: 0, defaultMin: 30, tournamentAvg: null });
+    expect(s.avg).toEqual({ sec: 30 * 60, count: 0, source: 'configurado' });
+    expect(s.remainingMin).toBe(30);
   });
 
   it('dia encerrado: sem previsao e com o horario do ultimo jogo', () => {
