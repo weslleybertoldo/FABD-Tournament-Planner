@@ -1458,6 +1458,52 @@ ipcMain.handle('supabase:getLiveState', async (_, tournamentId) => {
   return { ok: false, error: lastErr?.message || 'erro desconhecido' };
 });
 
+// Ao abrir o torneio: devolve ao site os jogos finalizados que faltam em
+// live_matches/live_scores (live-history.js escolhe quais). ignoreDuplicates
+// = ON CONFLICT DO NOTHING: nunca pisa no que ja esta la (o arbitro manda).
+// updated_at = hora do fim do jogo: o site ordena "Partidas Finalizadas" por ele.
+ipcMain.handle('supabase:republishHistory', async (_, tournamentId, entries) => {
+  if (!entries?.length) return { ok: true, count: 0 };
+  if (!currentFederation?.id) {
+    log('ERROR', 'republishHistory: sem federacao ativa (login pendente?)');
+    return { ok: false, error: 'sem federacao ativa' };
+  }
+  const now = new Date().toISOString();
+  const matchRows = [], scoreRows = [];
+  for (const { match, score } of entries) {
+    const id = stableMatchId(tournamentId, match);
+    const at = match.finishedAt || now;
+    matchRows.push({
+      id, tournament_id: tournamentId, federation_id: currentFederation.id,
+      match_num: match.num,
+      draw_name: match.drawName || '', round: match.round || 1,
+      round_name: match.roundName || '', player1: match.player1 || '',
+      player2: match.player2 || '', court: match.court || '',
+      umpire: match.umpire || '', status: 'Finalizada',
+      created_at: match.startedAt || at, updated_at: at
+    });
+    scoreRows.push({ ...score, match_id: id, tournament_id: tournamentId, federation_id: currentFederation.id, updated_at: at });
+  }
+  const delays = [0, 2000, 5000];
+  let lastErr = null;
+  for (const delay of delays) {
+    if (delay) await new Promise(r => setTimeout(r, delay));
+    try {
+      const lm = await supabase.from('live_matches').upsert(matchRows, { onConflict: 'id', ignoreDuplicates: true });
+      if (lm.error) throw lm.error;
+      const ls = await supabase.from('live_scores').upsert(scoreRows, { onConflict: 'match_id', ignoreDuplicates: true });
+      if (ls.error) throw ls.error;
+      log('INFO', `Historico do site: ${entries.length} jogo(s) finalizado(s) devolvido(s)`);
+      return { ok: true, count: entries.length };
+    } catch (e) {
+      lastErr = e;
+      if (!_isTransientError(e)) break;
+    }
+  }
+  log('WARN', 'republishHistory falhou:', lastErr?.message);
+  return { ok: false, error: lastErr?.message || 'erro desconhecido' };
+});
+
 ipcMain.handle('supabase:subscribe', async (_, tournamentId) => {
   try {
     // Parar polling e retry anteriores

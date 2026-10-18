@@ -93,6 +93,14 @@ async function recoverLiveFromReferees() {
   // Mesmo caminho do resultado que chega do arbitro em tempo real (salva,
   // propaga na chave e re-publica o torneio)
   for (const s of plan.finals) await handleRealtimeScoreUpdate(s);
+  // Historico do site: finalizados que sumiram de live_matches/live_scores (o
+  // app ate a v4.106 apagava ao fechar) voltam pra "Partidas Finalizadas" do
+  // site Ao Vivo (live-history.js). O que o arbitro mandou fica como esta.
+  const hist = planLiveHistory(tournament.matches || [], st.matches, m => _stableMatchId(tournament.id, m));
+  if (hist.length && window.api?.supabaseRepublishHistory) {
+    const r = await window.api.supabaseRepublishHistory(tournament.id, hist);
+    console.log('[recover] historico do site:', r?.ok ? `${r.count} jogo(s) devolvido(s)` : `falhou (${r?.error})`);
+  }
   if (plan.toCourt.length || plan.finals.length) {
     const parts = [];
     if (plan.toCourt.length) parts.push(`${plan.toCourt.length} jogo(s) de volta em quadra`);

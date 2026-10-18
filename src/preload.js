@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('api', {
   supabaseRegisterEmQuadra: (tid, ids) => ipcRenderer.invoke('supabase:registerEmQuadra', tid, ids),
   onReconcileNeeded: (cb) => { ipcRenderer.removeAllListeners('supabase:reconcile-needed'); ipcRenderer.on('supabase:reconcile-needed', (_, data) => cb(data)); },
   supabaseGetLiveState: (tid) => ipcRenderer.invoke('supabase:getLiveState', tid),
+  supabaseRepublishHistory: (tid, entries) => ipcRenderer.invoke('supabase:republishHistory', tid, entries),
   supabaseListLiveTournaments: () => ipcRenderer.invoke('supabase:listLiveTournaments'),
   supabaseCloseLiveEvent: (tid) => ipcRenderer.invoke('supabase:closeLiveEvent', tid),
   supabaseIsOrganizer: () => ipcRenderer.invoke('supabase:isOrganizer'),
