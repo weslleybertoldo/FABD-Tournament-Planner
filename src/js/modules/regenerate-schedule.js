@@ -146,7 +146,10 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
     }
     const def = !!(s.player1 && s.player2);
     let rn = s.roundName || '';
-    if (!rn) {
+    if (!rn && d.type === 'Todos contra Todos') {
+      // Todos contra todos nao tem semifinal/final (mesmo nome da geracao da chave)
+      rn = `R${s.round}`;
+    } else if (!rn) {
       const totalR = Math.max(...(d.matches || []).map(x => x.round) || [1]);
       rn = s.round === totalR ? 'Final' : s.round === totalR - 1 ? 'Semifinal' : `R${s.round}`;
     }
