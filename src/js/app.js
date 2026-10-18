@@ -3208,6 +3208,11 @@ function showTournamentConfig(){
   document.getElementById('tc-rest-min').value=tournament.restMinBetweenGames!=null?tournament.restMinBetweenGames:20;
   document.getElementById('tc-rest-sets').value=tournament.restBetweenSets!=null?tournament.restBetweenSets:2;
   document.getElementById('tc-rest-mid').value=tournament.restMidSet!=null?tournament.restMidSet:1;
+  // Quadras e Programacao por dia ja montadas: o Salvar le esses campos mesmo
+  // com a aba fechada. Antes, salvar sem abrir a aba Programacao gravava a
+  // programacao vazia (17/10/2026: o II Festival perdeu a separacao por dia).
+  renderCourtNames();
+  renderDaySchedule();
   openModal('modal-tournament-config');
 }
 
