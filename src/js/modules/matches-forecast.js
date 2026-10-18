@@ -21,12 +21,17 @@ function forecastIsDone(m) {
   return FORECAST_DONE_STATUS.includes(m.status);
 }
 
+// Jogo com menos que isso em quadra nao e medicao: foi posto em quadra so pra
+// lancar o resultado (18/10/2026: 3 jogos recolocados depois de fechar o app
+// mediram 23 s, 86 s e 136 s e baixaram a media do dia pra 4min47s).
+const FORECAST_MIN_SEC = 5 * 60;
+
 // Tempo medio em quadra (s) dos finalizados com inicio e fim; null sem dados
 function forecastAvgSec(matches) {
   const secs = matches
     .filter(m => forecastIsDone(m) && m.startedAt && m.finishedAt)
     .map(m => Math.floor((new Date(m.finishedAt) - new Date(m.startedAt)) / 1000))
-    .filter(s => s > 0);
+    .filter(s => s >= FORECAST_MIN_SEC);
   if (!secs.length) return null;
   return { sec: Math.floor(secs.reduce((a, b) => a + b, 0) / secs.length), count: secs.length };
 }
