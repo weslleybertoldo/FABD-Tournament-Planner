@@ -417,6 +417,16 @@ ipcMain.handle('app:info', () => ({ version: app.getVersion(), beta: IS_BETA_CHA
 ipcMain.handle('db:closeTournament', async () => {
   // Limpar TODOS os dados do Supabase (torneio atual + residuos antigos)
   const tid = db.tournament?.id;
+  // Descarta o envio atrasado do torneio (debounce de 15 s) e espera o que ja
+  // saiu: sem isso ele recriava a linha de tournaments depois do delete e o
+  // site voltava a mostrar o evento fechado (achado no E2E de 18/10/2026)
+  if (upsertTimer) { clearTimeout(upsertTimer); upsertTimer = null; }
+  if (pendingUpsert) {
+    pendingUpsert = null;
+    const resolvers = pendingResolvers; pendingResolvers = [];
+    resolvers.forEach(r => r({ ok: false, error: 'torneio fechado' }));
+  }
+  if (upsertInFlight) { try { await upsertInFlight; } catch (_e) { /* o delete abaixo resolve */ } }
   try {
     if (tid) {
       // Limpar torneio atual
@@ -821,6 +831,8 @@ function broadcastSyncStatus() {
   } catch(_) {}
 }
 
+let upsertInFlight = null; // envio em andamento — o Fechar Torneio espera ele antes de apagar
+
 async function flushUpsert() {
   if (!pendingUpsert) return;
   const row = pendingUpsert;
@@ -830,7 +842,8 @@ async function flushUpsert() {
   lastSyncStatus = { state: 'syncing', at: Date.now(), error: null };
   broadcastSyncStatus();
   try {
-    const { error } = await supabase.from('tournaments').upsert(row, { onConflict: 'id' });
+    upsertInFlight = Promise.resolve(supabase.from('tournaments').upsert(row, { onConflict: 'id' }));
+    const { error } = await upsertInFlight.finally(() => { upsertInFlight = null; });
     if (error) {
       log('ERROR', 'Supabase upsert:', error.message);
       lastSyncStatus = { state: 'error', at: Date.now(), error: error.message };
