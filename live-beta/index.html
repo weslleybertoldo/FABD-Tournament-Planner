@@ -318,18 +318,30 @@
     // === BUSCAR TORNEIO ===
     let isLoading=false;
 
+    // Federacao de cada torneio (t.federations) numa consulta separada. Sem o
+    // embed federations(...): o schema staging nao tem FKs e o embed derrubava a
+    // consulta de tournaments no live-beta (PGRST200) — mesmo fix do referee (54f083a)
+    async function attachFederations(list){
+      const ids = [...new Set(list.map(t => t.federation_id).filter(Boolean))];
+      if (!ids.length) return list;
+      const { data } = await sb.from('federations').select('id,slug,name,short_name,primary_color,logo_url,state,city').in('id', ids);
+      const byId = new Map((data || []).map(f => [f.id, f]));
+      list.forEach(t => { t.federations = byId.get(t.federation_id) || null; });
+      return list;
+    }
+
     // Lista de torneios ativos (atualizados nas ultimas 24h) com info da federacao
     async function fetchActiveTournaments(){
       try{
         const since = new Date(Date.now() - 24*60*60*1000).toISOString();
         const fedSlug = getUrlParam('f');
         let q = sb.from('tournaments')
-          .select('id,name,federation_id,updated_at,federations(id,slug,name,short_name,primary_color,logo_url,state,city)')
+          .select('id,name,federation_id,updated_at')
           .gte('updated_at', since)
           .order('updated_at',{ascending:false});
         const { data, error } = await q;
         if(error)throw error;
-        let list = data || [];
+        let list = await attachFederations(data || []);
         if (fedSlug) list = list.filter(t => t.federations?.slug === fedSlug);
         activeTournaments = list;
         return list;
@@ -343,11 +355,10 @@
     // Carrega 1 torneio especifico (com info da federacao); usado quando ?t=ID
     async function fetchTournamentById(id, includeData){
       try{
-        const cols = includeData
-          ? 'id,name,federation_id,data,federations(id,slug,name,short_name,primary_color,logo_url)'
-          : 'id,name,federation_id,federations(id,slug,name,short_name,primary_color,logo_url)';
+        const cols = includeData ? 'id,name,federation_id,data' : 'id,name,federation_id';
         const { data, error } = await sb.from('tournaments').select(cols).eq('id', id).maybeSingle();
         if(error)throw error;
+        if (data) await attachFederations([data]);
         return data;
       }catch(e){ console.error('[Live] fetchTournamentById:', e); return null; }
     }
