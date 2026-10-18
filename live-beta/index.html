@@ -108,6 +108,8 @@
     .group-card table{width:100%;font-size:12px;border-collapse:collapse}
     .group-card th{padding:6px 10px;text-align:left;color:#64748B;font-size:10px;text-transform:uppercase}
     .group-card td{padding:6px 10px;border-top:1px solid #0F172A}
+    .group-card tr.qualified td{background:rgba(16,185,129,.12)}
+    .q-badge{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;color:#10B981;border:1px solid rgba(16,185,129,.5);vertical-align:middle;white-space:nowrap}
     .group-matches{margin-bottom:24px}
     .group-matches .gm-title{font-size:13px;font-weight:700;color:#94A3B8;margin-bottom:8px}
     .group-match-item{display:flex;align-items:center;gap:8px;padding:6px 12px;background:#1E293B;border-radius:6px;margin-bottom:4px;font-size:12px}
@@ -266,9 +268,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <!-- Classificacao dos grupos igual a do Planner (desempate BWF): ordem das tabelas
-       dos grupos e nome do classificado na 2a fase. Opcional: sem ele o site cai na
-       ordem por vitorias e nos rotulos "1o do Grupo A". -->
+       dos grupos, saldo de pontos, quem se classificou (inclusive os melhores 3os) e
+       nome do classificado na 2a fase. Opcional: sem ele o site cai na ordem por
+       vitorias e nos rotulos "1o do Grupo A". -->
   <script src="../src/js/modules/bracket-roundrobin-groups.js"></script>
+  <script src="../src/js/modules/bracket-best-thirds.js"></script>
   <script>
     // This is the publishable anon key - safe for client-side use with proper RLS
     // Esta pagina so faz SELECT (leitura) - RLS garante que nao pode escrever dados
@@ -746,12 +750,25 @@
 
       let h='<div class="section-title">Fase de Grupos</div>';
 
+      // Saldo de pontos e quem se classificou, como na tabela do Planner (pedido
+      // do Weslley, 18/10/2026: "nao mostra o saldo de pontos ... e tambem nao
+      // mostra quem se classificou"). Classificado so com o grupo encerrado; os
+      // melhores 3os so com TODOS os grupos encerrados (dependem de todos).
+      const full=typeof computeGroupStandings==='function';
+      const qualifiers=draw.groupQualifiers||2;
+      const groupDone=g=>{
+        const real=(g.matches||[]).filter(x=>x.player1&&x.player2&&x.player1!=='BYE'&&x.player2!=='BYE');
+        return real.length>0&&real.every(x=>x.winner!==undefined&&x.winner!==null);
+      };
+      const bestThirdNames=full&&typeof usesBestThirds==='function'&&usesBestThirds(gd.groups,qualifiers)&&gd.groups.every(groupDone)
+        ?new Set(rankGroupThirds(gd.groups).slice(0,2).map(t=>t.name)):new Set();
+
       // Tabelas dos grupos
       h+='<div class="group-container">';
       gd.groups.forEach(g=>{
         h+=`<div class="group-card">`;
         h+=`<div class="group-title">${esc(g.name)}</div>`;
-        h+=`<table><thead><tr><th>Jogador</th><th style="text-align:center">J</th><th style="text-align:center">V</th><th style="text-align:center">D</th></tr></thead><tbody>`;
+        h+=`<table><thead><tr><th>Jogador</th><th style="text-align:center">J</th><th style="text-align:center">V</th><th style="text-align:center">D</th>${full?'<th style="text-align:center">Saldo</th>':''}</tr></thead><tbody>`;
 
         // Calcular stats de cada jogador do grupo
         const stats={};
@@ -766,12 +783,20 @@
 
         // Mesma ordem do Planner (desempate BWF) — e ela que decide o classificado
         // da 2a fase; sem o modulo, ordena so por vitorias
-        const sorted=typeof computeGroupStandings==='function'
-          ?computeGroupStandings(g.players||[],g.matches||[]).map(s=>s.name)
+        const standings=full?computeGroupStandings(g.players||[],g.matches||[]):null;
+        const sorted=full
+          ?standings.map(s=>s.name)
           :[...(g.players||[])].sort((a,b)=>(stats[b]?.w||0)-(stats[a]?.w||0));
-        sorted.forEach(p=>{
+        const done=full&&groupDone(g);
+        sorted.forEach((p,i)=>{
           const s=stats[p]||{w:0,l:0,games:0};
-          h+=`<tr><td style="font-weight:600">${esc(p)}</td><td style="text-align:center">${s.games}</td><td style="text-align:center;color:#10B981">${s.w}</td><td style="text-align:center;color:#EF4444">${s.l}</td></tr>`;
+          const tag=!done?'':i<qualifiers?'Classif.':bestThirdNames.has(p)?'Melhor 3&ordm;':'';
+          h+=`<tr${tag?' class="qualified"':''}><td style="font-weight:600">${esc(p)}${tag?`<span class="q-badge">${tag}</span>`:''}</td><td style="text-align:center">${s.games}</td><td style="text-align:center;color:#10B981">${s.w}</td><td style="text-align:center;color:#EF4444">${s.l}</td>`;
+          if(full){
+            const diff=standings[i].ptsDiff;
+            h+=`<td style="text-align:center;font-weight:600;color:${diff>0?'#10B981':diff<0?'#EF4444':'#94A3B8'}">${diff>0?'+':''}${diff}</td>`;
+          }
+          h+=`</tr>`;
         });
         h+=`</tbody></table></div>`;
       });
@@ -808,7 +833,20 @@
     // (fase 'elimination', ainda "A definir"): rotulo "1o do Grupo A" vira o nome
     // de quem ficou em 1o quando o grupo acaba (mesma regra do Planner).
     function previewEliminationMatches(draw){
-      const label=(raw,disp)=>raw||(typeof resolveGroupQualifierLabel==='function'
+      // Melhores 3os: com TODOS os grupos encerrados o Planner ja sabe quem sao,
+      // mas a chave da 2a fase so e gerada depois — o site ficava no rotulo
+      // "Melhor 3o colocado" (18/10/2026). Mesma montagem das quartas do Planner
+      // (inclui a troca dos 3os quando um cairia contra o 1o do proprio grupo).
+      const gs=draw.groupsData?.groups||[];
+      const thirdsByLabel={};
+      if(typeof buildBestThirdsQuarterfinals==='function'&&usesBestThirds(gs,draw.groupQualifiers||2)&&areGroupsFinished(draw)){
+        const qf=buildBestThirdsQuarterfinals(gs);
+        bestThirdsQuarterfinalLabels(gs.map(g=>g.name)).forEach(([l1,l2],i)=>{
+          if(qf[i]?.player1)thirdsByLabel[l1]=qf[i].player1;
+          if(qf[i]?.player2)thirdsByLabel[l2]=qf[i].player2;
+        });
+      }
+      const label=(raw,disp)=>raw||thirdsByLabel[disp]||(typeof resolveGroupQualifierLabel==='function'
         ?resolveGroupQualifierLabel(draw,disp||'A definir'):(disp||'A definir'));
       return (tournamentData.matches||[])
         .filter(m=>m.drawName===draw.name&&m.phase==='elimination')
