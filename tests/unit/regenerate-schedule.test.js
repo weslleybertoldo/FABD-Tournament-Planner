@@ -238,3 +238,25 @@ describe('fillMissingTimesByDay — torneio de 2 dias', () => {
     expect(fillMissingTimesByDay()).toBe(false);
   });
 });
+
+describe('regenerateDrawSchedule — Todos contra Todos', () => {
+  it('rodadas 2 e 3 ficam R2/R3 (nao Semifinal/Final)', async () => {
+    const t = {
+      id: 't1', courts: 4, matchDuration: 30, restMinBetweenGames: 20,
+      startTime: '08:00', endTime: '18:00', breakStart: '00:00', breakEnd: '00:00',
+      draws: [{
+        id: 'd1', name: 'SF Principal', type: 'Todos contra Todos', event: 'SF',
+        matches: [
+          { round: 1, player1: 'A', player2: 'B' }, { round: 1, player1: 'C', player2: 'D' },
+          { round: 2, player1: 'A', player2: 'C' }, { round: 2, player1: 'B', player2: 'D' },
+          { round: 3, player1: 'A', player2: 'D' }, { round: 3, player1: 'B', player2: 'C' },
+        ],
+      }],
+      matches: [],
+    };
+    const { regenerateDrawSchedule } = loadRegen(t);
+    await regenerateDrawSchedule(0, true);
+    const names = t.matches.filter(m => m.drawName === 'SF Principal').map(m => `${m.round}:${m.roundName}`).sort();
+    expect(names).toEqual(['1:R1', '1:R1', '2:R2', '2:R2', '3:R3', '3:R3']);
+  });
+});
