@@ -179,51 +179,54 @@ describe('buildGroupsElimPreview — previa em formato de chave', () => {
 // acabaram antes das outras e os vencedores (Luiz e Kelvin) apareceram na 1a semi
 // da lista de partidas; a chave estava certa. Mesma estrutura, menor: 1 grupo com
 // 2 jogos (idx 0-1), quartas (idx 2-5), semis (idx 6-7) e final (idx 8).
-describe('repropagateAllResults — Grupos + Eliminatoria: vencedor na semi certa', () => {
-  const Q = [['V', 'M'], ['K', 'J'], ['L', 'H'], ['E', 'P']];
-  function mkGE({ quartasFeitas = [2, 3] } = {}) {
-    const grupo = [
-      { round: 1, player1: 'V', player2: 'K', winner: 1, score1: '15 15', score2: '3 4', phase: 'group', group: 'A' },
-      { round: 1, player1: 'L', player2: 'E', winner: 1, score1: '15 15', score2: '5 6', phase: 'group', group: 'A' },
-    ];
-    const elim = [
-      ...Q.map(([a, b], i) => {
-        const feita = quartasFeitas.includes(i);
-        return { round: 1, slotIdx: i, player1: a, player2: b, winner: feita ? 1 : undefined, advancer: feita ? a : '', score1: feita ? '15 15' : '', score2: feita ? '9 9' : '', isBye: false, phase: 'elimination' };
-      }),
-      { round: 2, slotIdx: 0, player1: '', player2: '', advancer: '', isBye: false, phase: 'elimination' },
-      { round: 2, slotIdx: 1, player1: '', player2: '', advancer: '', isBye: false, phase: 'elimination' },
-      { round: 3, slotIdx: 0, player1: '', player2: '', advancer: '', isBye: false, phase: 'elimination' },
-    ];
-    const lista = [
-      ...grupo.map((g, i) => ({ num: i + 1, drawName: 'SM', drawMatchIdx: i, phase: 'group', group: 'A', round: 1, player1: g.player1, player2: g.player2, winner: 1, score: '15-3 / 15-4', status: 'Finalizada' })),
-      ...Q.map(([a, b], i) => {
-        const feita = quartasFeitas.includes(i);
-        return { num: 3 + i, drawName: 'SM', drawMatchIdx: 2 + i, phase: 'elimination', round: 1, player1: a, player2: b, player1Display: a, player2Display: b, winner: feita ? 1 : undefined, score: feita ? '15-9 / 15-9' : '', status: feita ? 'Finalizada' : 'Em Quadra', isDefinida: true };
-      }),
-      { num: 7, drawName: 'SM', drawMatchIdx: 6, phase: 'elimination', round: 2, player1: '', player2: '', player1Display: 'Venc. jogo 3', player2Display: 'Venc. jogo 4', status: 'A definir', isDefinida: false },
-      { num: 8, drawName: 'SM', drawMatchIdx: 7, phase: 'elimination', round: 2, player1: '', player2: '', player1Display: 'Venc. jogo 5', player2Display: 'Venc. jogo 6', status: 'A definir', isDefinida: false },
-      { num: 9, drawName: 'SM', drawMatchIdx: 8, phase: 'elimination', round: 3, player1: '', player2: '', player1Display: 'Venc. jogo 7', player2Display: 'Venc. jogo 8', status: 'A definir', isDefinida: false },
-    ];
-    // Depois de salvar/abrir o JSON a chave (groupsData) e d.matches sao copias separadas
-    const copia = o => JSON.parse(JSON.stringify(o));
-    return {
-      id: 't1', name: 'Festival',
-      draws: [{
-        name: 'SM', type: 'Grupos + Eliminatoria', groupQualifiers: 2,
-        matches: copia([...grupo, ...elim]),
-        groupsData: { groups: [{ name: 'Grupo A', players: ['V', 'K', 'L', 'E'], matches: copia(grupo) }], eliminationMatches: copia(elim), eliminationGenerated: true },
-      }],
-      matches: lista,
-    };
-  }
+const Q = [['V', 'M'], ['K', 'J'], ['L', 'H'], ['E', 'P']];
+function mkGE({ quartasFeitas = [2, 3] } = {}) {
+  const grupo = [
+    { round: 1, player1: 'V', player2: 'K', winner: 1, score1: '15 15', score2: '3 4', phase: 'group', group: 'A' },
+    { round: 1, player1: 'L', player2: 'E', winner: 1, score1: '15 15', score2: '5 6', phase: 'group', group: 'A' },
+  ];
+  const elim = [
+    ...Q.map(([a, b], i) => {
+      const feita = quartasFeitas.includes(i);
+      return { round: 1, slotIdx: i, player1: a, player2: b, winner: feita ? 1 : undefined, advancer: feita ? a : '', score1: feita ? '15 15' : '', score2: feita ? '9 9' : '', isBye: false, phase: 'elimination' };
+    }),
+    { round: 2, slotIdx: 0, player1: '', player2: '', advancer: '', isBye: false, phase: 'elimination' },
+    { round: 2, slotIdx: 1, player1: '', player2: '', advancer: '', isBye: false, phase: 'elimination' },
+    { round: 3, slotIdx: 0, player1: '', player2: '', advancer: '', isBye: false, phase: 'elimination' },
+  ];
+  const lista = [
+    ...grupo.map((g, i) => ({ num: i + 1, drawName: 'SM', drawMatchIdx: i, phase: 'group', group: 'A', round: 1, player1: g.player1, player2: g.player2, winner: 1, score: '15-3 / 15-4', status: 'Finalizada' })),
+    ...Q.map(([a, b], i) => {
+      const feita = quartasFeitas.includes(i);
+      return { num: 3 + i, drawName: 'SM', drawMatchIdx: 2 + i, phase: 'elimination', round: 1, player1: a, player2: b, player1Display: a, player2Display: b, winner: feita ? 1 : undefined, score: feita ? '15-9 / 15-9' : '', status: feita ? 'Finalizada' : 'Em Quadra', isDefinida: true };
+    }),
+    { num: 7, drawName: 'SM', drawMatchIdx: 6, phase: 'elimination', round: 2, player1: '', player2: '', player1Display: 'Venc. jogo 3', player2Display: 'Venc. jogo 4', status: 'A definir', isDefinida: false },
+    { num: 8, drawName: 'SM', drawMatchIdx: 7, phase: 'elimination', round: 2, player1: '', player2: '', player1Display: 'Venc. jogo 5', player2Display: 'Venc. jogo 6', status: 'A definir', isDefinida: false },
+    { num: 9, drawName: 'SM', drawMatchIdx: 8, phase: 'elimination', round: 3, player1: '', player2: '', player1Display: 'Venc. jogo 7', player2Display: 'Venc. jogo 8', status: 'A definir', isDefinida: false },
+  ];
+  // Depois de salvar/abrir o JSON a chave (groupsData) e d.matches sao copias separadas
+  const copia = o => JSON.parse(JSON.stringify(o));
+  return {
+    id: 't1', name: 'Festival',
+    draws: [{
+      name: 'SM', type: 'Grupos + Eliminatoria', groupQualifiers: 2,
+      matches: copia([...grupo, ...elim]),
+      groupsData: { groups: [{ name: 'Grupo A', players: ['V', 'K', 'L', 'E'], matches: copia(grupo) }], eliminationMatches: copia(elim), eliminationGenerated: true },
+    }],
+    matches: lista,
+  };
+}
 
-  function carregar(t, mocks = {}) {
-    // updateEliminationMatchesInList de verdade (e ela que a lista usa pra seguir a chave)
-    const { updateEliminationMatchesInList } = loadModule('src/js/modules/bracket-mutators.js', { tournament: t });
-    return loadReconcile(t, { areGroupsFinished: () => true, updateEliminationMatchesInList, ...mocks });
-  }
-  const jogo = (t, num) => t.matches.find(m => m.num === num);
+function carregar(t, mocks = {}) {
+  // updateEliminationMatchesInList de verdade (e ela que a lista usa pra seguir a chave)
+  const { updateEliminationMatchesInList, drawScoreSides } = loadModule('src/js/modules/bracket-mutators.js', { tournament: t });
+  const ctx = loadReconcile(t, { areGroupsFinished: () => true, updateEliminationMatchesInList, ...mocks });
+  ctx.drawScoreSides = drawScoreSides;
+  return ctx;
+}
+const jogo = (t, num) => t.matches.find(m => m.num === num);
+
+describe('repropagateAllResults — Grupos + Eliminatoria: vencedor na semi certa', () => {
 
   it('3a e 4a quartas acabam primeiro: vencedores vao pra 2a semi (jogo 8), a 1a semi (jogo 7) fica a definir', () => {
     const t = mkGE({ quartasFeitas: [2, 3] });
@@ -264,5 +267,64 @@ describe('repropagateAllResults — Grupos + Eliminatoria: vencedor na semi cert
     expect(envios[0].matches.find(m => m.num === 8).player2).toBe('E');
     repropagateAllResults();
     expect(envios.length).toBe(1);
+  });
+});
+
+// Numeros da lista como no II Festival (o Regenerar renumera): quartas 36/40/44/51,
+// semis 53/54, final 52. O rotulo da vaga em aberto usava o numero da 2a fase
+// ("Venc. jogo 1") e nao o da lista ("Venc. jogo 36").
+describe('Grupos + Eliminatoria — rotulo da vaga e placar da 2a fase', () => {
+  const NUM = { 3: 36, 4: 40, 5: 44, 6: 51, 7: 53, 8: 54, 9: 52 };
+  function mkFestival(opts) {
+    const t = mkGE(opts);
+    t.matches.forEach(m => { if (NUM[m.num]) m.num = NUM[m.num]; });
+    return t;
+  }
+  const disp = (t, num) => { const m = t.matches.find(x => x.num === num); return [m.player1Display, m.player2Display]; };
+
+  it('vaga em aberto mostra o numero do jogo na lista (Venc. jogo 36, nao jogo 1)', () => {
+    const t = mkFestival({ quartasFeitas: [] });
+    carregar(t).repropagateAllResults();
+    expect(disp(t, 53)).toEqual(['Venc. jogo 36', 'Venc. jogo 40']);
+    expect(disp(t, 54)).toEqual(['Venc. jogo 44', 'Venc. jogo 51']);
+    expect(disp(t, 52)).toEqual(['Venc. jogo 53', 'Venc. jogo 54']);
+  });
+
+  it('placar da quarta chega na chave mesmo com o torneio aberto do arquivo', () => {
+    const t = mkFestival({ quartasFeitas: [] });
+    const { propagateResultToDraws } = loadModule('src/js/modules/bracket-mutators.js', { tournament: t });
+    propagateResultToDraws({ drawName: 'SM', drawMatchIdx: 3, round: 1, phase: 'elimination', player1: 'K', player2: 'J', winner: 1, score: '15-8 / 15-13' });
+    const em = t.draws[0].groupsData.eliminationMatches.find(e => e.round === 1 && e.slotIdx === 1);
+    expect([em.winner, em.advancer, em.score1, em.score2]).toEqual([1, 'K', '15 15', '8 13']);
+  });
+
+  it('placar que faltou na chave (resultado antigo) volta pela lista', () => {
+    const t = mkFestival({ quartasFeitas: [1] });
+    const em = t.draws[0].groupsData.eliminationMatches.find(e => e.round === 1 && e.slotIdx === 1);
+    em.score1 = ''; em.score2 = '';
+    carregar(t).repropagateAllResults();
+    expect([em.score1, em.score2]).toEqual(['15 15', '9 9']);
+  });
+});
+
+describe('Eliminatoria — rotulo da vaga com o numero do jogo na lista', () => {
+  it('final mostra Venc. jogo 10 e 20 quando a lista foi renumerada', () => {
+    const t = {
+      id: 't1', name: 'X',
+      draws: [{ name: 'SM', type: 'Eliminatoria', matches: [
+        { round: 1, player1: 'A', player2: 'B' }, { round: 1, player1: 'C', player2: 'D' }, { round: 2, player1: '', player2: '' },
+      ] }],
+      matches: [
+        { num: 10, drawName: 'SM', drawMatchIdx: 0, round: 1, player1: 'A', player2: 'B', status: 'Pendente' },
+        { num: 20, drawName: 'SM', drawMatchIdx: 1, round: 1, player1: 'C', player2: 'D', status: 'Pendente' },
+        { num: 30, drawName: 'SM', drawMatchIdx: 2, round: 2, player1: '', player2: '', player1Display: 'Venc. jogo 1', player2Display: 'Venc. jogo 2', status: 'A definir' },
+      ],
+    };
+    const { repropagateAllResults } = loadReconcile(t, {
+      findTournamentMatch: (drawName, idx) => t.matches.find(m => m.drawName === drawName && m.drawMatchIdx === idx),
+    });
+    repropagateAllResults();
+    const f = t.matches.find(m => m.num === 30);
+    expect([f.player1Display, f.player2Display]).toEqual(['Venc. jogo 10', 'Venc. jogo 20']);
   });
 });

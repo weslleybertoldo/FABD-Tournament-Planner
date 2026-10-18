@@ -19,6 +19,17 @@
 // Issue #14 sub-tarefa 14.L — auditoria 2026-05-09.
 // =====================================================================
 
+// "15-8 / 15-13" -> {score1:'15 15', score2:'8 13'} (formato da chave);
+// W.O./DSQ/RET ficam inteiros no score1
+function drawScoreSides(score){
+  if(score&&score!=='W.O.'&&score!=='DSQ'&&score!=='RET'){
+    const s1=[],s2=[];
+    score.split('/').map(s=>s.trim()).forEach(s=>{const p=s.split('-');if(p.length===2){s1.push(p[0].trim());s2.push(p[1].trim());}});
+    return {score1:s1.join(' '),score2:s2.join(' ')};
+  }
+  return {score1:score||'',score2:''};
+}
+
 function propagateResultToDraws(matchData){
   try{
     if(!tournament?.draws?.length||!matchData.drawName)return;
@@ -40,14 +51,7 @@ function propagateResultToDraws(matchData){
     dm.winner=matchData.winner;
     // Advancer so faz sentido em eliminatoria
     if(d.type==='Eliminatoria')dm.advancer=winnerName;
-    if(matchData.score&&matchData.score!=='W.O.'&&matchData.score!=='DSQ'&&matchData.score!=='RET'){
-      const sets=matchData.score.split('/').map(s=>s.trim());
-      let s1=[],s2=[];
-      sets.forEach(s=>{const p=s.split('-');if(p.length===2){s1.push(p[0].trim());s2.push(p[1].trim());}});
-      dm.score1=s1.join(' ');dm.score2=s2.join(' ');
-    } else {
-      dm.score1=matchData.score||'';dm.score2='';
-    }
+    Object.assign(dm,drawScoreSides(matchData.score));
     // Groups+Elimination: also update groupsData (after score is set on dm)
     if(d.type==='Grupos + Eliminatoria'&&d.groupsData){
       if(matchData.phase==='group'||dm.phase==='group'){
@@ -62,7 +66,9 @@ function propagateResultToDraws(matchData){
       }
       if(matchData.phase==='elimination'||dm.phase==='elimination'){
         const em=d.groupsData.eliminationMatches?.find(m=>m.player1===matchData.player1&&m.player2===matchData.player2);
-        if(em){em.winner=matchData.winner;em.advancer=winnerName;}
+        // Placar tambem: com o torneio aberto do arquivo a chave da 2a fase nao e
+        // o mesmo objeto do d.matches e o site mostrava a quarta sem placar (18/10/2026)
+        if(em){em.winner=matchData.winner;em.advancer=winnerName;em.score1=dm.score1;em.score2=dm.score2;}
       }
     }
 
@@ -142,18 +148,18 @@ function updateEliminationMatchesInList(){
       const existing=listMatch(emIdx);
       if(!existing)return;
 
-      // Vaga vazia na chave com nome na lista = nome que caiu no jogo errado
-      // (II Festival, 18/10/2026). Volta pra "Venc. jogo N" enquanto nao comecou.
-      if(existing.status==='A definir'||existing.status==='Pendente'){
+      // Vaga em aberto na chave (II Festival, 18/10/2026), so com o jogo ainda
+      // nao comecado: nome que ficou ali e de outro jogo e sai; o rotulo e o
+      // numero do jogo NA LISTA ("Venc. jogo 36", nao o "jogo 1" da 2a fase) e
+      // acompanha a renumeracao do Regenerar.
+      if(em.round>1&&(existing.status==='A definir'||existing.status==='Pendente')){
         ['player1','player2'].forEach((k,s)=>{
-          if(em[k]||!existing[k])return;
+          if(em[k])return;
+          if(existing[k]){existing[k]='';existing.isDefinida=false;existing.status='A definir';changed=true;}
           const feederIdx=elimMatches.findIndex(f=>f.round===em.round-1&&f.slotIdx===(em.slotIdx||0)*2+s);
           const feeder=feederIdx>=0?listMatch(feederIdx):null;
-          existing[k]='';
-          existing[k+'Display']=feeder?.num?`Venc. jogo ${feeder.num}`:'A definir';
-          existing.isDefinida=false;
-          existing.status='A definir';
-          changed=true;
+          const label=feeder?.num?`Venc. jogo ${feeder.num}`:'A definir';
+          if(existing[k+'Display']!==label){existing[k+'Display']=label;changed=true;}
         });
       }
 
