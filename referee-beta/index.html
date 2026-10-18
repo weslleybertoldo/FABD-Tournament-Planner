@@ -1139,6 +1139,10 @@
         leftPlayer=1;rightPlayer=2;
         state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
         intervalAsked=false;
+        // Todo jogo comeca com "Trocar saque" liberado — antes so a dupla zerava
+        // isso, e um simples aberto depois de uma dupla ja comecada ficava sem o
+        // botao o jogo inteiro (18/10/2026, II Festival)
+        canSwapInner=true;
 
         // Detectar duplas: primeiro verifica "/" nos nomes, se não encontrar verifica draw_name
         isDoubles=false;
@@ -1157,7 +1161,6 @@
           rightTopPlayer='p2a';rightBottomPlayer='p2b';
           doublesServer='p1a'; // primeiro sacador
           doublesReceiver='p2a'; // primeiro recebedor
-          canSwapInner=true;
           setupDoublesUI();
         }else{
           teardownDoublesUI();
@@ -1707,6 +1710,10 @@
         document.getElementById('readonly-badge').style.display='none';
         document.getElementById('btn-undo').style.display='inline-block';
         document.querySelectorAll('.court-side').forEach(el=>{el.style.pointerEvents='auto';el.style.opacity='1';});
+        // Volta o "Trocar lados" que o modo visualizacao escondeu — antes ficava
+        // sumido em todo jogo seguinte ate recarregar (o "Trocar saque" e as
+        // setinhas o updateDisplay ja controla pelo canSwapInner)
+        document.querySelectorAll('.swap-btn:not(.swap-serve)').forEach(el=>{el.style.display='';});
       }
     }
 
