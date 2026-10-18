@@ -21,6 +21,18 @@ describe('forecastAvgSec', () => {
   it('null sem jogo medido', () => {
     expect(forecastAvgSec([{ status: 'Pendente' }])).toBeNull();
   });
+
+  it('jogo com menos de 5 min em quadra nao entra (posto em quadra so pra lancar o resultado)', () => {
+    const at = (hhmm, s) => new Date(T(hhmm) + s * 1000).toISOString();
+    const ms = [
+      { status: 'Finalizada', startedAt: iso('09:10'), finishedAt: at('09:10', 23) },
+      { status: 'Finalizada', startedAt: iso('09:11'), finishedAt: at('09:11', 86) },
+      { status: 'Finalizada', startedAt: iso('09:14'), finishedAt: at('09:14', 299) },
+      { status: 'Finalizada', startedAt: iso('09:14'), finishedAt: iso('09:29') },
+      { status: 'Finalizada', startedAt: iso('10:00'), finishedAt: iso('10:05') }, // 5 min: entra
+    ];
+    expect(forecastAvgSec(ms)).toEqual({ sec: 10 * 60, count: 2 });
+  });
 });
 
 describe('forecastDayEndMs', () => {
