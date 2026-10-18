@@ -1,11 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { loadModule } from './_loader.js';
 
+// Regras de encaixe (grade, descanso, atletas possiveis) vem do schedule-slots.js
+const slotsMod = loadModule('src/js/modules/schedule-slots.js');
+const SLOTS = Object.fromEntries(Object.entries(slotsMod).filter(([k, v]) => k.startsWith('schedule') && typeof v === 'function'));
+
 function loadRegen(tournament, mocks = {}) {
   const toastCalls = [];
   const renderCalls = { matches: 0, draws: 0 };
   const saveCalls = [];
   const ctx = {
+    ...SLOTS,
     tournament,
     showToast: (msg, kind) => { toastCalls.push({ msg, kind }); },
     confirm: mocks.confirm || (() => true),
@@ -184,7 +189,7 @@ describe('regenerateDrawSchedule — eliminatoria provisoria por rodada', () => 
     const t = {
       id: 't1', courts: 4, matchDuration: 30, restMinBetweenGames: 20,
       startTime: '08:00', endTime: '18:00', breakStart: '00:00', breakEnd: '00:00',
-      draws: [{ id: 'd1', name: 'SM Principal', type: 'Grupos + Eliminatoria', event: 'SM', matches: [{ round: 1 }], groupsData: { groups: [] } }],
+      draws: [{ id: 'd1', name: 'SM Principal', type: 'Grupos + Eliminatoria', event: 'SM', matches: [{ round: 1 }], groupsData: { groups: [{ matches: [{ player1: 'A', player2: 'B' }, { player1: 'C', player2: 'D' }] }] } }],
       matches: [
         { drawName: 'SM Principal', drawMatchIdx: 0, player1: 'A', player2: 'B', round: 1, phase: 'group', status: 'Finalizada', time: '08:00', score: '21-10', winner: 1 },
         { drawName: 'SM Principal', drawMatchIdx: 1, player1: 'C', player2: 'D', round: 1, phase: 'group', status: 'Pendente', time: '08:50' },
@@ -202,9 +207,11 @@ describe('regenerateDrawSchedule — eliminatoria provisoria por rodada', () => 
     });
     await regenerateDrawSchedule(0, true);
     const byIdx = idx => t.matches.find(m => m.drawMatchIdx === idx);
-    expect([2, 3, 4, 5].map(i => byIdx(i).time)).toEqual(['09:40', '09:40', '09:40', '09:40']);
-    expect([6, 7].map(i => byIdx(i).time)).toEqual(['10:30', '10:30']);
-    expect(byIdx(8).time).toBe('11:20');
+    // Quadra a cada 30 min; quem pode chegar (A-D) descansa 50 min inicio a inicio:
+    // grupo C x D 08:50 -> quartas 10:00 (as 4 juntas) -> semis 11:00 -> final 12:00
+    expect([2, 3, 4, 5].map(i => byIdx(i).time)).toEqual(['10:00', '10:00', '10:00', '10:00']);
+    expect([6, 7].map(i => byIdx(i).time)).toEqual(['11:00', '11:00']);
+    expect(byIdx(8).time).toBe('12:00');
     expect(t.matches.filter(m => m.phase === 'elimination').length).toBe(7);
   });
 });
@@ -228,8 +235,9 @@ describe('fillMissingTimesByDay — torneio de 2 dias', () => {
     };
     const { fillMissingTimesByDay } = loadRegen(t);
     expect(fillMissingTimesByDay()).toBe(true);
-    // Os horarios de amanha que ja existiam ficam (08:00 esta fora dos slots do torneio, que comeca 10:30)
-    expect(t.matches.map(m => m.time)).toEqual(['10:30', '08:00', '08:00', '08:50', '']);
+    // Os horarios de amanha que ja existiam ficam (08:00 esta fora dos slots do torneio, que comeca 10:30).
+    // C e E jogaram 08:00: descanso de 50 min inicio a inicio -> 09:00 na grade de 30 em 30
+    expect(t.matches.map(m => m.time)).toEqual(['10:30', '08:00', '08:00', '09:00', '']);
   });
 
   it('nao faz nada quando todos os definidos ja tem horario', () => {

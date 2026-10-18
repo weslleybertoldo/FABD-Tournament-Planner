@@ -2172,41 +2172,11 @@ function rebuildMatchList() {
   const dist = sortMatchesByBTPOrder(allM.filter(m => m.isDefinida));
   const adefs = allM.filter(m => !m.isDefinida);
   // Atribuir horarios aos definidos (assignAutoTimes percorre na ordem recebida)
-  assignAutoTimes(dist);
-  // Jogos "A definir": atribuir horario APOS o ultimo jogo de GRUPO da mesma categoria
-  // Ordenar adefs: semifinais antes de finais (por round)
+  const sched = assignAutoTimes(dist);
+  // Jogos "A definir": depois da fase anterior da mesma chave, longe dos
+  // atletas que podem chegar neles. Ordem da lista: semifinais antes da final
   adefs.sort((a,b) => (a.drawName===b.drawName ? (a.round||0)-(b.round||0) : 0));
-  const slotDur = (tournament.matchDuration || 30) + (tournament.restMinBetweenGames || 20);
-  // Gerar slots e contar ocupacao para respeitar limite de quadras
-  const rbStart = timeToMin(tournament.startTime||'08:00'), rbEnd = timeToMin(tournament.endTime||'18:00');
-  const rbS = timeToMin(tournament.breakStart||'12:00'), rbE = timeToMin(tournament.breakEnd||'13:30');
-  const rbCourts = tournament.courts||4;
-  const rbSlots = [];
-  let rbCur = rbStart;
-  while (rbCur + (tournament.matchDuration||30) <= rbEnd) {
-    if (rbCur >= rbS && rbCur < rbE) { rbCur = rbE; continue; }
-    if (rbCur + (tournament.matchDuration||30) > rbS && rbCur < rbS) { rbCur = rbE; continue; }
-    rbSlots.push(rbCur);
-    rbCur += slotDur;
-  }
-  const rbCount = new Array(rbSlots.length).fill(0);
-  dist.forEach(m => { if(m.time){ const si=rbSlots.indexOf(timeToMin(m.time)); if(si>=0) rbCount[si]++; }});
-  adefs.forEach(m => {
-    const sameDrawGroupTimes = dist.filter(d => d.drawName === m.drawName && d.phase === 'group' && d.time).map(d => timeToMin(d.time));
-    const sameDrawAdefTimes = adefs.filter(d => d.drawName === m.drawName && d.time && d !== m).map(d => timeToMin(d.time));
-    const allTimes = [...sameDrawGroupTimes, ...sameDrawAdefTimes];
-    if (allTimes.length) {
-      const lastMin = Math.max(...allTimes);
-      for (let si = 0; si < rbSlots.length; si++) {
-        if (rbSlots[si] <= lastMin) continue;
-        if (rbCount[si] < rbCourts) {
-          m.time = minToTime(rbSlots[si]);
-          rbCount[si]++;
-          break;
-        }
-      }
-    }
-  });
+  assignToDefineTimes(dist, adefs, sched);
   tournament.matches = [...dist, ...adefs].map((m, i) => ({ ...m, id: (i + 1).toString(), num: i + 1 }));
 }
 
@@ -2217,105 +2187,66 @@ const EVENT_ORDER_BTP = ['SM', 'DM', 'SF', 'DF', 'DX'];
 
 // sortMatchesByBTPOrder extraido pra src/js/modules/match-helpers.js (issue #14.I).
 // distributeMatches extraido pra src/js/modules/match-helpers.js (issue #14.I).
+// Horario automatico (BTP): a quadra recebe jogo a cada duracao do jogo e o
+// descanso vale so pro atleta (schedule-slots.js). Sem horario que respeite
+// quadra e descanso, o jogo fica sem horario — quem chama avisa. Antes o
+// horario andava jogo + descanso (quadra parada) e, sem vaga, o jogo ia pra
+// qualquer horario com quadra, mesmo com o atleta em outro jogo (18/10/2026,
+// torneio grande: 3 atletas em 2 jogos no mesmo horario).
+// Retorna { book, slots } pra quem encaixa os "A definir" depois.
 function assignAutoTimes(matches) {
   const start = timeToMin(tournament.startTime || '08:00'), end = timeToMin(tournament.endTime || '18:00');
   const dur = tournament.matchDuration || 30, rest = tournament.restMinBetweenGames || 20;
   const bS = timeToMin(tournament.breakStart || '12:00'), bE = timeToMin(tournament.breakEnd || '13:30');
-  const slot = dur + rest, courts = tournament.courts || 4;
+  const slots = scheduleDaySlots({ start, end, breakStart: bS, breakEnd: bE, dur });
+  const book = scheduleBook({ dur, rest, courts: tournament.courts || 4 });
+  const fixed = m => ['Finalizada', 'WO', 'Em Quadra', 'Desistencia', 'Desqualificacao'].includes(m.status);
+  const athletesOf = m => scheduleIsToDefine(m)
+    ? schedulePossibleAthletes(m, (tournament.draws || []).find(d => d.name === m.drawName))
+    : scheduleAthletes(m.player1, m.player2);
+  const fitsDay = t => t >= start && t + dur <= end && !(bE > bS && t < bE && t + dur > bS);
 
-  // Gerar slots de horario
-  const slots = [];
-  let cur = start;
-  while (cur + dur <= end) {
-    if (cur >= bS && cur < bE) { cur = bE; continue; }
-    if (cur + dur > bS && cur < bS) { cur = bE; continue; }
-    slots.push(cur);
-    cur += slot;
-  }
-
-  // Controle de ocupacao: quantos jogos em cada slot
-  const slotCount = new Array(slots.length).fill(0);
-  const playerLastSlot = {};
-
-  // Extrair nomes individuais de duplas ("Joao Silva / Maria Santos" -> ["Joao Silva", "Maria Santos"])
-  function getIndividualPlayers(name) {
-    if (!name) return [];
-    if (name.includes('/')) return name.split('/').map(n => n.trim()).filter(Boolean);
-    return [name.trim()];
-  }
-  function registerPlayerSlot(name, slotIdx) {
-    getIndividualPlayers(name).forEach(p => { playerLastSlot[p] = slotIdx; });
-  }
-  function checkPlayerAvailable(name, slotIdx) {
-    return getIndividualPlayers(name).every(p => {
-      const last = playerLastSlot[p];
-      return last == null || slotIdx > last;
-    });
-  }
-
-  // Registrar jogos ja finalizados/em quadra
+  // Jogos finalizados/em quadra seguram o horario deles
   matches.forEach(m => {
-    if (m.time && (m.status === 'Finalizada' || m.status === 'WO' || m.status === 'Em Quadra' || m.status === 'Desistencia' || m.status === 'Desqualificacao')) {
-      const slotIdx = slots.indexOf(timeToMin(m.time));
-      if (slotIdx >= 0) {
-        slotCount[slotIdx]++;
-        registerPlayerSlot(m.player1, slotIdx);
-        registerPlayerSlot(m.player2, slotIdx);
-      }
-    }
+    if (m.time && fixed(m)) book.add(timeToMin(m.time), athletesOf(m), scheduleRole(m));
   });
 
-  // Registrar jogos que ja tem horario valido (mesmo que pendentes)
+  // Pendente com horario: mantem se cabe no dia, com quadra e atletas livres
   matches.forEach(m => {
-    if (m.time && (m.status === 'Finalizada' || m.status === 'WO' || m.status === 'Em Quadra' || m.status === 'Desistencia' || m.status === 'Desqualificacao')) return;
-    if (m.time) {
-      const mMin = timeToMin(m.time);
-      // Verificar se horario nao cai em pausa
-      const inBreak = mMin >= bS && mMin < bE;
-      const slotIdx = inBreak ? -1 : slots.indexOf(mMin);
-      if (slotIdx >= 0 && slotCount[slotIdx] < courts) {
-        // Slot tem vaga — manter horario existente
-        slotCount[slotIdx]++;
-        registerPlayerSlot(m.player1, slotIdx);
-        registerPlayerSlot(m.player2, slotIdx);
-        return;
-      }
-      // Slot cheio — precisa reatribuir, limpar horario
-      m.time = '';
-    }
+    if (!m.time || fixed(m)) return;
+    const t = timeToMin(m.time), ps = athletesOf(m);
+    if (fitsDay(t) && book.courtFree(t) && book.free(t, ps, scheduleRole(m))) { book.add(t, ps, scheduleRole(m)); return; }
+    m.time = '';
   });
 
-  // Atribuir horarios aos jogos sem horario
-  let startSearch = 0;
+  // Sem horario: na ordem da lista, o 1o horario com quadra e atletas descansados
   matches.forEach(m => {
-    if (m.time) return; // ja tem horario
+    if (m.time) return;
+    const ps = athletesOf(m);
+    const si = schedulePlaceDefined(book, slots, ps, scheduleRole(m));
+    if (si < 0) return;
+    m.time = minToTime(slots[si]);
+    if (!m.court) m.court = '';
+    book.add(slots[si], ps, scheduleRole(m));
+  });
+  return { book, slots };
+}
 
-    // Encontrar proximo slot com vaga E onde TODOS jogadores individuais descansaram
-    for (let si = startSearch; si < slots.length; si++) {
-      if (slotCount[si] >= courts) continue;
-      const p1Ok = checkPlayerAvailable(m.player1, si);
-      const p2Ok = checkPlayerAvailable(m.player2, si);
-
-      if (p1Ok && p2Ok) {
-        m.time = minToTime(slots[si]);
-        if (!m.court) m.court = '';
-        slotCount[si]++;
-        registerPlayerSlot(m.player1, si);
-        registerPlayerSlot(m.player2, si);
-        return;
-      }
-    }
-    // Sem slot ideal — relaxar regra de descanso e tentar qualquer slot com vaga
-    for (let si = 0; si < slots.length; si++) {
-      if (slotCount[si] < courts) {
-        m.time = minToTime(slots[si]);
-        if (!m.court) m.court = '';
-        slotCount[si]++;
-        registerPlayerSlot(m.player1, si);
-        registerPlayerSlot(m.player2, si);
-        return;
-      }
-    }
+// Jogos "A definir": cada um depois da fase anterior da mesma chave (a mesma
+// rodada divide o horario e a final fica por ultimo), numa quadra livre e
+// longe de todos os atletas que podem chegar nele (como o BTP). `sched` = o
+// retorno do assignAutoTimes do mesmo dia; `placed` = os jogos dele.
+function assignToDefineTimes(placed, adefs, sched) {
+  [...adefs].sort((a, b) => scheduleStageOf(a) - scheduleStageOf(b)).forEach(m => {
+    const before = [...placed, ...adefs]
+      .filter(x => x.drawName === m.drawName && x.time && scheduleStageOf(x) < scheduleStageOf(m))
+      .map(x => timeToMin(x.time));
+    if (!before.length) return;
+    const ps = schedulePossibleAthletes(m, (tournament.draws || []).find(d => d.name === m.drawName));
+    const si = schedulePlaceToDefine(sched.book, sched.slots, ps, Math.max(...before), scheduleRole(m));
+    if (si < 0) return;
+    m.time = minToTime(sched.slots[si]);
+    sched.book.add(sched.slots[si], ps, scheduleRole(m));
   });
 }
 
@@ -2511,7 +2442,6 @@ async function regenerateSchedule() {
     });
 
     // Atribuir horarios para cada dia separadamente
-    const slotDur = (tournament.matchDuration||30) + (tournament.restMinBetweenGames||20);
     matchesByDay.forEach((dayMatches,i)=>{
       if(!dayMatches.length)return;
       const day=tournament.daySchedule[i];
@@ -2526,49 +2456,9 @@ async function regenerateSchedule() {
       const definidos = dayMatches.filter(m => m.status !== 'A definir');
       const elimAdefs = dayMatches.filter(m => m.status === 'A definir');
 
-      // Atribuir horarios aos definidos primeiro
-      assignAutoTimes(definidos);
-
-      // Eliminatoria "A definir": horario APOS ultimo jogo de grupo da mesma categoria
-      // Respeitando limite de quadras por slot
-      const dayBS = timeToMin(tournament.breakStart||'12:00');
-      const dayBE = timeToMin(tournament.breakEnd||'13:30');
-      const dayStart = timeToMin(tournament.startTime||'08:00');
-      const dayEnd = timeToMin(tournament.endTime||'18:00');
-      const dayCourts = tournament.courts||4;
-
-      // Gerar slots do dia
-      const daySlots = [];
-      let dsCur = dayStart;
-      while (dsCur + (tournament.matchDuration||30) <= dayEnd) {
-        if (dsCur >= dayBS && dsCur < dayBE) { dsCur = dayBE; continue; }
-        if (dsCur + (tournament.matchDuration||30) > dayBS && dsCur < dayBS) { dsCur = dayBE; continue; }
-        daySlots.push(dsCur);
-        dsCur += slotDur;
-      }
-      // Contar ocupacao dos slots (jogos definidos ja atribuidos)
-      const dsCount = new Array(daySlots.length).fill(0);
-      definidos.forEach(m => { if(m.time){ const si=daySlots.indexOf(timeToMin(m.time)); if(si>=0) dsCount[si]++; }});
-
-      elimAdefs.sort((a,b) => scheduleStageOf(a) - scheduleStageOf(b));
-      elimAdefs.forEach(m => {
-        // So a fase anterior da chave empurra o horario: a mesma rodada divide o slot
-        const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
-        const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
-        const allTimes = [...sameDrawGroupTimes, ...sameDrawAdefTimes];
-        if (allTimes.length) {
-          const lastMin = Math.max(...allTimes);
-          // Encontrar proximo slot APOS o ultimo jogo da categoria que tenha vaga
-          for (let si = 0; si < daySlots.length; si++) {
-            if (daySlots[si] <= lastMin) continue; // deve ser APOS
-            if (dsCount[si] < dayCourts) {
-              m.time = minToTime(daySlots[si]);
-              dsCount[si]++;
-              break;
-            }
-          }
-        }
-      });
+      // Definidos primeiro; depois os "A definir": fase anterior da chave +
+      // longe dos atletas que podem chegar neles (mesma agenda do dia)
+      assignToDefineTimes(definidos, elimAdefs, assignAutoTimes(definidos));
 
       tournament.startTime=origStart;tournament.endTime=origEnd;
       tournament.breakStart=origBS;tournament.breakEnd=origBE;
@@ -2591,42 +2481,7 @@ async function regenerateSchedule() {
     // Sem daySchedule: separar definidos vs eliminatoria "A definir"
     const definidos = tournament.matches.filter(m => m.status !== 'A definir');
     const elimAdefs = tournament.matches.filter(m => m.status === 'A definir');
-    assignAutoTimes(definidos);
-    // Eliminatoria: apos ultimo jogo de grupo da mesma categoria (respeitando limite de quadras)
-    const slotDurNoDay = (tournament.matchDuration||30) + (tournament.restMinBetweenGames||20);
-    const noBrS = timeToMin(tournament.breakStart||'12:00');
-    const noBrE = timeToMin(tournament.breakEnd||'13:30');
-    const ndStart = timeToMin(tournament.startTime||'08:00');
-    const ndEnd = timeToMin(tournament.endTime||'18:00');
-    const ndCourts = tournament.courts||4;
-    // Gerar slots
-    const ndSlots = [];
-    let ndCur = ndStart;
-    while (ndCur + (tournament.matchDuration||30) <= ndEnd) {
-      if (ndCur >= noBrS && ndCur < noBrE) { ndCur = noBrE; continue; }
-      if (ndCur + (tournament.matchDuration||30) > noBrS && ndCur < noBrS) { ndCur = noBrE; continue; }
-      ndSlots.push(ndCur);
-      ndCur += slotDurNoDay;
-    }
-    const ndCount = new Array(ndSlots.length).fill(0);
-    definidos.forEach(m => { if(m.time){ const si=ndSlots.indexOf(timeToMin(m.time)); if(si>=0) ndCount[si]++; }});
-    elimAdefs.sort((a,b) => scheduleStageOf(a) - scheduleStageOf(b));
-    elimAdefs.forEach(m => {
-      const sameDrawGroupTimes = definidos.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
-      const sameDrawAdefTimes = elimAdefs.filter(d => d.drawName === m.drawName && d.time && scheduleStageOf(d) < scheduleStageOf(m)).map(d => timeToMin(d.time));
-      const allTimes = [...sameDrawGroupTimes, ...sameDrawAdefTimes];
-      if (allTimes.length) {
-        const lastMin = Math.max(...allTimes);
-        for (let si = 0; si < ndSlots.length; si++) {
-          if (ndSlots[si] <= lastMin) continue;
-          if (ndCount[si] < ndCourts) {
-            m.time = minToTime(ndSlots[si]);
-            ndCount[si]++;
-            break;
-          }
-        }
-      }
-    });
+    assignToDefineTimes(definidos, elimAdefs, assignAutoTimes(definidos));
     tournament.matches = [...definidos, ...elimAdefs];
     tournament.matches.sort((a,b)=>{
       const ta=a.time?timeToMin(a.time):9999;
@@ -2642,7 +2497,8 @@ async function regenerateSchedule() {
   prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
   renderSchedule();
   const total=tournament.matches.filter(m=>m.time).length;
-  showToast(`Horarios regenerados e renumerados! ${total} jogos.`);
+  const aviso=scheduleMissingWarning(tournament.matches);
+  showToast(`Horarios regenerados e renumerados! ${total} jogos com horario.${aviso}`,aviso?'warning':'success');
 }
 
 // Re-sincronizar estado das draws com tournament.matches
