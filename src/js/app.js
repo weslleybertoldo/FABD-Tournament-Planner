@@ -2661,17 +2661,21 @@ async function handleRealtimeScoreUpdate(data){
       if(matchNum)m=tournament.matches.find(x=>x.num===matchNum);
     }
     if(!m)return;
+    const _isFinalUpdate = !!(data.winner && data.final_score);
     // Deduplicacao: ignorar updates com timestamp igual ou anterior ao ultimo processado
+    // — menos o resultado final: o arbitro grava o ultimo ponto e o resultado quase
+    // juntos e o ponto pode chegar com a hora mais nova. O final era descartado como
+    // repetido, inclusive no reconcile (18/10/2026: jogo 27 do II Festival preso
+    // Em Quadra por 16 min). Repetir o final nao tem efeito: o status abaixo barra.
     const updateKey = data.match_id;
     const updateTs = data.updated_at;
-    if (lastScoreUpdateTimestamp[updateKey] && lastScoreUpdateTimestamp[updateKey] >= updateTs) return;
+    if (!_isFinalUpdate && lastScoreUpdateTimestamp[updateKey] && lastScoreUpdateTimestamp[updateKey] >= updateTs) return;
     lastScoreUpdateTimestamp[updateKey] = updateTs;
     // Se jogo ja foi finalizado localmente, ignorar
     if(m.status==='Finalizada'||m.status==='WO')return;
     // Se arbitro finalizou (winner+final_score), aceita independente do status local —
     // cobre caso onde organizador nao marcou "Em Quadra" no Planner mas o referee
     // pegou e finalizou direto. Antes desse fix, finalizacao ficava presa local.
-    const _isFinalUpdate = !!(data.winner && data.final_score);
     if(m.status!=='Em Quadra' && !_isFinalUpdate)return;
 
     // Atualizar placar ao vivo para exibicao
