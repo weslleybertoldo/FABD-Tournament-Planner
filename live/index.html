@@ -265,6 +265,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Classificacao dos grupos igual a do Planner (desempate BWF): ordem das tabelas
+       dos grupos e nome do classificado na 2a fase. Opcional: sem ele o site cai na
+       ordem por vitorias e nos rotulos "1o do Grupo A". -->
+  <script src="../src/js/modules/bracket-roundrobin-groups.js"></script>
   <script>
     // This is the publishable anon key - safe for client-side use with proper RLS
     // Esta pagina so faz SELECT (leitura) - RLS garante que nao pode escrever dados
@@ -542,7 +546,7 @@
               else{h+=`<div>-</div>`;}
               h+=`</div>`;
               h+=`<div class="hist-name right${w===2?' win':''}">${esc(m.player2)}</div></div>`;
-              h+=`<div class="hist-meta"><span>${esc(m.round_name||'R'+m.round)}</span>`;
+              h+=`<div class="hist-meta"><span>${esc(roundLabel(m.draw_name,m.round,m.round_name))}</span>`;
               if(m.court)h+=`<span>${esc(m.court)}</span>`;
               if(umpire)h+=`<span>Arbitro: ${esc(umpire)}</span>`;
               if(duration)h+=`<span>${duration}</span>`;
@@ -598,7 +602,7 @@
         h+=`<tr class="${statusClass}">`;
         h+=`<td class="sched-num">${m.num||'-'}${m.time?`<div style="font-size:10px;color:#F59E0B;font-weight:600">${esc(m.time)}</div>`:''}</td>`;
         h+=`<td><span class="badge badge-gray">${esc(m.drawName||'')}</span></td>`;
-        h+=`<td style="color:#94A3B8;font-size:12px">${esc(m.roundName||'')}</td>`;
+        h+=`<td style="color:#94A3B8;font-size:12px">${esc(roundLabel(m.drawName,m.round,m.roundName))}</td>`;
         h+=`<td class="sched-players"><span class="${isWinner1?'sched-winner':''}">${esc(p1)}</span><span class="sched-vs"> vs </span><span class="${isWinner2?'sched-winner':''}">${esc(p2)}</span></td>`;
         h+=`<td style="color:#F59E0B;font-weight:700;font-size:12px">${esc(m.score||'')}</td>`;
 
@@ -699,9 +703,12 @@
 
       if(draw.type==='Grupos + Eliminatoria'&&draw.groupsData){
         h+=renderGroups(draw);
-        if(draw.groupsData.eliminationMatches?.length){
+        // Com grupos em andamento a eliminatoria ainda nao foi gerada: mostra a
+        // previa (os jogos "A definir" da 2a fase) com quem ja se classificou.
+        const elim=draw.groupsData.eliminationMatches?.length?draw.groupsData.eliminationMatches:previewEliminationMatches(draw);
+        if(elim.length){
           h+=`<div class="section-title" style="margin-top:24px">Fase Eliminatoria</div>`;
-          h+=renderEliminationBracket(draw.groupsData.eliminationMatches,draw.players?.length||8);
+          h+=renderEliminationBracket(elim,draw.players?.length||8);
         }
       } else {
         h+=renderEliminationBracket(draw.matches||[],draw.players?.length||8);
@@ -746,8 +753,11 @@
           }
         });
 
-        // Ordenar por vitorias
-        const sorted=[...(g.players||[])].sort((a,b)=>(stats[b]?.w||0)-(stats[a]?.w||0));
+        // Mesma ordem do Planner (desempate BWF) — e ela que decide o classificado
+        // da 2a fase; sem o modulo, ordena so por vitorias
+        const sorted=typeof computeGroupStandings==='function'
+          ?computeGroupStandings(g.players||[],g.matches||[]).map(s=>s.name)
+          :[...(g.players||[])].sort((a,b)=>(stats[b]?.w||0)-(stats[a]?.w||0));
         sorted.forEach(p=>{
           const s=stats[p]||{w:0,l:0,games:0};
           h+=`<tr><td style="font-weight:600">${esc(p)}</td><td style="text-align:center">${s.games}</td><td style="text-align:center;color:#10B981">${s.w}</td><td style="text-align:center;color:#EF4444">${s.l}</td></tr>`;
@@ -781,6 +791,34 @@
       h+=`</div>`;
 
       return h;
+    }
+
+    // Previa da 2a fase de "Grupos + Eliminatoria" a partir dos jogos da agenda
+    // (fase 'elimination', ainda "A definir"): rotulo "1o do Grupo A" vira o nome
+    // de quem ficou em 1o quando o grupo acaba (mesma regra do Planner).
+    function previewEliminationMatches(draw){
+      const label=(raw,disp)=>raw||(typeof resolveGroupQualifierLabel==='function'
+        ?resolveGroupQualifierLabel(draw,disp||'A definir'):(disp||'A definir'));
+      return (tournamentData.matches||[])
+        .filter(m=>m.drawName===draw.name&&m.phase==='elimination')
+        .map(m=>{
+          // "15-4 / 15-13" -> score1 "15 15", score2 "4 13" (formato do bracket)
+          const sets=String(m.score||'').split('/').map(s=>s.trim().split('-'));
+          const hasScore=!!m.winner&&sets.every(p=>p.length===2&&p[0]!==''&&p[1]!=='');
+          return {
+            round:m.round||1, slotIdx:m.drawMatchIdx??m.num??0, winner:m.winner,
+            player1:label(m.player1,m.player1Display), player2:label(m.player2,m.player2Display),
+            score1:hasScore?sets.map(p=>p[0]).join(' '):'', score2:hasScore?sets.map(p=>p[1]).join(' '):''
+          };
+        });
+    }
+
+    // Nome da rodada: "Todos contra Todos" nao tem semifinal/final — o Planner
+    // chegou a gravar Semifinal/Final nas rodadas 2/3 ao regenerar os horarios.
+    function roundLabel(drawName,round,roundName){
+      const d=(tournamentData?.draws||[]).find(x=>x.name===drawName);
+      if(d?.type==='Todos contra Todos')return `R${round||1}`;
+      return roundName||(round?`R${round}`:'');
     }
 
     // Renderizar bracket eliminatorio
