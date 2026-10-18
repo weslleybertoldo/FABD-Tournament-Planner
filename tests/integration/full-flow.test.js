@@ -50,6 +50,7 @@ const MODULES = [
   'src/js/modules/bracket-best-thirds.js',
   'src/js/modules/bracket-mutators.js',
   'src/js/modules/bracket-reconcile.js',
+  'src/js/modules/schedule-slots.js',
   'src/js/modules/regenerate-schedule.js',
 ];
 
