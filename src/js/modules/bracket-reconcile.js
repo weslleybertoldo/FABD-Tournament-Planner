@@ -229,9 +229,11 @@ function repropagateAllResults(){
             const dm=entry.match;
             if(dm.player2==='BYE'&&dm.player1&&!dm.advancer){dm.winner=1;dm.advancer=dm.player1;changed=true;}
             if(dm.player1==='BYE'&&dm.player2&&!dm.advancer){dm.winner=2;dm.advancer=dm.player2;changed=true;}
-            if(!dm.winner){
+            if(!dm.winner||!dm.score1){
               const tm=(tournament.matches||[]).find(m=>m.drawName===d.name&&m.phase==='elimination'&&m.player1===dm.player1&&m.player2===dm.player2);
-              if(tm&&tm.winner){dm.winner=tm.winner;dm.advancer=tm.winner===1?tm.player1:tm.player2;changed=true;}
+              if(tm&&tm.winner&&!dm.winner){dm.winner=tm.winner;dm.advancer=tm.winner===1?tm.player1:tm.player2;changed=true;}
+              // placar que nao chegou na chave (site le daqui) — 18/10/2026
+              if(tm&&tm.winner&&tm.score&&dm.winner&&!dm.score1){Object.assign(dm,drawScoreSides(tm.score));changed=true;}
             }
             if(dm.advancer&&r<totalRounds){
               const nextRMatches=byRound[r+1]||[];
@@ -330,6 +332,24 @@ function repropagateAllResults(){
             }
           }
         }
+      });
+    }
+
+    // Vaga em aberto: rotulo com o numero do jogo NA LISTA ("Venc. jogo 36"),
+    // que muda quando a lista e renumerada (Regenerar) — 18/10/2026. So pelo
+    // drawMatchIdx exato: os outros caminhos de busca pegam a 1a vaga vazia.
+    const naLista=idx=>(tournament.matches||[]).find(x=>x.drawName===d.name&&x.drawMatchIdx===idx);
+    for(let r=2;r<=totalRounds;r++){
+      (byRound[r]||[]).forEach((entry,posInRound)=>{
+        const tm=naLista(entry.globalIdx);
+        if(!tm||(tm.status!=='A definir'&&tm.status!=='Pendente'))return;
+        ['player1','player2'].forEach((k,s)=>{
+          if(tm[k])return;
+          const f=(byRound[r-1]||[])[posInRound*2+s];
+          const ftm=f?naLista(f.globalIdx):null;
+          const label=ftm?.num?`Venc. jogo ${ftm.num}`:'A definir';
+          if(tm[k+'Display']!==label){tm[k+'Display']=label;changed=true;}
+        });
       });
     }
   });
