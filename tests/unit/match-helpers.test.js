@@ -135,3 +135,18 @@ describe('distributeMatches', () => {
     expect(distributeMatches([])).toEqual([]);
   });
 });
+
+describe('formatScoreByGames', () => {
+  it('mostra game a game, pontos do jogador 1 primeiro (padrao BWF)', () => {
+    const { formatScoreByGames } = loadMatchHelpers();
+    expect(formatScoreByGames('13-15 / 15-8 / 15-11')).toBe('13-15 / 15-8 / 15-11');
+    expect(formatScoreByGames('15-13/7-15/ 9 - 15')).toBe('15-13 / 7-15 / 9-15');
+    expect(formatScoreByGames('15-10')).toBe('15-10');
+  });
+
+  it('sem placar devolve vazio', () => {
+    const { formatScoreByGames } = loadMatchHelpers();
+    expect(formatScoreByGames('')).toBe('');
+    expect(formatScoreByGames(null)).toBe('');
+  });
+});
