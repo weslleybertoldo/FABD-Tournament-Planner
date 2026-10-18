@@ -111,6 +111,9 @@ function renderMatches() {
   let _lastMatchTime = '';
   let _matchesAtTime = 0;
   let _lastMatchDraw = '';
+  // Horarios do seletor: um calculo por chave (a grade e a do dia da chave)
+  const _timeChoices = {};
+  const _choicesOf = m => _timeChoices[m.drawName] || (_timeChoices[m.drawName] = matchTimeChoices(m));
 
   let h='';
   pendingMatches.forEach(m=>{
@@ -198,7 +201,7 @@ function renderMatches() {
     const _hideRow=_dayDraws&&!_dayDraws.has(m.drawName||'')?'display:none;':'';
     // Texto da busca: so o conteudo da linha (sem as opcoes das listas de quadra/arbitro)
     const _search=normSearch([dayLabel,m.time,m.drawName,m.roundName||'R'+m.round,m.num,m.player1,m.player2,d1,d2,m.court,m.umpire,m.status].join(' '));
-    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" data-search="${esc(_search)}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${esc(m.time)||'-'}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" data-action="assignCourt" data-event="change" data-arg-1="${i}" data-arg-2="$value"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" data-action="updateMatchField" data-event="change" data-arg-1="${i}" data-arg-2="umpire" data-arg-3="$value"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" data-action="showScoreModal" data-arg-1="${i}">Placar</button>${resetBtn}`}</td></tr>`;
+    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" data-search="${esc(_search)}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${isEQ?(esc(m.time)||'-'):`<select class="form-control" style="width:auto;padding:2px 4px;font-size:11px" title="Mudar o horário" data-action="setMatchTime" data-event="change" data-arg-1="${i}" data-arg-2="$value">${getTimeOptions(m,_choicesOf(m))}</select>`}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" data-action="assignCourt" data-event="change" data-arg-1="${i}" data-arg-2="$value"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" data-action="updateMatchField" data-event="change" data-arg-1="${i}" data-arg-2="umpire" data-arg-3="$value"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" data-action="showScoreModal" data-arg-1="${i}">Placar</button>${resetBtn}`}</td></tr>`;
   });
   // Quadras livres do ultimo horario
   if (_lastMatchTime && _matchesAtTime < _nc) {

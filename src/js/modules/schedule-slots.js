@@ -9,8 +9,9 @@
 // - jogo "A definir" segura o horario de todos os atletas que podem chegar
 //   nele (o ja classificado + os que vem dos jogos que alimentam a vaga).
 // PURO: nao le `tournament` nem DOM — recebe tudo por parametro.
-// Usado por app.js (assignAutoTimes, rebuildMatchList, regenerateSchedule) e
-// regenerate-schedule.js (fillMissingTimesByDay, regenerateDrawSchedule).
+// Usado por app.js (assignAutoTimes, rebuildMatchList, regenerateSchedule,
+// setMatchTime — horario mudado a mao em Partidas) e regenerate-schedule.js
+// (fillMissingTimesByDay, regenerateDrawSchedule).
 // Cobertura: tests/unit/schedule-slots.test.js
 // =====================================================================
 
@@ -168,4 +169,75 @@ function schedulePlaceToDefine(book, slots, athletes, lastStart, role) {
 function scheduleMissingWarning(matches) {
   const n = matches.filter(m => !m.time).length;
   return n ? ` ⚠ ${n} jogo(s) ficaram SEM horario: falta quadra ou descanso no dia (veja em Partidas).` : '';
+}
+
+// "HH:MM" <-> minutos (o modulo e puro: nao usa o timeToMin do app.js)
+function scheduleMinutes(hhmm) {
+  const [h, m] = String(hhmm || '').split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+function scheduleClock(min) {
+  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+}
+
+// Jogo que ja acabou: nao segura quadra, atleta nem a fase seguinte da chave
+function scheduleIsDone(m) {
+  return ['Finalizada', 'WO', 'Desistencia', 'Desqualificacao'].includes(m.status);
+}
+
+// Avisos de pôr o jogo `m` as `t` (min) a mao: o que fura as regras da agenda
+// (as mesmas do encaixe automatico). others = jogos do MESMO dia (o proprio m,
+// os sem horario e os que ja acabaram nao contam). cfg = { start, end,
+// breakStart, breakEnd, dur, rest, courts }. drawOf(jogo) = chave dele (quem
+// pode chegar num "A definir" e se a chave tem fases). [] = sem aviso.
+// Regra (Weslley, 18/10/2026): avisa e deixa ele confirmar — nao bloqueia.
+function scheduleConflicts(m, t, others, cfg, drawOf) {
+  const dur = Math.max(1, cfg.dur || 30), rest = Math.max(0, cfg.rest || 0), courts = cfg.courts || 1;
+  const out = [];
+  if (t < cfg.start || t + dur > cfg.end) out.push(`Fora do horário do dia (${scheduleClock(cfg.start)} às ${scheduleClock(cfg.end)}).`);
+  else if (cfg.breakEnd > cfg.breakStart && t < cfg.breakEnd && t + dur > cfg.breakStart) out.push(`Cai na pausa (${scheduleClock(cfg.breakStart)} às ${scheduleClock(cfg.breakEnd)}).`);
+
+  const list = others.filter(x => x !== m && x.time && !scheduleIsDone(x)).map(x => ({ x, s: scheduleMinutes(x.time) }));
+  if (list.filter(o => Math.abs(o.s - t) < dur).length >= courts) {
+    out.push(courts === 1 ? 'A quadra já tem jogo nesse horário.' : `As ${courts} quadras já têm jogo nesse horário.`);
+  }
+
+  // Fases da chave em ordem (no Todos contra Todos uma rodada nao depende da outra)
+  const d = drawOf(m);
+  if (d && d.type !== 'Todos contra Todos') {
+    const stage = scheduleStageOf(m);
+    const same = list.filter(o => o.x.drawName === m.drawName);
+    const prev = same.filter(o => scheduleStageOf(o.x) < stage).map(o => o.s);
+    const next = same.filter(o => scheduleStageOf(o.x) > stage).map(o => o.s);
+    if (prev.length && t < Math.max(...prev) + dur) out.push(`Começa antes de acabar a fase anterior da chave (último jogo às ${scheduleClock(Math.max(...prev))}).`);
+    if (next.length && t + dur > Math.min(...next)) out.push(`Acaba depois do início da fase seguinte da chave (1º jogo às ${scheduleClock(Math.min(...next))}).`);
+  }
+
+  // Atletas: os certos e os que podem chegar num "A definir"
+  const athletesOf = x => (scheduleIsToDefine(x) ? schedulePossibleAthletes(x, drawOf(x)) : scheduleAthletes(x.player1, x.player2));
+  const mine = new Set(athletesOf(m));
+  const role = scheduleRole(m);
+  list.forEach(({ x, s }) => {
+    const r = scheduleRole(x);
+    if (r.tag === role.tag && (r.possivel || role.possivel)) return; // mesma fase da chave
+    const dist = Math.abs(s - t);
+    if (dist >= dur + rest) return;
+    const shared = athletesOf(x).filter(a => mine.has(a));
+    if (!shared.length) return;
+    const quem = shared.length > 3 ? `${shared.slice(0, 3).join(', ')} e mais ${shared.length - 3}` : shared.join(', ');
+    const ref = `(jogo ${x.num ? '#' + x.num + ' ' : ''}às ${x.time}, ${x.drawName || 'sem chave'})`;
+    if (r.possivel || role.possivel) out.push(`Atleta que pode chegar nos 2 jogos, sem descanso ${ref}: ${quem}.`);
+    else if (dist < dur) out.push(`Atleta em 2 jogos ao mesmo tempo ${ref}: ${quem}.`);
+    else out.push(`Descanso de ${dist - dur} min, o mínimo é ${rest} ${ref}: ${quem}.`);
+  });
+  return out;
+}
+
+// Lista na ordem de Partidas/Agenda: dia da chave (daySchedule), horario (sem
+// horario no fim) e numero do jogo. Devolve uma copia; nao renumera.
+function scheduleSortByDay(matches, days) {
+  const sets = (days || []).map(day => new Set(day.draws || []));
+  const dayOf = m => { let i = sets.length; sets.forEach((s, k) => { if (s.has(m.drawName)) i = k; }); return i; };
+  const at = m => (m.time ? scheduleMinutes(m.time) : 9999);
+  return [...matches].sort((a, b) => dayOf(a) - dayOf(b) || at(a) - at(b) || (a.num || 0) - (b.num || 0));
 }
