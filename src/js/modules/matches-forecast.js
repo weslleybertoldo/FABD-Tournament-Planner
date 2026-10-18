@@ -5,7 +5,9 @@
 // PURO: nao le DOM nem `tournament` — recebe tudo por parametro.
 //
 // Previsao = simula os jogos que faltam nas quadras do dia:
-// - cada jogo dura o tempo medio em quadra (finalizados com inicio e fim);
+// - cada jogo dura o tempo medio em quadra de TODOS os jogos medidos do
+//   torneio (finalizados com inicio e fim), nao so os do dia — regra do
+//   Weslley (18/10/2026): a media do dia, com 1 ou 2 jogos, distorcia a previsao;
 // - 1 jogo por quadra; jogo em quadra termina em inicio + media;
 // - atleta descansa restMin entre um jogo e outro;
 // - jogo 'A definir' so comeca depois que a fase anterior da mesma chave
@@ -107,16 +109,15 @@ function forecastDayEndMs(dayMatches, opts) {
 }
 
 // Resumo de um conjunto de jogos (um dia) pro painel.
-// opts: { nowMs, dayStartMs, courts, restMin, defaultMin, fallbackAvg }
-// fallbackAvg = media do torneio, usada quando o dia ainda nao tem jogo medido.
+// opts: { nowMs, dayStartMs, courts, restMin, defaultMin, tournamentAvg }
+// tournamentAvg = forecastAvgSec de todos os jogos do torneio; sem jogo
+// medido, vale a duracao configurada (defaultMin).
 function forecastSummary(dayMatches, opts) {
   const total = dayMatches.length;
   const done = dayMatches.filter(forecastIsDone).length;
   const inCourt = dayMatches.filter(m => m.status === 'Em Quadra').length;
   const toDefine = dayMatches.filter(m => m.status === 'A definir').length;
-  const dayAvg = forecastAvgSec(dayMatches);
-  const avg = dayAvg ? { ...dayAvg, source: 'dia' }
-    : opts.fallbackAvg ? { ...opts.fallbackAvg, source: 'torneio' }
+  const avg = opts.tournamentAvg ? { ...opts.tournamentAvg, source: 'torneio' }
     : { sec: (opts.defaultMin || 30) * 60, count: 0, source: 'configurado' };
   const startMs = Math.max(opts.nowMs, opts.dayStartMs || 0);
   const endMs = total > done

@@ -184,9 +184,7 @@ function renderMatches() {
 
     let pHtml;
     if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
-      const sets=m.score.split('/').map(s=>s.trim());let s1=[],s2=[];
-      sets.forEach(s=>{const p=s.split('-');if(p.length===2){s1.push(p[0].trim());s2.push(p[1].trim());}});
-      pHtml=`<td><strong style="${m.winner===1?'color:#10B981':''}">${w1(p1)}</strong></td><td style="text-align:center;font-weight:700;font-size:13px;white-space:nowrap"><span style="color:${m.winner===1?'#10B981':'var(--fabd-gray-700)'}">${s1.join(' ')}</span><span style="color:var(--fabd-gray-400);margin:0 4px">x</span><span style="color:${m.winner===2?'#10B981':'var(--fabd-gray-700)'}">${s2.join(' ')}</span></td><td><strong style="${m.winner===2?'color:#10B981':''}">${w2(p2)}</strong></td>`;
+      pHtml=`<td><strong style="${m.winner===1?'color:#10B981':''}">${w1(p1)}</strong></td><td style="text-align:center;font-weight:700;font-size:13px;white-space:nowrap;color:var(--fabd-gray-700)">${esc(formatScoreByGames(m.score))}</td><td><strong style="${m.winner===2?'color:#10B981':''}">${w2(p2)}</strong></td>`;
     } else if(m.score==='W.O.'||m.score==='DSQ'||m.score==='RET'){
       pHtml=`<td><strong>${w1(p1)}</strong></td><td style="text-align:center;font-weight:700;color:var(--fabd-red)">${esc(m.score)}</td><td><strong>${w2(p2)}</strong></td>`;
     } else {
@@ -231,21 +229,20 @@ function renderMatchesProgress() {
   const summarize=(list,day)=>forecastSummary(list,{
     nowMs,dayStartMs:day?dayMs(day,day.startTime||tournament.startTime||'08:00'):0,
     courts:tournament.courts||4,restMin:tournament.restMinBetweenGames||0,
-    defaultMin:tournament.matchDuration||30,fallbackAvg:allAvg
+    defaultMin:tournament.matchDuration||30,tournamentAvg:allAvg
   });
   const hm=ms=>{const d=new Date(ms);return`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
   const dur=min=>min>=60?`${Math.floor(min/60)}h${String(min%60).padStart(2,'0')}`:`${min} min`;
   const avgTxt=sec=>`${Math.floor(sec/60)}min${sec%60?` ${String(sec%60).padStart(2,'0')}s`:''}`;
   const tile=(cls,icon,label,value,sub,extra='')=>`<div class="mp-tile ${cls}"><div class="mp-label"><span>${icon}</span>${label}</div><div class="mp-value">${value}</div>${extra}<div class="mp-sub">${sub}</div></div>`;
   const statusSub=s=>[s.inCourt?`${s.inCourt} em quadra`:'',s.pending?`${s.pending} pendente${s.pending>1?'s':''}`:'',s.toDefine?`${s.toDefine} a definir`:''].filter(Boolean).join(' · ')||'nenhum jogo faltando';
-  const avgSub=a=>a.source==='dia'?`media de ${a.count} jogo${a.count>1?'s':''} do dia`:a.source==='torneio'?`media do torneio (${a.count} jogo${a.count>1?'s':''})`:'duracao configurada (sem jogo medido)';
+  const avgSub=a=>a.source==='torneio'?`media do torneio (${a.count} jogo${a.count>1?'s':''})`:'duracao configurada (sem jogo medido)';
   const selDay=dayVal?days.find(d=>d.date===dayVal):null;
   const list=selDay?matches.filter(m=>(selDay.draws||[]).includes(m.drawName)):matches;
   const s=summarize(list,selDay);
   const pct=s.total?Math.round(s.done/s.total*100):0;
   let h=tile('green','&#9989;','Finalizadas',`${s.done}<small>/${s.total}</small>`,statusSub(s),`<div class="mp-bar"><span style="width:${pct}%"></span></div>`);
-  const avg=selDay?s.avg:(allAvg?{...allAvg,source:'torneio'}:s.avg);
-  h+=tile('','&#9201;','Tempo medio por jogo',avgTxt(avg.sec),avgSub(avg));
+  h+=tile('','&#9201;','Tempo medio por jogo',avgTxt(s.avg.sec),avgSub(s.avg));
   if(selDay||!days.length){
     // Um dia (ou torneio sem agenda por dia)
     const future=selDay&&s.startMs>nowMs;
@@ -364,9 +361,7 @@ function renderFinishedMatches(){
     // Placar formatado
     let scoreHtml;
     if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
-      const sets=m.score.split('/').map(s=>s.trim());let s1=[],s2=[];
-      sets.forEach(s=>{const p=s.split('-');if(p.length===2){s1.push(p[0].trim());s2.push(p[1].trim());}});
-      scoreHtml=`<span style="color:${m.winner===1?'#10B981':'var(--fabd-gray-700)'}">${s1.join(' ')}</span><span style="color:var(--fabd-gray-400);margin:0 4px">x</span><span style="color:${m.winner===2?'#10B981':'var(--fabd-gray-700)'}">${s2.join(' ')}</span>`;
+      scoreHtml=`<span style="color:var(--fabd-gray-700);white-space:nowrap">${esc(formatScoreByGames(m.score))}</span>`;
     } else {
       scoreHtml=`<span style="color:var(--fabd-red);font-weight:700">${esc(m.score||'-')}</span>`;
     }

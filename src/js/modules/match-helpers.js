@@ -15,6 +15,15 @@
 // Issue #14 sub-tarefa 14.I — auditoria 2026-05-09.
 // =====================================================================
 
+// Placar game a game, padrao BWF (pontos do jogador 1 primeiro em cada game):
+// "15-13/7-15/ 9-15" -> "15-13 / 7-15 / 9-15", igual ao site ao vivo. Antes as
+// Partidas e a Agenda juntavam os pontos de cada lado ("15 7 9 x 13 15 15") e
+// a leitura confundia (decisao do Weslley, 18/10/2026: "1" = game a game).
+function formatScoreByGames(score) {
+  return String(score || '').split('/').map(s => s.trim()).filter(Boolean)
+    .map(s => s.split('-').map(x => x.trim()).join('-')).join(' / ');
+}
+
 function _stableMatchId(tournamentId, m) {
   const draw = (m.drawName || '').replace(/[^a-zA-Z0-9]/g, '');
   const p1 = (m.player1 || '').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);

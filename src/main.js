@@ -218,17 +218,24 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
   mainWindow.setMenuBarVisibility(false);
 
-  // Alerta ao fechar com torneio aberto
+  // Alerta ao fechar com torneio aberto. Fechar o app NAO encerra o evento:
+  // os jogos em quadra (live_matches/live_scores) e o torneio no site continuam —
+  // o arbitro segue marcando e, ao abrir o torneio de novo ("Abrir Backup"), os
+  // jogos dos arbitros voltam (live-recovery.js). Encerrar o evento e so pelo
+  // botao "Fechar Torneio" (db:closeTournament). Antes este handler apagava tudo
+  // isso (18/10/2026: fechar o app sem querer com 4 jogos em quadra tirou os
+  // jogos do Planner). O app continua abrindo vazio (decisao do Weslley).
   mainWindow.on('close', (e) => {
     if (db.tournament) {
       const { dialog: dlg } = require('electron');
       const choice = dlg.showMessageBoxSync(mainWindow, {
-        type: 'warning',
-        buttons: ['Exportar Backup e Sair', 'Sair sem Backup', 'Cancelar'],
+        type: 'question',
+        buttons: ['Exportar Backup e Sair', 'Sair', 'Cancelar'],
         defaultId: 2,
         cancelId: 2,
         title: 'Torneio Aberto',
-        message: 'Voce tem um torneio aberto. Deseja exportar um backup antes de sair?'
+        message: 'Sair do app?',
+        detail: 'Os jogos em quadra continuam com os árbitros: o evento só encerra no botão "Fechar Torneio". Exporte o backup pra abrir o torneio de novo com tudo atualizado.'
       });
       if (choice === 2) { e.preventDefault(); return; }
       if (choice === 0) {
@@ -239,17 +246,14 @@ function createWindow() {
           log('INFO', 'Backup exportado ao fechar:', backupPath);
         } catch(err) { log('ERROR', 'Erro backup ao fechar:', err.message); }
       }
-      // Limpar Supabase ao fechar (fire-and-forget com log de erro)
-      try {
-        const tid = db.tournament.id;
-        supabase.from('live_scores').delete().eq('tournament_id', tid).then(({ error }) => { if (error) log('ERROR', 'Cleanup scores:', error.message); });
-        supabase.from('live_matches').delete().eq('tournament_id', tid).then(({ error }) => { if (error) log('ERROR', 'Cleanup matches:', error.message); });
-        supabase.from('tournaments').delete().eq('id', tid).then(({ error }) => { if (error) log('ERROR', 'Cleanup tournament:', error.message); });
-        log('INFO', 'Supabase cleanup ao fechar app');
-      } catch(err) { log('ERROR', 'Erro cleanup Supabase:', err.message); }
-      // Limpar torneio local
+      // Como antes, o torneio sai do banco local (o app abre vazio) — mas uma
+      // copia do estado final fica em backups/ (o "Abrir Backup" aceita o .json)
+      if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+      saveDatabaseSync(db);
+      createBackup();
       db.tournament = null;
       saveDatabaseSync(db);
+      log('INFO', 'App fechado com torneio aberto (evento continua)');
     }
   });
 }
@@ -413,6 +417,16 @@ ipcMain.handle('app:info', () => ({ version: app.getVersion(), beta: IS_BETA_CHA
 ipcMain.handle('db:closeTournament', async () => {
   // Limpar TODOS os dados do Supabase (torneio atual + residuos antigos)
   const tid = db.tournament?.id;
+  // Descarta o envio atrasado do torneio (debounce de 15 s) e espera o que ja
+  // saiu: sem isso ele recriava a linha de tournaments depois do delete e o
+  // site voltava a mostrar o evento fechado (achado no E2E de 18/10/2026)
+  if (upsertTimer) { clearTimeout(upsertTimer); upsertTimer = null; }
+  if (pendingUpsert) {
+    pendingUpsert = null;
+    const resolvers = pendingResolvers; pendingResolvers = [];
+    resolvers.forEach(r => r({ ok: false, error: 'torneio fechado' }));
+  }
+  if (upsertInFlight) { try { await upsertInFlight; } catch (_e) { /* o delete abaixo resolve */ } }
   try {
     if (tid) {
       // Limpar torneio atual
@@ -817,6 +831,8 @@ function broadcastSyncStatus() {
   } catch(_) {}
 }
 
+let upsertInFlight = null; // envio em andamento — o Fechar Torneio espera ele antes de apagar
+
 async function flushUpsert() {
   if (!pendingUpsert) return;
   const row = pendingUpsert;
@@ -826,7 +842,8 @@ async function flushUpsert() {
   lastSyncStatus = { state: 'syncing', at: Date.now(), error: null };
   broadcastSyncStatus();
   try {
-    const { error } = await supabase.from('tournaments').upsert(row, { onConflict: 'id' });
+    upsertInFlight = Promise.resolve(supabase.from('tournaments').upsert(row, { onConflict: 'id' }));
+    const { error } = await upsertInFlight.finally(() => { upsertInFlight = null; });
     if (error) {
       log('ERROR', 'Supabase upsert:', error.message);
       lastSyncStatus = { state: 'error', at: Date.now(), error: error.message };
@@ -1415,17 +1432,76 @@ ipcMain.handle('organizers:remove', async (_, email) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('supabase:cleanup', async (_, tournamentId) => {
-  try {
-    // Limpar dados ao vivo do Supabase (live_matches, live_scores)
-    // NÃO afeta torneio local — apenas dados do painel ao vivo
-    const { error: e1 } = await supabase.from('live_scores').delete().eq('tournament_id', tournamentId);
-    if (e1) log('ERROR', 'Cleanup scores:', e1.message);
-    const { error: e2 } = await supabase.from('live_matches').delete().eq('tournament_id', tournamentId);
-    if (e2) log('ERROR', 'Cleanup matches:', e2.message);
-    log('INFO', 'Supabase cleanup concluido para torneio ' + tournamentId);
-    return true;
-  } catch(e) { log('ERROR', 'Supabase cleanup:', e.message); return false; }
+// O que esta com os arbitros (live_matches + live_scores do torneio). So
+// leitura: ao abrir o torneio o renderer recupera jogos em quadra e resultados
+// (live-recovery.js). Substitui o supabase:cleanup, que apagava tudo isso
+// quando o local nao tinha jogo em quadra. 3 tentativas: internet de ginasio cai.
+ipcMain.handle('supabase:getLiveState', async (_, tournamentId) => {
+  const delays = [0, 2000, 5000];
+  let lastErr = null;
+  for (const delay of delays) {
+    if (delay) await new Promise(r => setTimeout(r, delay));
+    try {
+      const [lm, ls] = await Promise.all([
+        supabase.from('live_matches').select('id,status,court,umpire,created_at,updated_at').eq('tournament_id', tournamentId),
+        supabase.from('live_scores').select('*').eq('tournament_id', tournamentId)
+      ]);
+      if (lm.error) throw lm.error;
+      if (ls.error) throw ls.error;
+      return { ok: true, matches: lm.data || [], scores: ls.data || [] };
+    } catch (e) {
+      lastErr = e;
+      if (!_isTransientError(e)) break;
+    }
+  }
+  log('WARN', 'getLiveState falhou:', lastErr?.message);
+  return { ok: false, error: lastErr?.message || 'erro desconhecido' };
+});
+
+// Ao abrir o torneio: devolve ao site os jogos finalizados que faltam em
+// live_matches/live_scores (live-history.js escolhe quais). ignoreDuplicates
+// = ON CONFLICT DO NOTHING: nunca pisa no que ja esta la (o arbitro manda).
+// updated_at = hora do fim do jogo: o site ordena "Partidas Finalizadas" por ele.
+ipcMain.handle('supabase:republishHistory', async (_, tournamentId, entries) => {
+  if (!entries?.length) return { ok: true, count: 0 };
+  if (!currentFederation?.id) {
+    log('ERROR', 'republishHistory: sem federacao ativa (login pendente?)');
+    return { ok: false, error: 'sem federacao ativa' };
+  }
+  const now = new Date().toISOString();
+  const matchRows = [], scoreRows = [];
+  for (const { match, score } of entries) {
+    const id = stableMatchId(tournamentId, match);
+    const at = match.finishedAt || now;
+    matchRows.push({
+      id, tournament_id: tournamentId, federation_id: currentFederation.id,
+      match_num: match.num,
+      draw_name: match.drawName || '', round: match.round || 1,
+      round_name: match.roundName || '', player1: match.player1 || '',
+      player2: match.player2 || '', court: match.court || '',
+      umpire: match.umpire || '', status: 'Finalizada',
+      created_at: match.startedAt || at, updated_at: at
+    });
+    scoreRows.push({ ...score, match_id: id, tournament_id: tournamentId, federation_id: currentFederation.id, updated_at: at });
+  }
+  const delays = [0, 2000, 5000];
+  let lastErr = null;
+  for (const delay of delays) {
+    if (delay) await new Promise(r => setTimeout(r, delay));
+    try {
+      const lm = await supabase.from('live_matches').upsert(matchRows, { onConflict: 'id', ignoreDuplicates: true });
+      if (lm.error) throw lm.error;
+      const ls = await supabase.from('live_scores').upsert(scoreRows, { onConflict: 'match_id', ignoreDuplicates: true });
+      if (ls.error) throw ls.error;
+      log('INFO', `Historico do site: ${entries.length} jogo(s) finalizado(s) devolvido(s)`);
+      return { ok: true, count: entries.length };
+    } catch (e) {
+      lastErr = e;
+      if (!_isTransientError(e)) break;
+    }
+  }
+  log('WARN', 'republishHistory falhou:', lastErr?.message);
+  return { ok: false, error: lastErr?.message || 'erro desconhecido' };
 });
 
 ipcMain.handle('supabase:subscribe', async (_, tournamentId) => {

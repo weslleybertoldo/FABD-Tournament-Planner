@@ -133,9 +133,7 @@ function renderScheduleMatch(m){
   const p2Style=m.winner===2?'color:#10B981;font-weight:700':'font-weight:600';
   let scoreHtml='';
   if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
-    const sets=m.score.split('/').map(s=>s.trim());let s1=[],s2=[];
-    sets.forEach(s=>{const p=s.split('-');if(p.length===2){s1.push(p[0].trim());s2.push(p[1].trim());}});
-    scoreHtml=`<span style="color:${m.winner===1?'#10B981':'var(--fabd-gray-700)'}; font-weight:700">${s1.join(' ')}</span><span style="color:var(--fabd-gray-400);margin:0 6px">x</span><span style="color:${m.winner===2?'#10B981':'var(--fabd-gray-700)'}; font-weight:700">${s2.join(' ')}</span>`;
+    scoreHtml=`<span style="color:var(--fabd-gray-700);font-weight:700;white-space:nowrap">${esc(formatScoreByGames(m.score))}</span>`;
   } else if(m.score==='W.O.'||m.score==='DSQ'||m.score==='RET'){
     scoreHtml=`<span style="color:var(--fabd-red);font-weight:700">${esc(m.score)}</span>`;
   } else {
