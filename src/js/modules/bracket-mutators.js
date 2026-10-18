@@ -132,14 +132,30 @@ function updateEliminationMatchesInList(){
     let groupMatchCount=0;
     (d.groupsData.groups||[]).forEach(g=>{g.matches.forEach(m=>{if(m.player1&&m.player2&&m.player1!=='BYE'&&m.player2!=='BYE')groupMatchCount++;});});
 
+    const listMatch=emIdx=>tournament.matches.find(m=>
+      m.drawName===d.name&&m.phase==='elimination'&&m.drawMatchIdx===groupMatchCount+emIdx
+    );
+
     // Pra cada match de eliminatoria
     elimMatches.forEach((em,emIdx)=>{
-      const expectedIdx=groupMatchCount+emIdx;
       // Encontrar o match na lista por drawMatchIdx exato
-      const existing=tournament.matches.find(m=>
-        m.drawName===d.name&&m.phase==='elimination'&&m.drawMatchIdx===expectedIdx
-      );
+      const existing=listMatch(emIdx);
       if(!existing)return;
+
+      // Vaga vazia na chave com nome na lista = nome que caiu no jogo errado
+      // (II Festival, 18/10/2026). Volta pra "Venc. jogo N" enquanto nao comecou.
+      if(existing.status==='A definir'||existing.status==='Pendente'){
+        ['player1','player2'].forEach((k,s)=>{
+          if(em[k]||!existing[k])return;
+          const feederIdx=elimMatches.findIndex(f=>f.round===em.round-1&&f.slotIdx===(em.slotIdx||0)*2+s);
+          const feeder=feederIdx>=0?listMatch(feederIdx):null;
+          existing[k]='';
+          existing[k+'Display']=feeder?.num?`Venc. jogo ${feeder.num}`:'A definir';
+          existing.isDefinida=false;
+          existing.status='A definir';
+          changed=true;
+        });
+      }
 
       // Atualizar player1
       if(em.player1&&existing.player1!==em.player1){

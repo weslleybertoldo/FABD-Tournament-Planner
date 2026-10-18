@@ -241,13 +241,10 @@ function repropagateAllResults(){
                 const slot=posInRound%2;
                 if(slot===0&&nm.player1!==dm.advancer){nm.player1=dm.advancer;changed=true;}
                 if(slot===1&&nm.player2!==dm.advancer){nm.player2=dm.advancer;changed=true;}
-                // Update tournament.match
-                const ntm=(tournament.matches||[]).find(m=>m.drawName===d.name&&m.phase==='elimination'&&m.round===nm.round&&(!m.player1||!m.player2||m.status==='A definir'));
-                if(ntm){
-                  if(slot===0&&ntm.player1!==dm.advancer){ntm.player1=dm.advancer;ntm.player1Display=dm.advancer;changed=true;}
-                  if(slot===1&&ntm.player2!==dm.advancer){ntm.player2=dm.advancer;ntm.player2Display=dm.advancer;changed=true;}
-                  if(ntm.player1&&ntm.player2&&ntm.status==='A definir'){ntm.isDefinida=true;ntm.status='Pendente';changed=true;}
-                }
+                // A lista de partidas segue a chave pelo drawMatchIdx exato
+                // (updateEliminationMatchesInList, no fim). Antes ia pro 1o jogo da
+                // rodada seguinte com vaga vazia: no II Festival (18/10/2026) o
+                // vencedor da 4a quarta apareceu na 1a semi da lista.
               }
             }
           });
@@ -336,14 +333,16 @@ function repropagateAllResults(){
       });
     }
   });
+  // Lista de partidas da eliminatoria = chave (sempre, nao so quando a chave mudou)
+  if(updateEliminationMatchesInList())changed=true;
   if(changed){
-    // Atualizar matches de eliminatoria na lista
-    updateEliminationMatchesInList();
-
     // Dar horario so a jogo definido que ficou sem, no proprio dia (o
     // assignAutoTimes com todos os jogos apagava os horarios do outro dia)
     fillMissingTimesByDay();
     window.api.saveTournament(tournament);
+    // O site tambem: o envio do fim do jogo sai ANTES deste avanco e o site
+    // ficava com a semi "A definir" ate o proximo envio (18/10/2026)
+    prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
   }
 }
 
