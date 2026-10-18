@@ -492,6 +492,11 @@ async function loadData(autoLoad=false) {
       // nada e apagado (live-recovery.js).
       try { await recoverLiveFromReferees(); } catch(e) { console.warn('Recuperar jogos dos arbitros:', e); }
 
+      // Vencedores ja avancados na chave e na lista ANTES do envio abaixo: sem
+      // isso o site recebia a 2a fase atrasada ate alguem abrir a aba Partidas
+      // (18/10/2026)
+      repropagateAllResults();
+
       // Sincronizar dados com Supabase (sem ativar Realtime ainda)
       try {
         prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id, tournament.name, tournament);
@@ -3018,7 +3023,7 @@ async function closeLiveEvent(tid,name){
   else{showToast(`Erro ao fechar: ${r?.error||'desconhecido'}`,'error');}
   renderLiveEvents();
 }
-const APP_VERSION='4.108';
+const APP_VERSION='4.109';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');

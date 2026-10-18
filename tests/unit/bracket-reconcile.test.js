@@ -13,7 +13,11 @@ function loadReconcile(tournament, mocks = {}) {
     computeGroupStandings: mocks.computeGroupStandings || (() => []),
     usesBestThirds: mocks.usesBestThirds || (() => false),
     buildBestThirdsQuarterfinals: mocks.buildBestThirdsQuarterfinals || (() => []),
-    window: { api: { saveTournament: mocks.saveTournament || (() => Promise.resolve()) } },
+    prepareRankingsForSync: mocks.prepareRankingsForSync || (() => {}),
+    window: { api: {
+      saveTournament: mocks.saveTournament || (() => Promise.resolve()),
+      supabaseUpsertTournament: mocks.supabaseUpsertTournament || (() => Promise.resolve()),
+    } },
   };
   return loadModule('src/js/modules/bracket-reconcile.js', ctx);
 }
@@ -168,5 +172,159 @@ describe('buildGroupsElimPreview — previa em formato de chave', () => {
     expect(m.filter(x => x.round === 1).map(x => [x.player1, x.player2])).toEqual(labels);
     expect(m.filter(x => x.round === 2).length).toBe(2);
     expect(m.filter(x => x.round === 3).length).toBe(1);
+  });
+});
+
+// II Festival (18/10/2026), SM Principal: 3 grupos + quartas. A 3a e a 4a quartas
+// acabaram antes das outras e os vencedores (Luiz e Kelvin) apareceram na 1a semi
+// da lista de partidas; a chave estava certa. Mesma estrutura, menor: 1 grupo com
+// 2 jogos (idx 0-1), quartas (idx 2-5), semis (idx 6-7) e final (idx 8).
+const Q = [['V', 'M'], ['K', 'J'], ['L', 'H'], ['E', 'P']];
+function mkGE({ quartasFeitas = [2, 3] } = {}) {
+  const grupo = [
+    { round: 1, player1: 'V', player2: 'K', winner: 1, score1: '15 15', score2: '3 4', phase: 'group', group: 'A' },
+    { round: 1, player1: 'L', player2: 'E', winner: 1, score1: '15 15', score2: '5 6', phase: 'group', group: 'A' },
+  ];
+  const elim = [
+    ...Q.map(([a, b], i) => {
+      const feita = quartasFeitas.includes(i);
+      return { round: 1, slotIdx: i, player1: a, player2: b, winner: feita ? 1 : undefined, advancer: feita ? a : '', score1: feita ? '15 15' : '', score2: feita ? '9 9' : '', isBye: false, phase: 'elimination' };
+    }),
+    { round: 2, slotIdx: 0, player1: '', player2: '', advancer: '', isBye: false, phase: 'elimination' },
+    { round: 2, slotIdx: 1, player1: '', player2: '', advancer: '', isBye: false, phase: 'elimination' },
+    { round: 3, slotIdx: 0, player1: '', player2: '', advancer: '', isBye: false, phase: 'elimination' },
+  ];
+  const lista = [
+    ...grupo.map((g, i) => ({ num: i + 1, drawName: 'SM', drawMatchIdx: i, phase: 'group', group: 'A', round: 1, player1: g.player1, player2: g.player2, winner: 1, score: '15-3 / 15-4', status: 'Finalizada' })),
+    ...Q.map(([a, b], i) => {
+      const feita = quartasFeitas.includes(i);
+      return { num: 3 + i, drawName: 'SM', drawMatchIdx: 2 + i, phase: 'elimination', round: 1, player1: a, player2: b, player1Display: a, player2Display: b, winner: feita ? 1 : undefined, score: feita ? '15-9 / 15-9' : '', status: feita ? 'Finalizada' : 'Em Quadra', isDefinida: true };
+    }),
+    { num: 7, drawName: 'SM', drawMatchIdx: 6, phase: 'elimination', round: 2, player1: '', player2: '', player1Display: 'Venc. jogo 3', player2Display: 'Venc. jogo 4', status: 'A definir', isDefinida: false },
+    { num: 8, drawName: 'SM', drawMatchIdx: 7, phase: 'elimination', round: 2, player1: '', player2: '', player1Display: 'Venc. jogo 5', player2Display: 'Venc. jogo 6', status: 'A definir', isDefinida: false },
+    { num: 9, drawName: 'SM', drawMatchIdx: 8, phase: 'elimination', round: 3, player1: '', player2: '', player1Display: 'Venc. jogo 7', player2Display: 'Venc. jogo 8', status: 'A definir', isDefinida: false },
+  ];
+  // Depois de salvar/abrir o JSON a chave (groupsData) e d.matches sao copias separadas
+  const copia = o => JSON.parse(JSON.stringify(o));
+  return {
+    id: 't1', name: 'Festival',
+    draws: [{
+      name: 'SM', type: 'Grupos + Eliminatoria', groupQualifiers: 2,
+      matches: copia([...grupo, ...elim]),
+      groupsData: { groups: [{ name: 'Grupo A', players: ['V', 'K', 'L', 'E'], matches: copia(grupo) }], eliminationMatches: copia(elim), eliminationGenerated: true },
+    }],
+    matches: lista,
+  };
+}
+
+function carregar(t, mocks = {}) {
+  // updateEliminationMatchesInList de verdade (e ela que a lista usa pra seguir a chave)
+  const { updateEliminationMatchesInList, drawScoreSides } = loadModule('src/js/modules/bracket-mutators.js', { tournament: t });
+  const ctx = loadReconcile(t, { areGroupsFinished: () => true, updateEliminationMatchesInList, ...mocks });
+  ctx.drawScoreSides = drawScoreSides;
+  return ctx;
+}
+const jogo = (t, num) => t.matches.find(m => m.num === num);
+
+describe('repropagateAllResults — Grupos + Eliminatoria: vencedor na semi certa', () => {
+
+  it('3a e 4a quartas acabam primeiro: vencedores vao pra 2a semi (jogo 8), a 1a semi (jogo 7) fica a definir', () => {
+    const t = mkGE({ quartasFeitas: [2, 3] });
+    carregar(t).repropagateAllResults();
+    expect([jogo(t, 8).player1, jogo(t, 8).player2, jogo(t, 8).status]).toEqual(['L', 'E', 'Pendente']);
+    expect([jogo(t, 7).player1, jogo(t, 7).player2, jogo(t, 7).status]).toEqual(['', '', 'A definir']);
+  });
+
+  it('so a 4a quarta acabou: o vencedor vai pra vaga 2 da 2a semi, nao pra 1a semi', () => {
+    const t = mkGE({ quartasFeitas: [3] });
+    carregar(t).repropagateAllResults();
+    expect([jogo(t, 8).player1, jogo(t, 8).player2]).toEqual(['', 'E']);
+    expect([jogo(t, 7).player1, jogo(t, 7).player2]).toEqual(['', '']);
+  });
+
+  it('nome que ficou na semi errada sai da lista (vaga da chave vazia e jogo nao comecou)', () => {
+    const t = mkGE({ quartasFeitas: [0, 2, 3] });
+    const { repropagateAllResults } = carregar(t);
+    repropagateAllResults();
+    // estado que ele viu as 14:00: a 1a semi com o vencedor da 4a quarta
+    Object.assign(jogo(t, 7), { player2: 'E', player2Display: 'E', status: 'Pendente', isDefinida: true });
+    repropagateAllResults();
+    expect([jogo(t, 7).player1, jogo(t, 7).player2, jogo(t, 7).player2Display]).toEqual(['V', '', 'Venc. jogo 4']);
+    expect([jogo(t, 7).status, jogo(t, 7).isDefinida]).toEqual(['A definir', false]);
+    expect([jogo(t, 8).player1, jogo(t, 8).player2]).toEqual(['L', 'E']);
+  });
+
+  it('manda a chave pro site quando o vencedor avanca, e nao manda de novo sem mudanca', () => {
+    const t = mkGE({ quartasFeitas: [2, 3] });
+    const envios = [];
+    const { repropagateAllResults } = carregar(t, {
+      supabaseUpsertTournament: (id, nome, dados) => { envios.push(JSON.parse(JSON.stringify(dados))); return Promise.resolve(); },
+    });
+    repropagateAllResults();
+    expect(envios.length).toBe(1);
+    const semi2 = envios[0].draws[0].groupsData.eliminationMatches.find(e => e.round === 2 && e.slotIdx === 1);
+    expect([semi2.player1, semi2.player2]).toEqual(['L', 'E']);
+    expect(envios[0].matches.find(m => m.num === 8).player2).toBe('E');
+    repropagateAllResults();
+    expect(envios.length).toBe(1);
+  });
+});
+
+// Numeros da lista como no II Festival (o Regenerar renumera): quartas 36/40/44/51,
+// semis 53/54, final 52. O rotulo da vaga em aberto usava o numero da 2a fase
+// ("Venc. jogo 1") e nao o da lista ("Venc. jogo 36").
+describe('Grupos + Eliminatoria — rotulo da vaga e placar da 2a fase', () => {
+  const NUM = { 3: 36, 4: 40, 5: 44, 6: 51, 7: 53, 8: 54, 9: 52 };
+  function mkFestival(opts) {
+    const t = mkGE(opts);
+    t.matches.forEach(m => { if (NUM[m.num]) m.num = NUM[m.num]; });
+    return t;
+  }
+  const disp = (t, num) => { const m = t.matches.find(x => x.num === num); return [m.player1Display, m.player2Display]; };
+
+  it('vaga em aberto mostra o numero do jogo na lista (Venc. jogo 36, nao jogo 1)', () => {
+    const t = mkFestival({ quartasFeitas: [] });
+    carregar(t).repropagateAllResults();
+    expect(disp(t, 53)).toEqual(['Venc. jogo 36', 'Venc. jogo 40']);
+    expect(disp(t, 54)).toEqual(['Venc. jogo 44', 'Venc. jogo 51']);
+    expect(disp(t, 52)).toEqual(['Venc. jogo 53', 'Venc. jogo 54']);
+  });
+
+  it('placar da quarta chega na chave mesmo com o torneio aberto do arquivo', () => {
+    const t = mkFestival({ quartasFeitas: [] });
+    const { propagateResultToDraws } = loadModule('src/js/modules/bracket-mutators.js', { tournament: t });
+    propagateResultToDraws({ drawName: 'SM', drawMatchIdx: 3, round: 1, phase: 'elimination', player1: 'K', player2: 'J', winner: 1, score: '15-8 / 15-13' });
+    const em = t.draws[0].groupsData.eliminationMatches.find(e => e.round === 1 && e.slotIdx === 1);
+    expect([em.winner, em.advancer, em.score1, em.score2]).toEqual([1, 'K', '15 15', '8 13']);
+  });
+
+  it('placar que faltou na chave (resultado antigo) volta pela lista', () => {
+    const t = mkFestival({ quartasFeitas: [1] });
+    const em = t.draws[0].groupsData.eliminationMatches.find(e => e.round === 1 && e.slotIdx === 1);
+    em.score1 = ''; em.score2 = '';
+    carregar(t).repropagateAllResults();
+    expect([em.score1, em.score2]).toEqual(['15 15', '9 9']);
+  });
+});
+
+describe('Eliminatoria — rotulo da vaga com o numero do jogo na lista', () => {
+  it('final mostra Venc. jogo 10 e 20 quando a lista foi renumerada', () => {
+    const t = {
+      id: 't1', name: 'X',
+      draws: [{ name: 'SM', type: 'Eliminatoria', matches: [
+        { round: 1, player1: 'A', player2: 'B' }, { round: 1, player1: 'C', player2: 'D' }, { round: 2, player1: '', player2: '' },
+      ] }],
+      matches: [
+        { num: 10, drawName: 'SM', drawMatchIdx: 0, round: 1, player1: 'A', player2: 'B', status: 'Pendente' },
+        { num: 20, drawName: 'SM', drawMatchIdx: 1, round: 1, player1: 'C', player2: 'D', status: 'Pendente' },
+        { num: 30, drawName: 'SM', drawMatchIdx: 2, round: 2, player1: '', player2: '', player1Display: 'Venc. jogo 1', player2Display: 'Venc. jogo 2', status: 'A definir' },
+      ],
+    };
+    const { repropagateAllResults } = loadReconcile(t, {
+      findTournamentMatch: (drawName, idx) => t.matches.find(m => m.drawName === drawName && m.drawMatchIdx === idx),
+    });
+    repropagateAllResults();
+    const f = t.matches.find(m => m.num === 30);
+    expect([f.player1Display, f.player2Display]).toEqual(['Venc. jogo 10', 'Venc. jogo 20']);
   });
 });

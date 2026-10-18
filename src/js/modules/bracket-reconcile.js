@@ -229,9 +229,11 @@ function repropagateAllResults(){
             const dm=entry.match;
             if(dm.player2==='BYE'&&dm.player1&&!dm.advancer){dm.winner=1;dm.advancer=dm.player1;changed=true;}
             if(dm.player1==='BYE'&&dm.player2&&!dm.advancer){dm.winner=2;dm.advancer=dm.player2;changed=true;}
-            if(!dm.winner){
+            if(!dm.winner||!dm.score1){
               const tm=(tournament.matches||[]).find(m=>m.drawName===d.name&&m.phase==='elimination'&&m.player1===dm.player1&&m.player2===dm.player2);
-              if(tm&&tm.winner){dm.winner=tm.winner;dm.advancer=tm.winner===1?tm.player1:tm.player2;changed=true;}
+              if(tm&&tm.winner&&!dm.winner){dm.winner=tm.winner;dm.advancer=tm.winner===1?tm.player1:tm.player2;changed=true;}
+              // placar que nao chegou na chave (site le daqui) — 18/10/2026
+              if(tm&&tm.winner&&tm.score&&dm.winner&&!dm.score1){Object.assign(dm,drawScoreSides(tm.score));changed=true;}
             }
             if(dm.advancer&&r<totalRounds){
               const nextRMatches=byRound[r+1]||[];
@@ -241,13 +243,10 @@ function repropagateAllResults(){
                 const slot=posInRound%2;
                 if(slot===0&&nm.player1!==dm.advancer){nm.player1=dm.advancer;changed=true;}
                 if(slot===1&&nm.player2!==dm.advancer){nm.player2=dm.advancer;changed=true;}
-                // Update tournament.match
-                const ntm=(tournament.matches||[]).find(m=>m.drawName===d.name&&m.phase==='elimination'&&m.round===nm.round&&(!m.player1||!m.player2||m.status==='A definir'));
-                if(ntm){
-                  if(slot===0&&ntm.player1!==dm.advancer){ntm.player1=dm.advancer;ntm.player1Display=dm.advancer;changed=true;}
-                  if(slot===1&&ntm.player2!==dm.advancer){ntm.player2=dm.advancer;ntm.player2Display=dm.advancer;changed=true;}
-                  if(ntm.player1&&ntm.player2&&ntm.status==='A definir'){ntm.isDefinida=true;ntm.status='Pendente';changed=true;}
-                }
+                // A lista de partidas segue a chave pelo drawMatchIdx exato
+                // (updateEliminationMatchesInList, no fim). Antes ia pro 1o jogo da
+                // rodada seguinte com vaga vazia: no II Festival (18/10/2026) o
+                // vencedor da 4a quarta apareceu na 1a semi da lista.
               }
             }
           });
@@ -335,15 +334,35 @@ function repropagateAllResults(){
         }
       });
     }
-  });
-  if(changed){
-    // Atualizar matches de eliminatoria na lista
-    updateEliminationMatchesInList();
 
+    // Vaga em aberto: rotulo com o numero do jogo NA LISTA ("Venc. jogo 36"),
+    // que muda quando a lista e renumerada (Regenerar) — 18/10/2026. So pelo
+    // drawMatchIdx exato: os outros caminhos de busca pegam a 1a vaga vazia.
+    const naLista=idx=>(tournament.matches||[]).find(x=>x.drawName===d.name&&x.drawMatchIdx===idx);
+    for(let r=2;r<=totalRounds;r++){
+      (byRound[r]||[]).forEach((entry,posInRound)=>{
+        const tm=naLista(entry.globalIdx);
+        if(!tm||(tm.status!=='A definir'&&tm.status!=='Pendente'))return;
+        ['player1','player2'].forEach((k,s)=>{
+          if(tm[k])return;
+          const f=(byRound[r-1]||[])[posInRound*2+s];
+          const ftm=f?naLista(f.globalIdx):null;
+          const label=ftm?.num?`Venc. jogo ${ftm.num}`:'A definir';
+          if(tm[k+'Display']!==label){tm[k+'Display']=label;changed=true;}
+        });
+      });
+    }
+  });
+  // Lista de partidas da eliminatoria = chave (sempre, nao so quando a chave mudou)
+  if(updateEliminationMatchesInList())changed=true;
+  if(changed){
     // Dar horario so a jogo definido que ficou sem, no proprio dia (o
     // assignAutoTimes com todos os jogos apagava os horarios do outro dia)
     fillMissingTimesByDay();
     window.api.saveTournament(tournament);
+    // O site tambem: o envio do fim do jogo sai ANTES deste avanco e o site
+    // ficava com a semi "A definir" ate o proximo envio (18/10/2026)
+    prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
   }
 }
 
