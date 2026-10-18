@@ -75,6 +75,33 @@ function _registerEmQuadraIds() {
   window.api.supabaseRegisterEmQuadra(tournament.id, ids).catch(e => console.warn('[supabase] registerEmQuadra falhou (offline ou RLS):', e?.message || e));
 }
 
+// Ao abrir o torneio: jogo que o arbitro esta marcando volta pra quadra e jogo
+// que ele finalizou com o app fechado entra com o resultado (live-recovery.js).
+// Sem internet nao muda nada no local nem no Supabase.
+async function recoverLiveFromReferees() {
+  if (!tournament?.id || !window.api?.supabaseGetLiveState) return;
+  const st = await window.api.supabaseGetLiveState(tournament.id);
+  if (!st?.ok) { showToast('Sem internet: não deu pra conferir os jogos com os árbitros. Reabra o torneio quando voltar.', 'warning'); return; }
+  const plan = planLiveRecovery(tournament.matches || [], st.matches, st.scores, m => _stableMatchId(tournament.id, m));
+  plan.toCourt.forEach(({ match, court, umpire, startedAt }) => {
+    match.status = 'Em Quadra';
+    match.court = court;
+    if (umpire) match.umpire = umpire;
+    match.startedAt = startedAt || new Date().toISOString();
+  });
+  if (plan.toCourt.length) await window.api.saveTournament(tournament);
+  // Mesmo caminho do resultado que chega do arbitro em tempo real (salva,
+  // propaga na chave e re-publica o torneio)
+  for (const s of plan.finals) await handleRealtimeScoreUpdate(s);
+  if (plan.toCourt.length || plan.finals.length) {
+    const parts = [];
+    if (plan.toCourt.length) parts.push(`${plan.toCourt.length} jogo(s) de volta em quadra`);
+    if (plan.finals.length) parts.push(`${plan.finals.length} resultado(s)`);
+    console.log('[recover] arbitros:', parts.join(', '));
+    showToast(`Recuperado dos árbitros: ${parts.join(' e ')}`);
+  }
+}
+
 // Reconciliacao: main detectou divergencia e nos pede pra re-sincronizar
 if (window.api?.onReconcileNeeded) {
   window.api.onReconcileNeeded(async ({ missing, wrongStatus }) => {
@@ -445,20 +472,10 @@ async function loadData(autoLoad=false) {
         }
       });
 
-      // Cleanup Supabase: limpar dados orfaos do painel ao vivo
-      // Se nao tem jogos em quadra, limpa live_matches/live_scores (dados de sessao anterior)
-      // Se tem jogos em quadra, mantem somente esses jogos
-      try {
-        const emQuadra = (tournament.matches||[]).filter(m => m.status === 'Em Quadra');
-        if (emQuadra.length === 0) {
-          // Nenhum jogo em quadra: limpar tudo do Supabase
-          await window.api.supabaseCleanup(tournament.id);
-          console.log('Supabase cleanup: nenhum jogo em quadra, dados ao vivo limpos');
-        } else {
-          // Tem jogos em quadra: sincronizar apenas esses
-          console.log(`${emQuadra.length} jogo(s) em quadra, mantendo no Supabase`);
-        }
-      } catch(e) { console.warn('Supabase cleanup:', e); }
+      // Fechar o app nao encerra o evento (so o botao "Fechar Torneio"): ao abrir
+      // o torneio ("Abrir Backup"), traz de volta o que esta com os arbitros —
+      // nada e apagado (live-recovery.js).
+      try { await recoverLiveFromReferees(); } catch(e) { console.warn('Recuperar jogos dos arbitros:', e); }
 
       // Sincronizar dados com Supabase (sem ativar Realtime ainda)
       try {
@@ -468,6 +485,9 @@ async function loadData(autoLoad=false) {
         const hasEmQuadra = (tournament.matches||[]).some(m => m.status === 'Em Quadra');
         if (hasEmQuadra) {
           await window.api.supabaseSubscribe(tournament.id);
+          // Reconcile (30s) dos jogos em quadra desde a abertura — antes so
+          // comecava no proximo jogo posto em quadra
+          _registerEmQuadraIds();
           console.log('Realtime ativado (jogos em quadra detectados)');
         }
       } catch(e) { console.warn('Supabase connect:', e); }
@@ -794,10 +814,12 @@ async function importTournamentBackup() {
   try {
     const result = await window.api.importTournament();
     if (!result) return;
+    // Antes do loadData: o aviso da recuperacao dos arbitros (feita dentro
+    // dele) tem que ficar por cima deste — o showToast troca o anterior
+    showToast(`Torneio "${result.name}" importado!`);
     await loadData(true);
     document.getElementById('breadcrumb').textContent = tournament?.name || '';
     renderTournamentPage(); updateOverview();
-    showToast(`Torneio "${result.name}" importado!`);
   } catch(e) { showToast('Erro: '+e.message, 'error'); }
 }
 
@@ -2655,7 +2677,10 @@ async function handleRealtimeScoreUpdate(data){
       m.score=data.final_score;
       m.status='Finalizada';
       m.winner=data.winner;
-      m.finishedAt=new Date().toISOString();
+      // Hora em que o arbitro finalizou: no tempo real e agora; na recuperacao
+      // ao abrir e no reconcile e a hora de verdade, nao a da leitura
+      const finAt=data.updated_at?new Date(data.updated_at):null;
+      m.finishedAt=(finAt&&!isNaN(finAt))?finAt.toISOString():new Date().toISOString();
       m.liveScore='';
       try{propagateResultToDraws(m);}catch(e){console.warn('Erro ao propagar resultado:',e);showToast('Aviso: resultado recebido mas propagacao na chave falhou','warning');}
       await window.api.saveTournament(tournament);

@@ -49,7 +49,7 @@ contextBridge.exposeInMainWorld('api', {
   onAuthSignedOut: (cb) => { ipcRenderer.removeAllListeners('auth:signed-out'); ipcRenderer.on('auth:signed-out', () => cb()); },
   supabaseRegisterEmQuadra: (tid, ids) => ipcRenderer.invoke('supabase:registerEmQuadra', tid, ids),
   onReconcileNeeded: (cb) => { ipcRenderer.removeAllListeners('supabase:reconcile-needed'); ipcRenderer.on('supabase:reconcile-needed', (_, data) => cb(data)); },
-  supabaseCleanup: (tid) => ipcRenderer.invoke('supabase:cleanup', tid),
+  supabaseGetLiveState: (tid) => ipcRenderer.invoke('supabase:getLiveState', tid),
   supabaseListLiveTournaments: () => ipcRenderer.invoke('supabase:listLiveTournaments'),
   supabaseCloseLiveEvent: (tid) => ipcRenderer.invoke('supabase:closeLiveEvent', tid),
   supabaseIsOrganizer: () => ipcRenderer.invoke('supabase:isOrganizer'),

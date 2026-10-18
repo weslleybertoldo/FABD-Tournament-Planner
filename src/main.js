@@ -218,17 +218,24 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
   mainWindow.setMenuBarVisibility(false);
 
-  // Alerta ao fechar com torneio aberto
+  // Alerta ao fechar com torneio aberto. Fechar o app NAO encerra o evento:
+  // os jogos em quadra (live_matches/live_scores) e o torneio no site continuam —
+  // o arbitro segue marcando e, ao abrir o torneio de novo ("Abrir Backup"), os
+  // jogos dos arbitros voltam (live-recovery.js). Encerrar o evento e so pelo
+  // botao "Fechar Torneio" (db:closeTournament). Antes este handler apagava tudo
+  // isso (18/10/2026: fechar o app sem querer com 4 jogos em quadra tirou os
+  // jogos do Planner). O app continua abrindo vazio (decisao do Weslley).
   mainWindow.on('close', (e) => {
     if (db.tournament) {
       const { dialog: dlg } = require('electron');
       const choice = dlg.showMessageBoxSync(mainWindow, {
-        type: 'warning',
-        buttons: ['Exportar Backup e Sair', 'Sair sem Backup', 'Cancelar'],
+        type: 'question',
+        buttons: ['Exportar Backup e Sair', 'Sair', 'Cancelar'],
         defaultId: 2,
         cancelId: 2,
         title: 'Torneio Aberto',
-        message: 'Voce tem um torneio aberto. Deseja exportar um backup antes de sair?'
+        message: 'Sair do app?',
+        detail: 'Os jogos em quadra continuam com os árbitros: o evento só encerra no botão "Fechar Torneio". Exporte o backup pra abrir o torneio de novo com tudo atualizado.'
       });
       if (choice === 2) { e.preventDefault(); return; }
       if (choice === 0) {
@@ -239,17 +246,14 @@ function createWindow() {
           log('INFO', 'Backup exportado ao fechar:', backupPath);
         } catch(err) { log('ERROR', 'Erro backup ao fechar:', err.message); }
       }
-      // Limpar Supabase ao fechar (fire-and-forget com log de erro)
-      try {
-        const tid = db.tournament.id;
-        supabase.from('live_scores').delete().eq('tournament_id', tid).then(({ error }) => { if (error) log('ERROR', 'Cleanup scores:', error.message); });
-        supabase.from('live_matches').delete().eq('tournament_id', tid).then(({ error }) => { if (error) log('ERROR', 'Cleanup matches:', error.message); });
-        supabase.from('tournaments').delete().eq('id', tid).then(({ error }) => { if (error) log('ERROR', 'Cleanup tournament:', error.message); });
-        log('INFO', 'Supabase cleanup ao fechar app');
-      } catch(err) { log('ERROR', 'Erro cleanup Supabase:', err.message); }
-      // Limpar torneio local
+      // Como antes, o torneio sai do banco local (o app abre vazio) — mas uma
+      // copia do estado final fica em backups/ (o "Abrir Backup" aceita o .json)
+      if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+      saveDatabaseSync(db);
+      createBackup();
       db.tournament = null;
       saveDatabaseSync(db);
+      log('INFO', 'App fechado com torneio aberto (evento continua)');
     }
   });
 }
@@ -1415,17 +1419,30 @@ ipcMain.handle('organizers:remove', async (_, email) => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('supabase:cleanup', async (_, tournamentId) => {
-  try {
-    // Limpar dados ao vivo do Supabase (live_matches, live_scores)
-    // NÃO afeta torneio local — apenas dados do painel ao vivo
-    const { error: e1 } = await supabase.from('live_scores').delete().eq('tournament_id', tournamentId);
-    if (e1) log('ERROR', 'Cleanup scores:', e1.message);
-    const { error: e2 } = await supabase.from('live_matches').delete().eq('tournament_id', tournamentId);
-    if (e2) log('ERROR', 'Cleanup matches:', e2.message);
-    log('INFO', 'Supabase cleanup concluido para torneio ' + tournamentId);
-    return true;
-  } catch(e) { log('ERROR', 'Supabase cleanup:', e.message); return false; }
+// O que esta com os arbitros (live_matches + live_scores do torneio). So
+// leitura: ao abrir o torneio o renderer recupera jogos em quadra e resultados
+// (live-recovery.js). Substitui o supabase:cleanup, que apagava tudo isso
+// quando o local nao tinha jogo em quadra. 3 tentativas: internet de ginasio cai.
+ipcMain.handle('supabase:getLiveState', async (_, tournamentId) => {
+  const delays = [0, 2000, 5000];
+  let lastErr = null;
+  for (const delay of delays) {
+    if (delay) await new Promise(r => setTimeout(r, delay));
+    try {
+      const [lm, ls] = await Promise.all([
+        supabase.from('live_matches').select('id,status,court,umpire,created_at,updated_at').eq('tournament_id', tournamentId),
+        supabase.from('live_scores').select('*').eq('tournament_id', tournamentId)
+      ]);
+      if (lm.error) throw lm.error;
+      if (ls.error) throw ls.error;
+      return { ok: true, matches: lm.data || [], scores: ls.data || [] };
+    } catch (e) {
+      lastErr = e;
+      if (!_isTransientError(e)) break;
+    }
+  }
+  log('WARN', 'getLiveState falhou:', lastErr?.message);
+  return { ok: false, error: lastErr?.message || 'erro desconhecido' };
 });
 
 ipcMain.handle('supabase:subscribe', async (_, tournamentId) => {
