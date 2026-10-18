@@ -184,9 +184,7 @@ function renderMatches() {
 
     let pHtml;
     if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
-      const sets=m.score.split('/').map(s=>s.trim());let s1=[],s2=[];
-      sets.forEach(s=>{const p=s.split('-');if(p.length===2){s1.push(p[0].trim());s2.push(p[1].trim());}});
-      pHtml=`<td><strong style="${m.winner===1?'color:#10B981':''}">${w1(p1)}</strong></td><td style="text-align:center;font-weight:700;font-size:13px;white-space:nowrap"><span style="color:${m.winner===1?'#10B981':'var(--fabd-gray-700)'}">${s1.join(' ')}</span><span style="color:var(--fabd-gray-400);margin:0 4px">x</span><span style="color:${m.winner===2?'#10B981':'var(--fabd-gray-700)'}">${s2.join(' ')}</span></td><td><strong style="${m.winner===2?'color:#10B981':''}">${w2(p2)}</strong></td>`;
+      pHtml=`<td><strong style="${m.winner===1?'color:#10B981':''}">${w1(p1)}</strong></td><td style="text-align:center;font-weight:700;font-size:13px;white-space:nowrap;color:var(--fabd-gray-700)">${esc(formatScoreByGames(m.score))}</td><td><strong style="${m.winner===2?'color:#10B981':''}">${w2(p2)}</strong></td>`;
     } else if(m.score==='W.O.'||m.score==='DSQ'||m.score==='RET'){
       pHtml=`<td><strong>${w1(p1)}</strong></td><td style="text-align:center;font-weight:700;color:var(--fabd-red)">${esc(m.score)}</td><td><strong>${w2(p2)}</strong></td>`;
     } else {
@@ -363,9 +361,7 @@ function renderFinishedMatches(){
     // Placar formatado
     let scoreHtml;
     if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
-      const sets=m.score.split('/').map(s=>s.trim());let s1=[],s2=[];
-      sets.forEach(s=>{const p=s.split('-');if(p.length===2){s1.push(p[0].trim());s2.push(p[1].trim());}});
-      scoreHtml=`<span style="color:${m.winner===1?'#10B981':'var(--fabd-gray-700)'}">${s1.join(' ')}</span><span style="color:var(--fabd-gray-400);margin:0 4px">x</span><span style="color:${m.winner===2?'#10B981':'var(--fabd-gray-700)'}">${s2.join(' ')}</span>`;
+      scoreHtml=`<span style="color:var(--fabd-gray-700);white-space:nowrap">${esc(formatScoreByGames(m.score))}</span>`;
     } else {
       scoreHtml=`<span style="color:var(--fabd-red);font-weight:700">${esc(m.score||'-')}</span>`;
     }
