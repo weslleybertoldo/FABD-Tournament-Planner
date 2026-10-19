@@ -850,6 +850,18 @@ async function flushUpsert() {
   broadcastSyncStatus();
 }
 
+// Chaves de cada dia pro site ao vivo: dia configurado antes do sorteio fica sem
+// chaves ate o Planner completar pelo modo (ensureDayScheduleDraws, schedule.js);
+// aqui a mesma conta, pra o site nunca receber um dia vazio que o Planner preenche
+function publishedDayDraws(day, draws) {
+  if (day.draws && day.draws.length) return day.draws;
+  const names = (draws || []).map(d => d.name);
+  const mode = day.mode || 'todas';
+  if (mode === 'simples') return names.filter(n => n.startsWith('SM ') || n.startsWith('SF '));
+  if (mode === 'duplas') return names.filter(n => n.startsWith('DM ') || n.startsWith('DF ') || n.startsWith('DX '));
+  return names;
+}
+
 ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tournamentData) => {
   try {
     if (!currentFederation?.id) {
@@ -869,6 +881,11 @@ ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tourna
         courtNames: tournamentData.courtNames || [],
         startDate: tournamentData.startDate,
         endDate: tournamentData.endDate,
+        // Dia de cada jogo no site ao vivo (Programacao por dia): a mesma regra do
+        // Planner (scheduleDayOf) precisa da data e das chaves de cada dia e das
+        // rodadas por dia — so isso, sem os horarios da configuracao
+        daySchedule: (tournamentData.daySchedule || []).map(d => ({ date: d.date, draws: publishedDayDraws(d, tournamentData.draws) })),
+        roundDays: tournamentData.roundDays || {},
         location: tournamentData.location,
         city: tournamentData.city,
         // Apenas nome + clube — sem PII (telefone/dob/email) para nao vazar publicamente
