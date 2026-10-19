@@ -103,6 +103,31 @@
     .modal .actions{display:flex;gap:12px}
     .modal .actions .btn{flex:1;padding:12px}
 
+    /* Encerrar jogo sem fechar os games (W.O., desistencia, desqualificacao, ambos ausentes):
+       segurar o botao 5 s abre as opcoes. touch-action/user-select/callout: segurar no toque
+       nao rola a tela, nao seleciona texto e nao abre menu do sistema */
+    .btn-secondary{background:#334155;color:#fff}
+    .btn-end{position:relative;overflow:hidden;background:#1E293B;color:#FCD34D;box-shadow:inset 0 0 0 1px #F59E0B;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+    .btn-end .end-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:#B45309;pointer-events:none}
+    .btn-end .end-label{position:relative;pointer-events:none}
+    .btn-end.holding{color:#fff}
+    .end-hint{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);background:#1E293B;border:1px solid #F59E0B;color:#FCD34D;padding:8px 16px;border-radius:10px;font-size:14px;font-weight:600;white-space:nowrap;z-index:20;pointer-events:none;opacity:0;transition:opacity .15s}
+    .end-hint.show{opacity:1}
+    .end-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+    .end-grid.one-col{grid-template-columns:1fr}
+    .end-opt{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:76px;padding:12px 10px;background:#0F172A;color:#fff;border:2px solid #334155;border-radius:12px;font-size:17px;font-weight:700;cursor:pointer;touch-action:manipulation}
+    .end-opt:active{border-color:#F59E0B;background:#1E3A8A}
+    .end-opt small{font-size:11px;font-weight:500;color:#94A3B8}
+    .end-summary{font-size:18px;font-weight:700;color:#F59E0B;line-height:1.35;margin-bottom:8px}
+    /* Celular deitado (tela baixa): janela mais compacta e, no limite, rola em vez de cortar */
+    #modal-end .modal{max-height:100%;overflow-y:auto}
+    @media (max-height:420px){
+      #modal-end .modal{padding:14px 16px}
+      #modal-end h3{margin-bottom:8px}
+      .end-grid{gap:8px;margin-bottom:10px}
+      .end-opt{min-height:56px;padding:8px}
+    }
+
     /* Nome do servidor ao lado da peteca */
     .server-name{position:absolute;font-size:16px;font-weight:700;color:rgba(255,255,255,0.95);z-index:3;white-space:nowrap;transition:all 0.3s ease;text-shadow:1px 1px 4px rgba(0,0,0,0.6)}
 
@@ -313,9 +338,13 @@
     <div class="scorer-bottom">
       <span style="font-size:10px;color:#94A3B8" id="scorer-umpire"></span>
       <button class="btn btn-danger" id="btn-undo" onclick="undoPoint()">&#8630; Desfazer</button>
+      <!-- Segurar 5 s abre "Como o jogo terminou?". Começa escondido: só o updateReadOnlyUI
+           mostra, e só para o árbitro dono do jogo (no modo visualização fica escondido) -->
+      <button class="btn btn-end" id="btn-end-match" type="button" style="display:none" title="Segure 5 s para encerrar" aria-label="Encerrar jogo (segure 5 segundos)"><span class="end-fill" id="end-fill"></span><span class="end-label">&#127937; Encerrar jogo</span></button>
       <span style="font-size:11px;color:#64748B" id="scorer-draw-info"></span>
       <span style="font-size:10px;color:#F59E0B;display:none" id="readonly-badge">&#128274; Somente visualização</span>
     </div>
+    <div class="end-hint" id="end-hint" role="status" aria-live="polite"></div>
   </div>
 
   <!-- MODAL CONFIRMAR -->
@@ -339,6 +368,44 @@
       <div class="actions">
         <button class="btn btn-danger" onclick="closeExitModal()">Cancelar</button>
         <button class="btn btn-success" onclick="confirmExit()">Sair</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ENCERRAR JOGO (W.O. / desistência / desqualificação / ambos ausentes) -->
+  <div class="modal-overlay" id="modal-end">
+    <div class="modal">
+      <div id="end-step-kind">
+        <h3>Como o jogo terminou?</h3>
+        <div class="end-grid">
+          <button class="end-opt" type="button" onclick="pickEndKind('wo')">W.O.<small>Não compareceu</small></button>
+          <button class="end-opt" type="button" onclick="pickEndKind('desist')">Desistência<small>Parou no meio do jogo</small></button>
+          <button class="end-opt" type="button" onclick="pickEndKind('desq')">Desqualificação<small>Excluído pelo árbitro</small></button>
+          <button class="end-opt" type="button" onclick="pickEndKind('semjogo')">Ambos ausentes<small>Ninguém avança</small></button>
+        </div>
+        <div class="actions">
+          <button class="btn btn-danger" type="button" onclick="closeEndModal()">Cancelar</button>
+        </div>
+      </div>
+      <div id="end-step-who" style="display:none">
+        <h3 id="end-who-title"></h3>
+        <div class="end-grid one-col">
+          <button class="end-opt" type="button" id="end-who-1" onclick="pickEndWho(1)"></button>
+          <button class="end-opt" type="button" id="end-who-2" onclick="pickEndWho(2)"></button>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" type="button" onclick="showEndStep('kind')">Voltar</button>
+          <button class="btn btn-danger" type="button" onclick="closeEndModal()">Cancelar</button>
+        </div>
+      </div>
+      <div id="end-step-confirm" style="display:none">
+        <h3>Confirmar encerramento</h3>
+        <div class="end-summary" id="end-summary"></div>
+        <p style="font-size:12px;color:#94A3B8;margin-bottom:20px">Depois de confirmar, o jogo é finalizado e sai da quadra.</p>
+        <div class="actions">
+          <button class="btn btn-secondary" type="button" onclick="endStepBack()">Voltar</button>
+          <button class="btn btn-success" type="button" id="end-confirm-btn" onclick="confirmEndMatch()">Confirmar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1697,6 +1764,161 @@
       }catch(e){alert('Erro: '+e.message);}
     }
 
+    // === ENCERRAR JOGO SEM FECHAR OS GAMES (W.O. / desistência / desqualificação / ambos ausentes) ===
+    // Pedido de 18/10/2026: segurar o botão 5 s abre as opções. O resultado segue o
+    // contrato com o Planner: final_score 'W.O.' / '<parcial> Desist.' / '<parcial> Desq.' /
+    // 'Sem jogo' e winner 1/2 (o outro lado) ou 0 em 'Sem jogo'.
+    const END_HOLD_MS=5000;
+    let endHold=null; // {pointerId,start,raf} enquanto o botão está pressionado
+    let endHintTimer=null;
+    let endKind=null,endWho=null,endSaving=false; // endWho = lado (1/2) que não veio/desistiu/foi desqualificado
+    const END_WHO_TITLE={wo:'Quem não veio?',desist:'Quem desistiu?',desq:'Quem foi desqualificado?'};
+
+    function setupEndHold(){
+      const btn=document.getElementById('btn-end-match');
+      if(!btn)return;
+      btn.addEventListener('pointerdown',startEndHold);
+      const stop=e=>{if(endHold&&e.pointerId===endHold.pointerId)cancelEndHold();};
+      btn.addEventListener('pointerup',stop);
+      btn.addEventListener('pointercancel',stop);
+      btn.addEventListener('pointerleave',stop);
+      btn.addEventListener('contextmenu',e=>e.preventDefault());
+    }
+
+    function startEndHold(e){
+      if(isReadOnly||!currentMatch||endHold)return;
+      if(e.pointerType==='mouse'&&e.button!==0)return;
+      e.preventDefault();
+      const btn=e.currentTarget;
+      // No toque o navegador prende o ponteiro no botão; soltando, o pointerleave
+      // cancela quando o dedo sai do botão (igual ao mouse)
+      try{if(btn.hasPointerCapture(e.pointerId))btn.releasePointerCapture(e.pointerId);}catch(_){}
+      btn.classList.add('holding');
+      endHold={pointerId:e.pointerId,start:performance.now(),raf:0};
+      const tick=()=>{
+        if(!endHold)return;
+        const elapsed=performance.now()-endHold.start;
+        document.getElementById('end-fill').style.width=Math.min(100,elapsed/END_HOLD_MS*100)+'%';
+        if(elapsed>=END_HOLD_MS){
+          resetEndHold();
+          try{navigator.vibrate?.(60);}catch(_){}
+          openEndModal();
+          return;
+        }
+        showEndHint('Continue segurando… '+Math.ceil((END_HOLD_MS-elapsed)/1000)+' s',0);
+        endHold.raf=requestAnimationFrame(tick);
+      };
+      tick();
+    }
+
+    // Soltou (ou saiu do botão) antes dos 5 s: zera e mostra a dica
+    function cancelEndHold(){
+      if(!endHold)return;
+      resetEndHold();
+      showEndHint('Segure 5 s para encerrar',2200);
+    }
+
+    function resetEndHold(){
+      if(endHold?.raf)cancelAnimationFrame(endHold.raf);
+      endHold=null;
+      const btn=document.getElementById('btn-end-match');if(btn)btn.classList.remove('holding');
+      const fill=document.getElementById('end-fill');if(fill)fill.style.width='0';
+      hideEndHint();
+    }
+
+    function showEndHint(text,ms){
+      const el=document.getElementById('end-hint');if(!el)return;
+      if(el.textContent!==text)el.textContent=text;
+      el.classList.add('show');
+      if(endHintTimer){clearTimeout(endHintTimer);endHintTimer=null;}
+      if(ms)endHintTimer=setTimeout(hideEndHint,ms);
+    }
+    function hideEndHint(){
+      if(endHintTimer){clearTimeout(endHintTimer);endHintTimer=null;}
+      const el=document.getElementById('end-hint');if(el)el.classList.remove('show');
+    }
+
+    function openEndModal(){
+      if(isReadOnly||!currentMatch)return;
+      endKind=null;endWho=null;
+      showEndStep('kind');
+      document.getElementById('modal-end').classList.add('active');
+    }
+    function closeEndModal(){
+      document.getElementById('modal-end').classList.remove('active');
+      endKind=null;endWho=null;
+    }
+    function showEndStep(step){
+      ['kind','who','confirm'].forEach(s=>{document.getElementById('end-step-'+s).style.display=s===step?'block':'none';});
+    }
+    function pickEndKind(kind){
+      if(!currentMatch)return;
+      endKind=kind;endWho=null;
+      if(kind==='semjogo'){showEndConfirm();return;}
+      document.getElementById('end-who-title').textContent=END_WHO_TITLE[kind];
+      document.getElementById('end-who-1').textContent=currentMatch.player1;
+      document.getElementById('end-who-2').textContent=currentMatch.player2;
+      showEndStep('who');
+    }
+    function pickEndWho(side){
+      endWho=side;
+      showEndConfirm();
+    }
+    function showEndConfirm(){
+      document.getElementById('end-summary').textContent=buildEndResult(endKind,endWho).summary;
+      showEndStep('confirm');
+    }
+    function endStepBack(){
+      showEndStep(endKind==='semjogo'?'kind':'who');
+    }
+
+    // Monta o que vai para o live_scores. who = lado que não veio/desistiu/foi desqualificado.
+    function buildEndResult(kind,who){
+      const p1=currentMatch.player1,p2=currentMatch.player2;
+      const semPlacar={current_set:1,score_p1:0,score_p2:0,sets_p1:[],sets_p2:[],sets_won_p1:0,sets_won_p2:0};
+      if(kind==='semjogo')return{...semPlacar,winner:0,final_score:'Sem jogo',summary:'Ambos ausentes — ninguém avança'};
+      const winner=who===1?2:1;
+      const loserName=who===1?p1:p2,winnerName=who===1?p2:p1;
+      if(kind==='wo')return{...semPlacar,winner,final_score:'W.O.',summary:'W.O. de '+loserName+' — vence '+winnerName};
+      // Desistência/desqualificação: games fechados + o game em andamento, se tiver ponto.
+      // Se o último game já fechou (setsP1 já tem state.set games), os pontos atuais
+      // são desse game e não entram de novo.
+      const s1=[...state.setsP1],s2=[...state.setsP2];
+      if(state.setsP1.length<state.set&&(state.p1>0||state.p2>0)){s1.push(state.p1);s2.push(state.p2);}
+      const partial=s1.map((v,i)=>v+'-'+s2[i]).join(' / ');
+      const suffix=kind==='desist'?'Desist.':'Desq.';
+      const label=kind==='desist'?'Desistência':'Desqualificação';
+      return{
+        current_set:state.set,score_p1:state.p1,score_p2:state.p2,
+        sets_p1:s1,sets_p2:s2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,
+        winner,final_score:partial?partial+' '+suffix:suffix,
+        summary:label+' de '+loserName+(partial?' ('+partial+')':'')+' — vence '+winnerName
+      };
+    }
+
+    // Grava igual ao confirmResult: confere que o jogo ainda está em quadra, upsert no
+    // live_scores com winner/final_score e depois live_matches 'Finalizada'
+    async function confirmEndMatch(){
+      if(!currentMatch||!sb||endSaving)return;
+      if(isReadOnly){alert('Modo visualização: só o árbitro do jogo pode encerrar.');closeEndModal();return;}
+      if(!endKind||(endKind!=='semjogo'&&!endWho))return;
+      const r=buildEndResult(endKind,endWho);
+      const btn=document.getElementById('end-confirm-btn');
+      endSaving=true;btn.disabled=true;btn.textContent='Salvando...';
+      try{
+        const {data:matchCheck}=await sb.from('live_matches').select('status').eq('id',currentMatch.id).single();
+        if(!matchCheck||matchCheck.status!=='Em Quadra'){alert('Este jogo nao esta mais em quadra. Saindo do placar.');closeEndModal();doExitScorer();return;}
+        // .select: sem linha de volta = RLS barrou em silêncio (igual ao syncScore)
+        const r1=await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,federation_id:currentMatch.federation_id,current_set:r.current_set,score_p1:r.score_p1,score_p2:r.score_p2,sets_p1:r.sets_p1,sets_p2:r.sets_p2,sets_won_p1:r.sets_won_p1,sets_won_p2:r.sets_won_p2,winner:r.winner,final_score:r.final_score,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'}).select('match_id');
+        if(r1.error){alert('Erro ao finalizar: '+r1.error.message);return;}
+        if(!r1.data?.length){alert('Erro ao finalizar: o resultado não foi salvo. Verifique se seu cadastro de árbitro está autorizado.');return;}
+        const r2=await sb.from('live_matches').update({status:'Finalizada',umpire:currentUser?.name||''}).eq('id',currentMatch.id);
+        if(r2.error){alert('Erro ao finalizar: '+r2.error.message);return;}
+        closeEndModal();alert('Resultado registrado!');doExitScorer();
+      }catch(e){alert('Erro: '+(e?.message||e));}
+      finally{endSaving=false;btn.disabled=false;btn.textContent='Confirmar';}
+    }
+
     function updateReadOnlyUI(){
       const umpName=currentUser?.name||'';
       document.getElementById('scorer-umpire').textContent=umpName?'Árbitro: '+firstTwoNames(umpName):'';
@@ -1706,9 +1928,14 @@
         // Desabilitar cliques na quadra
         document.querySelectorAll('.court-side').forEach(el=>{el.style.pointerEvents='none';el.style.opacity='0.85';});
         document.querySelectorAll('.swap-btn,.swap-inner').forEach(el=>{el.style.display='none';});
+        // Encerrar jogo é só do árbitro dono do jogo
+        document.getElementById('btn-end-match').style.display='none';
+        resetEndHold();closeEndModal();
       }else{
         document.getElementById('readonly-badge').style.display='none';
         document.getElementById('btn-undo').style.display='inline-block';
+        document.getElementById('btn-end-match').style.display='inline-block';
+        resetEndHold();
         document.querySelectorAll('.court-side').forEach(el=>{el.style.pointerEvents='auto';el.style.opacity='1';});
         // Volta o "Trocar lados" que o modo visualizacao escondeu — antes ficava
         // sumido em todo jogo seguinte ate recarregar (o "Trocar saque" e as
@@ -1732,6 +1959,7 @@
     }
 
     async function doExitScorer(){
+      resetEndHold();closeEndModal();
       // v4.36: release_match RPC (idempotente — só limpa se for o dono e jogo não finalizado)
       if(currentMatch&&!isReadOnly&&sb){
         try{await sb.rpc('release_match',{p_match_id:currentMatch.id});}catch(e){}
@@ -1746,6 +1974,7 @@
     // v4.19: popula diagnostico imediatamente (sync) ANTES de checkAuth — assim
     // user que clicar no <details> ja ve estado mesmo se checkAuth ainda nao rodou
     _renderDiagInfo();
+    setupEndHold();
     checkAuth();
   </script>
 </body>
