@@ -542,14 +542,16 @@ async function checkAutoUpdate(){
     // Canal beta: main ja decidiu (compara tag com app.getVersion()) — nao usa
     // isNewerVersion, que nao entende sufixo "-beta.N".
     if(data.beta_channel?!data.up_to_date:isNewerVersion(latestVersion,APP_VERSION)){
-      const exeAsset=(data.assets||[]).find(a=>a.name.endsWith('.exe'));
+      // Linux: o app oficial se atualiza sozinho (sem faixa); o beta baixa o AppImage (update-bar.js)
+      const baixar=updateBarDownload(data,/Linux/.test(navigator.userAgent));
+      if(!baixar)return;
       const bar=document.getElementById('update-bar');
       const txt=document.getElementById('update-bar-text');
       const btn=document.getElementById('update-bar-btn');
       if(bar&&txt){
         txt.textContent='Nova versao disponivel: v'+latestVersion;
-        if(exeAsset&&btn){
-          btn.onclick=()=>window.api.openExternal(exeAsset.browser_download_url);
+        if(baixar.url&&btn){
+          btn.onclick=()=>window.api.openExternal(baixar.url);
           btn.style.display='inline-block';
         } else if(btn){ btn.style.display='none'; }
         bar.style.display='flex';
