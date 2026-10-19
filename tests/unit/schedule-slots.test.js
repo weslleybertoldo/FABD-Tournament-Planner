@@ -353,6 +353,16 @@ describe('scheduleDayOf — rodadas por dia, igual ao BTP (Weslley, 18/10/2026)'
     expect(dia(ms[2], { 'SM A': { 3: '2026-12-25' } })).toBe(0);
   });
 
+  it('Automatico depois de uma rodada escolhida vai junto: so a semi no dia 2 leva a final', () => {
+    const rd = { 'SM A': { 2: '2026-11-08' } };
+    expect(ms.slice(0, 3).map(m => dia(m, rd))).toEqual([0, 1, 1]);
+  });
+
+  it('rodada escolhida nunca fica antes de uma rodada anterior escolhida', () => {
+    const rd = { 'SM A': { 2: '2026-11-08', 3: '2026-11-07' } };
+    expect(dia(ms[2], rd)).toBe(1);
+  });
+
   it('scheduleSortByDay usa o dia de cada jogo: a final escolhida pro dia 2 vai pro fim', () => {
     const lista = [
       { num: 1, drawName: 'SM A', round: 3, time: '08:00' },
