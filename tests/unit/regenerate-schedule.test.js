@@ -247,6 +247,8 @@ describe('regenerateDrawSchedule — rodadas por dia (igual ao BTP)', () => {
     expect([4, 5].map(sm)).toEqual(['08:30', '08:30']);
     // Final (Automatico) vai junto pro dia 2, depois das semis + descanso
     expect(sm(6)).toBe('09:30');
+    // Nome das rodadas igual ao da lista de Partidas (antes a 1a rodada de 8 virava 'R1')
+    expect([0, 4, 6].map(i => t.matches.find(m => m.drawName === 'SM X' && m.drawMatchIdx === i).roundName)).toEqual(['Quartas', 'Semifinal', 'Final']);
     // Ordem da lista: dia 1 (R1) e depois o dia 2 (DX, semis, final)
     expect(t.matches.map(m => `${m.drawName} ${m.time}`)).toEqual([
       'SM X 08:00', 'SM X 08:00', 'SM X 08:30', 'SM X 08:30',
