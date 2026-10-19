@@ -871,7 +871,8 @@ ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tourna
     const row = { id: tournamentId, name, federation_id: currentFederation.id, updated_at: new Date().toISOString() };
     if (tournamentData) {
       row.data = {
-        matches: tournamentData.matches || [],
+        // Ralis da sumula ficam so no arquivo (pedido do Weslley, 19/10/2026)
+        matches: (tournamentData.matches || []).map(({ rallies, ...m }) => m),
         draws: tournamentData.draws || [],
         rankings: tournamentData._rankings || {},
         courts: tournamentData.courts,
