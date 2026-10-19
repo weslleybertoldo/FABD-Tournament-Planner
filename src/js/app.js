@@ -2686,6 +2686,61 @@ async function updateMatchField(idx, field, value) {
   prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
 }
 
+// Dia da chave do jogo e a grade dele (as mesmas contas do Regenerar)
+function matchDayGrid(m) {
+  ensureDayScheduleDraws();
+  const day = (tournament.daySchedule || []).find(d => (d.draws || []).includes(m.drawName)) || null;
+  return {
+    inDay: x => !day || (day.draws || []).includes(x.drawName),
+    cfg: {
+      start: timeToMin(day?.startTime || tournament.startTime || '08:00'),
+      end: timeToMin(day?.endTime || tournament.endTime || '18:00'),
+      breakStart: timeToMin(day?.breakStart || tournament.breakStart || '12:00'),
+      breakEnd: timeToMin(day?.breakEnd || tournament.breakEnd || '13:30'),
+      dur: tournament.matchDuration || 30,
+      rest: tournament.restMinBetweenGames || 20,
+      courts: tournament.courts || 4,
+    },
+  };
+}
+
+// Horarios do seletor de Partidas: a grade do dia da chave e mais 3 h depois
+// do fim (jogo que nao coube no dia, ex. semis e finais no fim do dia 2)
+function matchTimeChoices(m) {
+  const { cfg } = matchDayGrid(m);
+  const grid = scheduleDaySlots(cfg).map(t => ({ t, after: false }));
+  for (let t = grid.length ? grid[grid.length - 1].t + cfg.dur : cfg.end; t < Math.min(cfg.end + 180, 24 * 60); t += cfg.dur) grid.push({ t, after: true });
+  return grid;
+}
+
+function getTimeOptions(m, choices) {
+  const opts = choices.map(c => [minToTime(c.t), c.after]);
+  if (m.time && !opts.some(o => o[0] === m.time)) opts.push([m.time, false]); // fora da grade: nao some da lista
+  opts.sort((a, b) => timeToMin(a[0]) - timeToMin(b[0]));
+  return '<option value="">-</option>' + opts.map(([v, after]) => `<option value="${esc(v)}"${v === m.time ? ' selected' : ''}>${esc(v)}${after ? ' (após o fim)' : ''}</option>`).join('');
+}
+
+// Horario mudado a mao em Partidas. Furou alguma regra da agenda (quadra,
+// atleta, descanso, fase da chave, dia/pausa — scheduleConflicts)? Avisa e so
+// muda se ele confirmar (Weslley, 18/10/2026). Nao renumera os jogos.
+async function setMatchTime(idx, value) {
+  const m = tournament?.matches?.[idx]; if (!m) return;
+  if ((m.time || '') === value) return;
+  if (m.status === 'Em Quadra' || scheduleIsDone(m)) { showToast('Jogo em quadra ou finalizado: o horário não muda.', 'warning'); renderMatches(); return; }
+  if (value) {
+    const { cfg, inDay } = matchDayGrid(m);
+    const drawOf = x => (tournament.draws || []).find(d => d.name === x.drawName);
+    const avisos = scheduleConflicts(m, timeToMin(value), tournament.matches.filter(inDay), cfg, drawOf);
+    if (avisos.length && !confirm(`Jogo #${m.num} (${m.drawName}) às ${value}:\n\n${avisos.map(a => '⚠ ' + a).join('\n')}\n\nMudar o horário mesmo assim?`)) { renderMatches(); return; }
+  }
+  m.time = value;
+  tournament.matches = scheduleSortByDay(tournament.matches, tournament.daySchedule);
+  await window.api.saveTournament(tournament);
+  prepareRankingsForSync(); window.api.supabaseUpsertTournament(tournament.id, tournament.name, tournament);
+  renderMatches();
+  showToast(value ? `Jogo #${m.num} agora às ${value}.` : `Jogo #${m.num} ficou sem horário.`);
+}
+
 function showScoreModal(idx) {
   const m=tournament.matches[idx];if(!m)return;scoringMatchIdx=idx;
   document.getElementById('score-p1').textContent=m.player1;
