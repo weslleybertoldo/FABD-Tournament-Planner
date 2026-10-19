@@ -852,3 +852,55 @@ function reportPlayers(){
 
 // === RANKING / PREMIACAO ===
 // Atualizar matches de eliminatoria na lista de partidas quando jogadores ficam disponiveis
+
+// === SUMULAS EM BRANCO (igual ao BTP: Report > Scoresheets) ===
+// Janela de filtros (dia, quadra, horario, pular "A definir" e ja impressas)
+// -> folhas A4 paisagem (scoresheet.js). Ao clicar Imprimir, os jogos ficam
+// marcados como impressos (m.scoresheetPrintedAt), igual ao BTP.
+function _scoresheetFilters(){
+  const v=id=>document.getElementById(id);
+  return {day:v('ss-day').value,court:v('ss-court').value,from:v('ss-from').value,to:v('ss-to').value,
+    skipUnknown:v('ss-skip-unknown').checked,skipPrinted:v('ss-skip-printed').checked};
+}
+function _scoresheetCtx(){
+  return {dayOf:m=>scheduleDayOf(m,tournament.daySchedule,tournament.roundDays),isDone:isMatchDone,isToDefine:scheduleIsToDefine};
+}
+function showScoresheetModal(){
+  if(!tournament){showToast('Nenhum torneio ativo','warning');return;}
+  const days=tournament.daySchedule||[];
+  document.getElementById('ss-day').innerHTML='<option value="">Todos os dias</option>'+days.map((d,i)=>`<option value="${i}">Dia ${i+1}${d.date?' - '+esc(fmtDate(d.date)):''}</option>`).join('');
+  document.getElementById('ss-court').innerHTML='<option value="">Todas as quadras</option>'+getCourtOptions('');
+  updateScoresheetCount();
+  openModal('modal-scoresheet');
+}
+function updateScoresheetCount(){
+  const n=scoresheetSelect(tournament?.matches||[],_scoresheetFilters(),_scoresheetCtx()).length;
+  document.getElementById('ss-count').textContent=n?`${n} súmula${n===1?'':'s'} pra gerar`:'Nenhum jogo com esses filtros';
+}
+function printScoresheets(){
+  const list=scoresheetSelect(tournament?.matches||[],_scoresheetFilters(),_scoresheetCtx());
+  if(!list.length){showToast('Nenhum jogo com esses filtros','warning');return;}
+  const t={name:tournament.name||'',
+    dateText:fmtDate(tournament.startDate)+(tournament.endDate&&tournament.endDate!==tournament.startDate?' a '+fmtDate(tournament.endDate):''),
+    location:[tournament.location,tournament.city].filter(Boolean).join(' - ')};
+  const days=tournament.daySchedule||[];
+  const sheets=list.map(m=>{
+    const d=days[scheduleDayOf(m,days,tournament.roundDays)];
+    return scoresheetSheet(m,t,{day:d?.date?fmtDate(d.date):'',clubOf:_getPlayerClub});
+  });
+  const w=window.open('','_blank','width=1200,height=800');
+  if(!w){showToast('Popup bloqueado. Permita popups para imprimir.','warning');return;}
+  w.document.write(scoresheetDocument(sheets,`${tournament.name||''} - Súmulas`));
+  w.document.close();
+  closeModal('modal-scoresheet');
+  w.document.addEventListener('click',async(e)=>{
+    const tg=e.target?.nodeType===1?e.target:e.target?.parentElement;
+    const action=tg?.closest?.('[data-action]')?.getAttribute('data-action');
+    if(action==='print'){
+      const now=new Date().toISOString();
+      list.forEach(m=>{m.scoresheetPrintedAt=now;});
+      await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
+      w.print();
+    }else if(action==='close')w.close();
+  });
+}
