@@ -1,7 +1,8 @@
 // =====================================================================
 // Regenerate Draw Schedule — regenera APENAS a agenda de UMA chave,
 // preservando jogos das outras categorias + jogos finalizados/em quadra
-// desta chave. Encaixa novos jogos em slots livres do dia da chave.
+// desta chave. Encaixa novos jogos em slots livres do dia de cada jogo
+// (rodadas por dia: scheduleDayOf).
 //
 // regenerateDrawSchedule(drawIdx, skipConfirm): async. Mutador pesado.
 // fillMissingTimesByDay(): da horario so aos definidos sem horario, por dia.
@@ -14,7 +15,8 @@
 // - timeToMin, minToTime (app.js)
 // - scheduleStageOf, scheduleDaySlots, scheduleBook, scheduleAthletes, scheduleRole,
 //   schedulePossibleAthletes, scheduleIsToDefine, schedulePlaceDefined,
-//   schedulePlaceToDefine, scheduleMissingWarning (schedule-slots.js)
+//   schedulePlaceToDefine, scheduleMissingWarning, scheduleDayOf,
+//   scheduleSortByDay (schedule-slots.js)
 // - prepareRankingsForSync, renderMatches, renderDraws (app.js)
 // - window.api.saveTournament, window.api.supabaseUpsertTournament (IPC)
 //
@@ -174,89 +176,81 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
     newDrawMatches.push(match);
   });
 
-  // 5. Encaixar os jogos desta chave no dia dela (schedule-slots.js: a quadra
-  // recebe jogo a cada duracao do jogo, o descanso e so do atleta e atleta
-  // nunca fica em 2 jogos — sem horario que sirva, o jogo fica sem)
+  // 5. Encaixar os jogos desta chave no dia de CADA jogo (rodadas por dia,
+  // igual ao BTP: semis e final podem ir pra outro dia). schedule-slots.js: a
+  // quadra recebe jogo a cada duracao do jogo, o descanso e so do atleta e
+  // atleta nunca fica em 2 jogos — sem horario que sirva, o jogo fica sem
   const _dur = tournament.matchDuration || 30;
-
-  // Determinar qual dia esta chave pertence
   ensureDayScheduleDraws();
-  let _dayConfig = null;
-  if (tournament.daySchedule?.length) {
-    _dayConfig = tournament.daySchedule.find(day => (day.draws || []).includes(drawName));
-  }
-  const _start = timeToMin(_dayConfig?.startTime || tournament.startTime || '08:00');
-  const _end = timeToMin(_dayConfig?.endTime || tournament.endTime || '18:00');
-  const _bS = timeToMin(_dayConfig?.breakStart || tournament.breakStart || '12:00');
-  const _bE = timeToMin(_dayConfig?.breakEnd || tournament.breakEnd || '13:30');
-  const _slots = scheduleDaySlots({ start: _start, end: _end, breakStart: _bS, breakEnd: _bE, dur: _dur });
-  const _book = scheduleBook({ dur: _dur, rest: tournament.restMinBetweenGames || 20, courts: tournament.courts || 4 });
+  const _days = tournament.daySchedule || [];
+  const _dayOf = m => scheduleDayOf(m, _days, tournament.roundDays); // -1 = sem dia: grade do torneio
   const _drawOf = m => (tournament.draws || []).find(x => x.name === m.drawName);
   const _athletes = m => scheduleIsToDefine(m) ? schedulePossibleAthletes(m, _drawOf(m)) : scheduleAthletes(m.player1, m.player2);
-  const _fitsDay = t => t >= _start && t + _dur <= _end && !(_bE > _bS && t < _bE && t + _dur > _bS);
 
-  // Outras categorias DO MESMO DIA seguram os horarios delas (nao mexemos)
-  const _sameDayDraws = _dayConfig ? new Set(_dayConfig.draws || []) : null;
-  otherMatches.forEach(m => {
-    if (!m.time) return;
-    if (_sameDayDraws && !_sameDayDraws.has(m.drawName)) return;
-    _book.add(timeToMin(m.time), _athletes(m), scheduleRole(m));
+  [...new Set(newDrawMatches.map(_dayOf))].forEach(di => {
+    const day = di >= 0 ? _days[di] : null;
+    const mine = newDrawMatches.filter(m => _dayOf(m) === di);
+    const _start = timeToMin(day?.startTime || tournament.startTime || '08:00');
+    const _end = timeToMin(day?.endTime || tournament.endTime || '18:00');
+    const _bS = timeToMin(day?.breakStart || tournament.breakStart || '12:00');
+    const _bE = timeToMin(day?.breakEnd || tournament.breakEnd || '13:30');
+    const _slots = scheduleDaySlots({ start: _start, end: _end, breakStart: _bS, breakEnd: _bE, dur: _dur });
+    const _book = scheduleBook({ dur: _dur, rest: tournament.restMinBetweenGames || 20, courts: tournament.courts || 4 });
+    const _fitsDay = t => t >= _start && t + _dur <= _end && !(_bE > _bS && t < _bE && t + _dur > _bS);
+
+    // Outras categorias DO MESMO DIA seguram os horarios delas (nao mexemos);
+    // jogo sem dia: todas seguram (como antes)
+    otherMatches.forEach(m => {
+      if (m.time && (!day || _dayOf(m) === di)) _book.add(timeToMin(m.time), _athletes(m), scheduleRole(m));
+    });
+
+    // Desta chave: finalizados/em quadra seguram o horario; o horario
+    // reaproveitado so fica se a quadra e os atletas (do novo sorteio) estao livres
+    mine.forEach(m => {
+      if (m.time && preservedStatuses.includes(m.status)) _book.add(timeToMin(m.time), _athletes(m), scheduleRole(m));
+    });
+    mine.forEach(m => {
+      if (!m.time || preservedStatuses.includes(m.status)) return;
+      const t = timeToMin(m.time), ps = _athletes(m);
+      if (_fitsDay(t) && _book.courtFree(t) && _book.free(t, ps, scheduleRole(m))) { _book.add(t, ps, scheduleRole(m)); return; }
+      m.time = '';
+    });
+
+    // Definidos sem horario: quadra livre e atletas descansados
+    mine.forEach(m => {
+      if (m.time || !m.isDefinida || m.status === 'A definir') return;
+      const ps = _athletes(m);
+      const si = schedulePlaceDefined(_book, _slots, ps, scheduleRole(m));
+      if (si < 0) return;
+      m.time = minToTime(_slots[si]);
+      _book.add(_slots[si], ps, scheduleRole(m));
+    });
+
+    // "A definir" depois da fase anterior da mesma chave NESTE dia (a mesma
+    // rodada divide o horario e a final fica por ultimo), longe dos atletas
+    // que podem chegar nele. Fase anterior toda em dia anterior: desde o
+    // inicio do dia; em dia posterior (escolha invertida): fica sem horario
+    [...mine].sort((a, b) => scheduleStageOf(a) - scheduleStageOf(b)).forEach(m => {
+      if (m.time || m.status !== 'A definir') return;
+      const prevPhase = newDrawMatches.filter(x => scheduleStageOf(x) < scheduleStageOf(m));
+      const here = prevPhase.filter(x => _dayOf(x) === di);
+      const before = here.filter(x => x.time).map(x => timeToMin(x.time));
+      if (!here.length) {
+        if (!prevPhase.length || prevPhase.some(x => _dayOf(x) > di) || !_slots.length) return;
+        before.push(_slots[0] - _dur);
+      }
+      if (!before.length) return;
+      const ps = _athletes(m);
+      const si = schedulePlaceToDefine(_book, _slots, ps, Math.max(...before), scheduleRole(m));
+      if (si < 0) return;
+      m.time = minToTime(_slots[si]);
+      _book.add(_slots[si], ps, scheduleRole(m));
+    });
   });
 
-  // Desta chave: finalizados/em quadra seguram o horario; o horario
-  // reaproveitado so fica se a quadra e os atletas (do novo sorteio) estao livres
-  newDrawMatches.forEach(m => {
-    if (m.time && preservedStatuses.includes(m.status)) _book.add(timeToMin(m.time), _athletes(m), scheduleRole(m));
-  });
-  newDrawMatches.forEach(m => {
-    if (!m.time || preservedStatuses.includes(m.status)) return;
-    const t = timeToMin(m.time), ps = _athletes(m);
-    if (_fitsDay(t) && _book.courtFree(t) && _book.free(t, ps, scheduleRole(m))) { _book.add(t, ps, scheduleRole(m)); return; }
-    m.time = '';
-  });
-
-  // Definidos sem horario: quadra livre e atletas descansados
-  newDrawMatches.forEach(m => {
-    if (m.time || !m.isDefinida || m.status === 'A definir') return;
-    const ps = _athletes(m);
-    const si = schedulePlaceDefined(_book, _slots, ps, scheduleRole(m));
-    if (si < 0) return;
-    m.time = minToTime(_slots[si]);
-    _book.add(_slots[si], ps, scheduleRole(m));
-  });
-
-  // "A definir" depois da fase anterior da mesma chave (a mesma rodada divide o
-  // horario e a final fica por ultimo), longe dos atletas que podem chegar nele
-  [...newDrawMatches].sort((a, b) => scheduleStageOf(a) - scheduleStageOf(b)).forEach(m => {
-    if (m.time || m.status !== 'A definir') return;
-    const before = newDrawMatches.filter(x => x.time && scheduleStageOf(x) < scheduleStageOf(m)).map(x => timeToMin(x.time));
-    if (!before.length) return;
-    const ps = _athletes(m);
-    const si = schedulePlaceToDefine(_book, _slots, ps, Math.max(...before), scheduleRole(m));
-    if (si < 0) return;
-    m.time = minToTime(_slots[si]);
-    _book.add(_slots[si], ps, scheduleRole(m));
-  });
-
-  // 6. Remontar tournament.matches: outras + novas desta chave, ordenados por dia e horario
-  const allMatches = [...otherMatches, ...newDrawMatches];
-
-  // Ordenar por dia (daySchedule) e depois por horario
-  ensureDayScheduleDraws();
-  const _dayDrawSets = (tournament.daySchedule || []).map(day => new Set(day.draws || []));
-  allMatches.sort((a, b) => {
-    // Primeiro: ordenar por dia
-    let dayA = _dayDrawSets.length, dayB = _dayDrawSets.length;
-    _dayDrawSets.forEach((s, i) => { if (s.has(a.drawName)) dayA = i; if (s.has(b.drawName)) dayB = i; });
-    if (dayA !== dayB) return dayA - dayB;
-    // Depois: ordenar por horario
-    const ta = a.time ? timeToMin(a.time) : 9999;
-    const tb = b.time ? timeToMin(b.time) : 9999;
-    if (ta !== tb) return ta - tb;
-    return (a.num || 0) - (b.num || 0);
-  });
-
-  tournament.matches = allMatches;
+  // 6. Remontar tournament.matches: outras + novas desta chave, na ordem dia
+  // do jogo -> horario -> numero
+  tournament.matches = scheduleSortByDay([...otherMatches, ...newDrawMatches], _days, tournament.roundDays);
 
   // 7. Renumerar
   tournament.matches.forEach((m, i) => { m.id = (i + 1).toString(); m.num = i + 1; });
