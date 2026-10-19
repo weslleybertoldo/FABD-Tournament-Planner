@@ -3264,7 +3264,7 @@ async function closeLiveEvent(tid,name){
   else{showToast(`Erro ao fechar: ${r?.error||'desconhecido'}`,'error');}
   renderLiveEvents();
 }
-const APP_VERSION='4.121';
+const APP_VERSION='4.122';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
