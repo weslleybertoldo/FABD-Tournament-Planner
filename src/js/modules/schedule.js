@@ -269,7 +269,7 @@ function getMatchDay(match){
   if(!tournament?.daySchedule?.length)return null;
   ensureDayScheduleDraws();
   // Dia do JOGO (fases por dia; antes: pelo modo + prefixo, e 2 dias "todas" davam tudo no dia 1)
-  const i=scheduleDayOf(match,tournament.daySchedule,scheduleDayContext(tournament.matches,tournament.draws));
+  const i=scheduleDayOf(match,tournament.daySchedule,tournament.roundDays);
   return i>=0?tournament.daySchedule[i]:null;
 }
 

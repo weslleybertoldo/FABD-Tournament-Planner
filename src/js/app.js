@@ -2435,7 +2435,7 @@ async function regenerateSchedule() {
   if(hasDays){
     // Atribuir horarios POR DIA (cada dia comeca do horario configurado)
     // Dia de cada JOGO (fases por dia: semis e finais podem ir pra outro dia)
-    const dayCtx=scheduleDayContext(tournament.matches,tournament.draws);
+    const dayCtx=tournament.roundDays;
     const matchesByDay=tournament.daySchedule.map(()=>[]);
     const orphans=[];
     tournament.matches.forEach(m=>{
@@ -2683,7 +2683,7 @@ async function updateMatchField(idx, field, value) {
 // Dia da chave do jogo e a grade dele (as mesmas contas do Regenerar)
 function matchDayGrid(m) {
   ensureDayScheduleDraws();
-  const days = tournament.daySchedule || [], ctx = scheduleDayContext(tournament.matches, tournament.draws);
+  const days = tournament.daySchedule || [], ctx = tournament.roundDays;
   const i = days.length ? scheduleDayOf(m, days, ctx) : -1;
   const day = i >= 0 ? days[i] : null;
   return {
@@ -2730,7 +2730,7 @@ async function setMatchTime(idx, value) {
     if (avisos.length && !confirm(`Jogo #${m.num} (${m.drawName}) às ${value}:\n\n${avisos.map(a => '⚠ ' + a).join('\n')}\n\nMudar o horário mesmo assim?`)) { renderMatches(); return; }
   }
   m.time = value;
-  tournament.matches = scheduleSortByDay(tournament.matches, tournament.daySchedule, scheduleDayContext(tournament.matches, tournament.draws));
+  tournament.matches = scheduleSortByDay(tournament.matches, tournament.daySchedule, tournament.roundDays);
   await window.api.saveTournament(tournament);
   prepareRankingsForSync(); window.api.supabaseUpsertTournament(tournament.id, tournament.name, tournament);
   renderMatches();
