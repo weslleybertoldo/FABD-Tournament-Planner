@@ -167,3 +167,53 @@ describe('validatePartialSets (desistencia/desqualificacao no meio do game)', ()
     expect(R.validatePartialSets([[-1, 2]], 21, 30).valid).toBe(false);
   });
 });
+
+// Placar automatico (Weslley, 18/10/2026): digitou os pontos de quem perdeu o
+// game, o app completa os de quem ganhou pela regra do torneio — inclusive na
+// prorrogacao (25 → 27), ate o maximo (29 → 30).
+describe('winnerPointsFor (placar automatico)', () => {
+  it('ate 19 pontos de quem perdeu, quem ganhou fez 21', () => {
+    expect(R.winnerPointsFor(0, 21, 30)).toBe(21);
+    expect(R.winnerPointsFor(15, 21, 30)).toBe(21);
+    expect(R.winnerPointsFor(19, 21, 30)).toBe(21);
+  });
+  it('na prorrogacao, 2 a mais que quem perdeu', () => {
+    expect(R.winnerPointsFor(20, 21, 30)).toBe(22);
+    expect(R.winnerPointsFor(21, 21, 30)).toBe(23);
+    expect(R.winnerPointsFor(25, 21, 30)).toBe(27);
+    expect(R.winnerPointsFor(28, 21, 30)).toBe(30);
+  });
+  it('no 29 a 29, quem fizer o 30 ganha', () => {
+    expect(R.winnerPointsFor(29, 21, 30)).toBe(30);
+  });
+  it('30 ou mais nao e de quem perdeu: nao completa', () => {
+    expect(R.winnerPointsFor(30, 21, 30)).toBe(null);
+    expect(R.winnerPointsFor(31, 21, 30)).toBe(null);
+  });
+  it('campo vazio, negativo ou com letra: nao completa', () => {
+    expect(R.winnerPointsFor('', 21, 30)).toBe(null);
+    expect(R.winnerPointsFor(null, 21, 30)).toBe(null);
+    expect(R.winnerPointsFor(undefined, 21, 30)).toBe(null);
+    expect(R.winnerPointsFor(-1, 21, 30)).toBe(null);
+    expect(R.winnerPointsFor('1.5', 21, 30)).toBe(null);
+    expect(R.winnerPointsFor('abc', 21, 30)).toBe(null);
+  });
+  it('aceita o valor do campo como texto', () => {
+    expect(R.winnerPointsFor('15', 21, 30)).toBe(21);
+    expect(R.winnerPointsFor(' 25 ', 21, 30)).toBe(27);
+  });
+  it('segue a regra do torneio (game de 15 ate 21, de 11 ate 15)', () => {
+    expect(R.winnerPointsFor(10, 15, 21)).toBe(15);
+    expect(R.winnerPointsFor(14, 15, 21)).toBe(16);
+    expect(R.winnerPointsFor(20, 15, 21)).toBe(21);
+    expect(R.winnerPointsFor(9, 11, 15)).toBe(11);
+    expect(R.winnerPointsFor(14, 11, 15)).toBe(15);
+  });
+  it('o placar completado passa na validacao do game fechado', () => {
+    for (let lo = 0; lo < 30; lo++) {
+      const hi = R.winnerPointsFor(lo, 21, 30);
+      const closed = (hi >= 21 && hi - lo >= 2) || hi === 30;
+      expect(closed).toBe(true);
+    }
+  });
+});

@@ -830,6 +830,8 @@ select, textarea {
 }
 
 .score-cell input:focus { outline: none; border-color: var(--fabd-blue); }
+/* placar automatico: campo completado pelo app (pontos de quem ganhou o game) */
+.score-cell input.auto-filled { background: #ECFDF5; border-color: #10B981; color: #047857; }
 
 .score-cell-label {
   font-size: 11px;
