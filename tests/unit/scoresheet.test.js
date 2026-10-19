@@ -109,6 +109,159 @@ describe('scoresheetSheet (a folha)', () => {
   });
 });
 
+describe('scoresheetSelect preenchida (jogos finalizados)', () => {
+  const base = { filled: true, day: '', court: '', from: '', to: '', skipUnknown: true, skipPrinted: true };
+
+  it('so os jogos finalizados (todas as situacoes), sem BYE; os 2 "pular" nao valem', () => {
+    const ms = [jogo(1), jogo(2, { status: 'Finalizada', scoresheetPrintedAt: '2026-10-18T10:00:00Z' }), jogo(3, { status: 'Em Quadra' }),
+      jogo(4, { status: 'WO' }), jogo(5, { status: 'SemJogo' }), jogo(6, { status: 'Desistencia' }), jogo(7, { status: 'Finalizada', player2: 'BYE' })];
+    expect(nums(S.scoresheetSelect(ms, base, ctx))).toEqual([2, 4, 5, 6]);
+  });
+
+  it('filtra dia, quadra e horario igual a em branco', () => {
+    const fin = { status: 'Finalizada' };
+    const ms = [jogo(1, { ...fin, dia: 0, court: 'Quadra 1', time: '08:00' }), jogo(2, { ...fin, dia: 1, court: 'Quadra 1', time: '08:00' }),
+      jogo(3, { ...fin, dia: 0, court: 'Quadra 2', time: '08:00' }), jogo(4, { ...fin, dia: 0, court: 'Quadra 1', time: '11:00' })];
+    expect(nums(S.scoresheetSelect(ms, { ...base, day: 0, court: 'Quadra 1', to: '10:00' }, ctx))).toEqual([1]);
+  });
+});
+
+describe('scoresheetGames', () => {
+  it('placar game a game; W.O./vazio = nenhum game', () => {
+    expect(S.scoresheetGames('21-18 / 17-21 / 21-16')).toEqual([[21, 18], [17, 21], [21, 16]]);
+    expect(S.scoresheetGames('21-18/ 5-3')).toEqual([[21, 18], [5, 3]]);
+    expect(S.scoresheetGames('W.O.')).toEqual([]);
+    expect(S.scoresheetGames('')).toEqual([]);
+  });
+});
+
+// celula da grade: [bloco, linha, coluna] -> valor (ou 'O<v>' se circulado)
+const cel = (gr, b, r, c) => { const v = gr.blocks[b][r][c]; return v == null ? null : (v.fin ? 'O' + v.val : v.val); };
+const linhaDe = (gr, b, r, n) => Array.from({ length: n }, (_, c) => cel(gr, b, r, c));
+
+describe('scoresheetGrid (grade BWF a partir do ponto a ponto do arbitro)', () => {
+  it('simples: 0 a 0 na 1a coluna, placar de quem ganhou na linha de quem saca o proximo, ultimo circulado, so o S', () => {
+    const gr = S.scoresheetGrid({ srv: 0, rcv: 2, pts: [[1, 0], [2, 2], [2, 2], [1, 0]] }, false);
+    expect(gr.sr).toEqual({ 0: 'S' });
+    expect(linhaDe(gr, 0, 0, 6)).toEqual([0, 1, null, null, 2, null].map((v, i) => (i === 4 ? 'O2' : v)));
+    expect(linhaDe(gr, 0, 2, 6)).toEqual([0, null, 1, 2, null, null]);
+    expect(gr.score).toEqual([2, 2]);
+    expect(gr.used).toBe(5);
+  });
+
+  it('dupla: usa as linhas GRAVADAS (sacador, recebedor e cada proximo sacador)', () => {
+    const gr = S.scoresheetGrid({ srv: 2, rcv: 1, pts: [[2, 3], [1, 1], [1, 0], [2, 2]] }, true);
+    expect(gr.sr).toEqual({ 2: 'S', 1: 'R' });
+    expect(cel(gr, 0, 2, 0)).toBe(0);
+    expect(cel(gr, 0, 1, 0)).toBe(0);
+    expect(cel(gr, 0, 3, 1)).toBe(1);
+    expect(cel(gr, 0, 1, 2)).toBe(1);
+    expect(cel(gr, 0, 0, 3)).toBe(2);
+    expect(cel(gr, 0, 2, 4)).toBe('O2');
+  });
+
+  it('game de 30-29 continua no 2o bloco (60 colunas)', () => {
+    const pts = [];
+    for (let k = 0; k < 29; k++) pts.push([1, 0], [2, 2]);
+    pts.push([1, 0]);
+    const gr = S.scoresheetGrid({ srv: 0, rcv: 2, pts }, false);
+    expect(gr.score).toEqual([30, 29]);
+    expect(gr.used).toBe(60);
+    expect(cel(gr, 1, 0, 24)).toBe('O30');
+    expect(cel(gr, 1, 2, 23)).toBe(29);
+  });
+
+  it('game interrompido (desistencia) nao circula o ultimo ponto', () => {
+    const gr = S.scoresheetGrid({ srv: 0, rcv: 2, pts: [[1, 0], [1, 0]] }, false, true);
+    expect(cel(gr, 0, 0, 2)).toBe(2);
+  });
+
+  it('linha fora do lado (dado torto) vai pro 1o nome do lado', () => {
+    const gr = S.scoresheetGrid({ srv: 0, rcv: 2, pts: [[2, 0], [1, 3]] }, true);
+    expect(cel(gr, 0, 2, 1)).toBe(1);
+    expect(cel(gr, 0, 0, 2)).toBe('O1');
+  });
+});
+
+describe('scoresheetSheet preenchida', () => {
+  const t = { name: 'Torneio', dateText: '18/10/2026', location: '' };
+  const clubOf = () => '';
+  const iso = (h, mi) => new Date(2026, 9, 18, h, mi).toISOString();
+  const rali = (a, b, ultimo) => { // a pontos do lado 1 e b do lado 2; o ultimo rali e de quem ganhou
+    const pts = [];
+    for (let k = 0; k < (ultimo === 1 ? a - 1 : a); k++) pts.push([1, 0]);
+    for (let k = 0; k < (ultimo === 2 ? b - 1 : b); k++) pts.push([2, 2]);
+    pts.push([ultimo, ultimo === 1 ? 0 : 2]);
+    return { srv: 0, rcv: 2, pts };
+  };
+  const fin = extra => ({ num: 9, drawName: 'SM Principal', roundName: 'Final', player1: 'Ana', player2: 'Bia', time: '15:00', court: 'Quadra 1',
+    umpire: 'Carlos', status: 'Finalizada', winner: 1, score: '21-18 / 17-21 / 21-16', startedAt: iso(15, 42), finishedAt: iso(16, 31), ...extra });
+  const info = { day: '18/10/2026', clubOf, filled: true, points: 21, maxPoints: 30 };
+
+  it('com o ponto a ponto: grade marcada, vencedor, placar, inicio/fim/duracao e arbitro', () => {
+    const h = S.scoresheetSheet(fin({ rallies: [rali(21, 18, 1), rali(17, 21, 2), rali(21, 16, 1)] }), t, info);
+    expect(h).toContain('is-filled');
+    expect(h).toContain('preenchida com o resultado do app');
+    expect(h).toContain('<em>VENCEDOR</em>');
+    expect(h).not.toContain('class="vbox"');
+    expect(h).toContain('games <b>2 × 1</b>');
+    expect(h).toContain('21-18 / 17-21 / 21-16');
+    expect(h).toContain('15:42');
+    expect(h).toContain('16:31');
+    expect(h).toContain('49 min');
+    expect((h.match(/class="pc"/g) || []).length).toBe(3); // ultimo ponto de cada game
+    expect(h).not.toContain('ponto a ponto não registrado');
+    expect(h).toContain('Assinatura do árbitro · <b>Carlos</b>');
+  });
+
+  it('sem o ponto a ponto (lancado no Planner): placar do game circulado + aviso', () => {
+    const h = S.scoresheetSheet(fin({ score: '21-18 / 21-15' }), t, info);
+    expect((h.match(/class="circ/g) || []).length).toBe(4);
+    expect(h).toContain('1º game: 21 × 18');
+    expect(h).toContain('ponto a ponto não registrado');
+    expect(h).toContain('3º game não disputado');
+    expect(h).toContain('games <b>2 × 0</b>');
+  });
+
+  it('ponto a ponto que nao bate com o placar (resultado corrigido depois) nao entra', () => {
+    const h = S.scoresheetSheet(fin({ score: '21-19 / 21-15', rallies: [rali(21, 18, 1), rali(21, 15, 1)] }), t, info);
+    expect(h).toContain('1º game: 21 × 19');
+    expect((h.match(/class="pc"/g) || []).length).toBe(1); // so o 2o game bate
+  });
+
+  it('W.O.: jogo nao disputado, W.O. marcado e quem venceu', () => {
+    const h = S.scoresheetSheet(fin({ status: 'WO', score: 'W.O.', winner: 2, atestado: true, startedAt: undefined }), t, info);
+    expect(h).toContain('Jogo não disputado');
+    expect(h).toContain('W.O. (atestado)');
+    expect(h).toContain('class="chk on"');
+    expect(h).toContain('vence <b>Atleta 2</b>');
+    expect(h).toMatch(/side side2 win[\s\S]*<em>VENCEDOR<\/em>/);
+  });
+
+  it('sem jogo (os dois ausentes): ninguem vence', () => {
+    const h = S.scoresheetSheet(fin({ status: 'SemJogo', score: '', winner: 0 }), t, info);
+    expect(h).toContain('<b>Sem jogo</b>');
+    expect(h).not.toContain('<em>VENCEDOR</em>');
+  });
+
+  it('desistencia no meio do game: parcial, Ret na coluna seguinte e o game interrompido sem circulo', () => {
+    const cut = { srv: 0, rcv: 2, pts: [[1, 0], [1, 0], [2, 2]] };
+    const h = S.scoresheetSheet(fin({ status: 'Desistencia', score: '21-18 / 2-1', rallies: [rali(21, 18, 1), cut] }), t, info);
+    expect(h).toContain('<b>Desistência</b> de Atleta 2');
+    expect(h).toContain('parcial 21-18 / 2-1');
+    expect(h).toContain('>Ret<');
+    expect((h.match(/class="pc"/g) || []).length).toBe(1);
+  });
+
+  it('em branco continua igual (sem resultado, caixa VENCEDOR pro arbitro)', () => {
+    const h = S.scoresheetSheet(fin({ rallies: [rali(21, 18, 1)] }), t, { day: '18/10/2026', clubOf });
+    expect(h).not.toContain('is-filled');
+    expect(h).toContain('class="vbox"');
+    expect(h).not.toContain('class="pc"');
+    expect(h).not.toContain('15:42');
+  });
+});
+
 describe('scoresheetDocument', () => {
   it('A4 paisagem, 1 folha por pagina, com botao de imprimir', () => {
     const doc = S.scoresheetDocument(['<section class="sheet">1</section>', '<section class="sheet">2</section>'], 'Sumulas');
