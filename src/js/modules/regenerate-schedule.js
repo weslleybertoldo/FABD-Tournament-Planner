@@ -125,7 +125,7 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
 
   // 4. Construir novos matches desta chave, reutilizando slots quando possivel
   const newDrawMatches = [];
-  const preservedStatuses = ['Finalizada', 'WO', 'Em Quadra', 'Desistencia', 'Desqualificacao'];
+  const preservedStatuses = ['Finalizada', 'WO', 'Em Quadra', 'Desistencia', 'Desqualificacao', 'SemJogo'];
 
   shouldExist.forEach(s => {
     // Prefere drawMatchIdx; fallback pelo par de jogadores (mesma dupla = mesmo horario)

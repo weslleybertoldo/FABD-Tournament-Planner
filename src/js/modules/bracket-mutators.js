@@ -30,6 +30,20 @@ function drawScoreSides(score){
   return {score1:score||'',score2:''};
 }
 
+// Placar por lado + situacao do jogo (W.O., desistencia...) — a marca vai do
+// lado de quem perdeu (match-result.js); sem o modulo, o formato antigo
+function _drawSides(matchData){
+  return typeof drawSidesFor==='function'?drawSidesFor(matchData):drawScoreSides(matchData.score);
+}
+const _DONE_SITUACOES=['Finalizada','WO','Desistencia','Desqualificacao','SemJogo'];
+// Situacao do jogo vai junto pra chave/grupo: classificacao do grupo (quem nao
+// completou) e pontos (W.O. sem atestado) leem daqui
+function _copyResult(dst,src){
+  if(_DONE_SITUACOES.includes(src.status))dst.status=src.status;else delete dst.status;
+  if(src.atestado)dst.atestado=true;else delete dst.atestado;
+  if(src.porDesq)dst.porDesq=true;else delete dst.porDesq;
+}
+
 function propagateResultToDraws(matchData){
   try{
     if(!tournament?.draws?.length||!matchData.drawName)return;
@@ -46,12 +60,14 @@ function propagateResultToDraws(matchData){
       dmIdx=d.matches.indexOf(dm);
     }
 
-    // Atualizar resultado na draw
-    const winnerName=matchData.winner===1?matchData.player1:matchData.player2;
+    // Atualizar resultado na draw. Sem jogo (ambos ausentes): ninguem avanca —
+    // um BYE vai pra proxima fase e o adversario passa direto (W.O.)
+    const winnerName=matchData.status==='SemJogo'?'BYE':matchData.winner===1?matchData.player1:matchData.player2;
     dm.winner=matchData.winner;
     // Advancer so faz sentido em eliminatoria
     if(d.type==='Eliminatoria')dm.advancer=winnerName;
-    Object.assign(dm,drawScoreSides(matchData.score));
+    Object.assign(dm,_drawSides(matchData));
+    _copyResult(dm,matchData);
     // Groups+Elimination: also update groupsData (after score is set on dm)
     if(d.type==='Grupos + Eliminatoria'&&d.groupsData){
       if(matchData.phase==='group'||dm.phase==='group'){
@@ -60,7 +76,7 @@ function propagateResultToDraws(matchData){
           const g=d.groupsData.groups.find(x=>x.name==='Grupo '+groupLabel);
           if(g){
             const gm=g.matches.find(m=>(m.player1===matchData.player1&&m.player2===matchData.player2)||(m.player1===matchData.player2&&m.player2===matchData.player1));
-            if(gm){gm.winner=matchData.winner;gm.score1=dm.score1;gm.score2=dm.score2;}
+            if(gm){gm.winner=matchData.winner;gm.score1=dm.score1;gm.score2=dm.score2;_copyResult(gm,matchData);}
           }
         }
       }
@@ -68,7 +84,7 @@ function propagateResultToDraws(matchData){
         const em=d.groupsData.eliminationMatches?.find(m=>m.player1===matchData.player1&&m.player2===matchData.player2);
         // Placar tambem: com o torneio aberto do arquivo a chave da 2a fase nao e
         // o mesmo objeto do d.matches e o site mostrava a quarta sem placar (18/10/2026)
-        if(em){em.winner=matchData.winner;em.advancer=winnerName;em.score1=dm.score1;em.score2=dm.score2;}
+        if(em){em.winner=matchData.winner;em.advancer=winnerName;em.score1=dm.score1;em.score2=dm.score2;_copyResult(em,matchData);}
       }
     }
 
@@ -96,7 +112,7 @@ function reverseResultInDraws(matchData){
     const totalRounds=Math.max(...d.matches.map(m=>m.round));
 
     const oldWinner=dm.advancer||null;
-    dm.winner=undefined;dm.advancer=undefined;dm.score1='';dm.score2='';
+    dm.winner=undefined;dm.advancer=undefined;dm.score1='';dm.score2='';delete dm.status;delete dm.atestado;delete dm.porDesq;
 
     if(dm.round<totalRounds&&oldWinner){
       const rMatches=byRound[dm.round]||[];
@@ -110,7 +126,7 @@ function reverseResultInDraws(matchData){
 
       // Verificar se o próximo jogo já foi finalizado
       const nextTm=findTournamentMatch(d.name,nextRMatches[nextPos].globalIdx,nm);
-      if(nextTm&&(nextTm.status==='Finalizada'||nextTm.status==='WO'||nextTm.status==='Desistencia')){
+      if(nextTm&&_DONE_SITUACOES.includes(nextTm.status)&&!(nextTm.player1==='BYE'||nextTm.player2==='BYE')){
         showToast('Nao pode desfazer: jogo seguinte ja foi finalizado','warning');
         dm.winner=matchData.winner;dm.advancer=oldWinner;
         return;

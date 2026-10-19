@@ -775,6 +775,16 @@ select, textarea {
 }
 
 /* === SCORE INPUT === */
+/* Situacao do jogo na janela do Placar (W.O., desistencia... igual ao BTP) */
+.sit-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.sit-pill { padding: 6px 12px; border-radius: 8px; border: 2px solid #cbd5e1; background: #fff; color: #333; font-size: 13px; font-weight: 600; cursor: pointer; }
+.sit-pill.active { background: var(--fabd-blue); border-color: var(--fabd-blue); color: #fff; }
+.sit-pill[data-sit="WO"].active, .sit-pill[data-sit="Desqualificacao"].active { background: #DC2626; border-color: #DC2626; }
+.sit-pill[data-sit="Desistencia"].active { background: #D97706; border-color: #D97706; }
+.sit-pill[data-sit="SemJogo"].active { background: #475569; border-color: #475569; }
+.sit-help { font-size: 12px; color: var(--fabd-gray-600); margin: 6px 0 0; min-height: 16px; }
+.sit-check { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 400; cursor: pointer; }
+
 .score-sets {
   display: flex;
   flex-direction: column;
