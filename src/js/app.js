@@ -2577,6 +2577,8 @@ async function handleRealtimeScoreUpdate(data){
       m.status=fin.status;
       m.winner=fin.status==='SemJogo'?0:data.winner;
       if(fin.atestado)m.atestado=true;else delete m.atestado;
+      // Ponto a ponto do arbitro (sumula preenchida): fica no jogo, no arquivo
+      if(Array.isArray(data.rallies)&&data.rallies.length)m.rallies=data.rallies;
       // Hora em que o arbitro finalizou: no tempo real e agora; na recuperacao
       // ao abrir e no reconcile e a hora de verdade, nao a da leitura
       const finAt=data.updated_at?new Date(data.updated_at):null;
@@ -2983,7 +2985,7 @@ async function resetMatch(idx){
       x.score='';x.status='Pendente';x.winner=undefined;x.finishedAt=undefined;delete x.porDesq;delete x.porDesqDe;
     });
   }
-  m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;m.liveScore='';m.liveSets=[];delete m.atestado;delete m.porDesq;
+  m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;m.liveScore='';m.liveSets=[];delete m.atestado;delete m.porDesq;delete m.rallies;
   // Renderizar primeiro (UI responsiva), salvar depois
   renderMatches();renderFinishedMatches();showToast('Jogo resetado');
   await window.api.saveTournament(tournament);
