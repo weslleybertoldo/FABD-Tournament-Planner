@@ -332,8 +332,35 @@ function setupAutoUpdater() {
 
     ipcMain.handle('updater:install', () => {
       log('INFO', '[updater] quitAndInstall');
-      // isSilent: sem as telas do instalador; isForceRunAfter: abre o app de novo
-      setImmediate(() => autoUpdater.quitAndInstall(true, true));
+      setImmediate(() => {
+        if (process.platform === 'linux' && process.env.APPIMAGE) {
+          // AppImage (notebook Linux, pedido do Weslley em 19/10/2026: atualizar
+          // sozinho igual ao Windows): o electron-updater abre o AppImage novo SEM
+          // argumentos, e la o app so abre com as flags do lancador (--no-sandbox:
+          // Ubuntu 26.04 com userns restrito; --disable-gpu: video Intel antigo).
+          // Entao instala sem abrir e, so se instalou (before-quit-for-update),
+          // abre o AppImage novo com os mesmos argumentos desta execucao. Nao da
+          // pra usar o app.relaunch: no Linux ele reabre por um processo que roda
+          // de dentro do AppImage velho, que desmonta quando este processo sai.
+          // Um bash solto espera este processo sair (porta, arquivos e a montagem do
+          // AppImage velho livres; no maximo 30 s), fecha o que herdou daqui (sem
+          // isso o app novo herda sockets e arquivos abertos deste) e abre o novo.
+          let novo = process.env.APPIMAGE;
+          autoUpdater.once('appimage-filename-updated', (destino) => { novo = destino; });
+          require('electron').autoUpdater.once('before-quit-for-update', () => {
+            log('INFO', '[updater] reabrindo', novo);
+            const espera = 'i=0; while kill -0 "$1" 2>/dev/null && [ $i -lt 100 ]; do sleep 0.3; i=$((i+1)); done; '
+              + 'for f in /proc/$$/fd/*; do n=${f##*/}; [ "$n" -gt 2 ] && eval "exec $n>&-"; done; shift; exec "$@"';
+            require('child_process').spawn('/bin/bash', ['-c', espera, 'bash', String(process.pid), novo, ...process.argv.slice(1)], {
+              detached: true, stdio: 'ignore', env: { ...process.env, APPIMAGE_SILENT_INSTALL: 'true' }
+            }).unref();
+          });
+          autoUpdater.quitAndInstall(true, false);
+          return;
+        }
+        // isSilent: sem as telas do instalador; isForceRunAfter: abre o app de novo
+        autoUpdater.quitAndInstall(true, true);
+      });
       return { ok: true };
     });
 

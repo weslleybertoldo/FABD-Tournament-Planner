@@ -64,7 +64,22 @@
         "owner": "weslleybertoldo",
         "repo": "FABD-Tournament-Planner"
       }
-    ]
+    ],
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "executableName": "fabd-tournament-planner",
+      "synopsis": "Torneios de badminton da FABD",
+      "artifactName": "FABD-Tournament-Planner-${version}.${ext}"
+    }
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",

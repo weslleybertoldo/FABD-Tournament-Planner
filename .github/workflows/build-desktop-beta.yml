@@ -68,3 +68,44 @@ jobs:
             O app de producao NAO recebe esta versao.
           files: |
             dist/*.exe
+
+  # AppImage da variante beta na prerelease (so o arquivo, sem o yml: o beta nao
+  # se atualiza, igual ao .exe). Testa o build do Linux antes do oficial.
+  build-linux-beta:
+    needs: build-beta
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Compute beta version
+        id: version
+        run: |
+          BASE=$(node -p "require('./package.json').version")
+          echo "beta=$BASE-beta.${{ github.run_number }}" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build AppImage (beta variant)
+        run: |
+          npx electron-builder --linux AppImage --x64 \
+            -c.appId=com.fabd.tournament-planner.beta \
+            -c.productName="FABD Tournament Planner Beta" \
+            -c.linux.executableName=fabd-tournament-planner-beta \
+            -c.linux.artifactName='FABD-Tournament-Planner-Beta-${version}.${ext}' \
+            -c.extraMetadata.version=${{ steps.version.outputs.beta }} \
+            -c.extraMetadata.betaChannel=true \
+            --publish never
+
+      - name: Upload AppImage to the pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "v${{ steps.version.outputs.beta }}" dist/*.AppImage --clobber
