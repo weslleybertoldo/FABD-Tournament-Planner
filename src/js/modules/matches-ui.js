@@ -106,7 +106,7 @@ function renderMatches() {
   let _lastMatchTime = '';
   let _matchesAtTime = 0;
   let _lastMatchDraw = '', _lastMatchDay = '';
-  // Horarios do seletor: um calculo por chave (a grade e a do dia da chave)
+  // Horarios do seletor: um calculo por chave e dia (a grade e a do dia do jogo)
   const _timeChoices = {};
   const _choicesOf = m => { const k = m.drawName + '|' + (getMatchDay(m)?.date || ''); return _timeChoices[k] || (_timeChoices[k] = matchTimeChoices(m)); };
 
