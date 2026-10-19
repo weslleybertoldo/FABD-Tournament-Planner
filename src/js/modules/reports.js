@@ -377,7 +377,19 @@ function reportWinners(){
   return h;
 }
 
+// Quem perdeu por W.O. sem atestado fica com 0 ponto naquela categoria (CBBd
+// 9.6.1.4; regras escolhidas pelo Weslley em 18/10/2026). W.O. com atestado,
+// desistencia e desqualificacao pontuam a rodada, como derrota.
 function computeFullClassification(d){
+  const rows=_computeFullClassification(d);
+  if(typeof lostByUnjustifiedWO!=='function')return rows;
+  rows.forEach(r=>{
+    if((d.matches||[]).some(m=>lostByUnjustifiedWO(m,r.name))){r.points=0;r.note=r.note?`${r.note} · W.O.`:'W.O.';}
+  });
+  return rows;
+}
+
+function _computeFullClassification(d){
   if(!d.players?.length)return[];
 
   if(d.type==='Eliminatoria'){
@@ -478,9 +490,12 @@ function computeFullClassification(d){
   // Todos contra Todos
   if(d.type==='Todos contra Todos'){
     const stats={};
+    // Quem nao completou (W.O., desistencia...) nao conta e vai por ultimo (BWF 16.2.5)
+    const out=typeof groupWithdrawnPlayers==='function'?groupWithdrawnPlayers(d.matches):new Set();
     d.players.forEach(p=>{stats[p]={name:p,wins:0,losses:0,ptsFor:0,ptsAgainst:0};});
     (d.matches||[]).forEach(m=>{
       if(!m.winner)return;
+      if(out.has(m.player1)||out.has(m.player2))return;
       if(stats[m.player1]&&stats[m.player2]){
         if(m.winner===1){stats[m.player1].wins++;stats[m.player2].losses++;}
         else{stats[m.player2].wins++;stats[m.player1].losses++;}
@@ -493,7 +508,7 @@ function computeFullClassification(d){
         }
       }
     });
-    return Object.values(stats).sort((a,b)=>b.wins-a.wins||(b.ptsFor-b.ptsAgainst)-(a.ptsFor-a.ptsAgainst)||b.ptsFor-a.ptsFor).map((s,i)=>({pos:i+1,name:s.name,wins:s.wins,losses:s.losses,note:''}));
+    return Object.values(stats).sort((a,b)=>(out.has(a.name)-out.has(b.name))||b.wins-a.wins||(b.ptsFor-b.ptsAgainst)-(a.ptsFor-a.ptsAgainst)||b.ptsFor-a.ptsFor).map((s,i)=>({pos:i+1,name:s.name,wins:s.wins,losses:s.losses,note:out.has(s.name)?'Nao completou':''}));
   }
 
   return[];
@@ -531,7 +546,7 @@ function reportClassification(){
       classification.forEach(c=>{
         const posStyle=c.pos===1?'color:#D4AF37;font-weight:800':c.pos===2?'color:#AAA;font-weight:700':c.pos===3?'color:#CD7F32;font-weight:700':'';
         const medal=c.pos===1?'\uD83E\uDD47 ':c.pos===2?'\uD83E\uDD48 ':c.pos===3?'\uD83E\uDD49 ':'';
-        const pts=c.pos>0?pointsForPosition(c.pos,scoringTable):0;
+        const pts=c.points!=null?c.points:(c.pos>0?pointsForPosition(c.pos,scoringTable):0);
         const clube=_clubForClassificationEntry(c.name,isDoubles);
         h+=`<tr><td style="${posStyle}">${medal}${c.pos}o</td><td>${esc(c.name)}</td><td style="font-size:12px">${esc(clube)}</td><td style="text-align:center">${c.wins!=null?c.wins:'-'}</td><td style="text-align:center">${c.losses!=null?c.losses:'-'}</td><td style="text-align:right;font-weight:600">${pts.toLocaleString('pt-BR')}</td><td style="font-size:11px;color:#666">${esc(c.note||'')}</td></tr>`;
       });
@@ -623,7 +638,8 @@ function _reassignFederados(classification,scoringTable,isDoubles,adimSet){
       currentNewPos=reassigned.length+1;
       lastOldPos=c.pos;
     }
-    reassigned.push({...c,pos:currentNewPos,points:pointsForPosition(currentNewPos,scoringTable),originalPos:c.pos});
+    // W.O. sem atestado continua 0 depois de reordenar os federados
+    reassigned.push({...c,pos:currentNewPos,points:c.points===0?0:pointsForPosition(currentNewPos,scoringTable),originalPos:c.pos});
   }
   return reassigned;
 }

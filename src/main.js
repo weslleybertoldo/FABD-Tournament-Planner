@@ -1079,7 +1079,8 @@ ipcMain.handle('supabase:registerEmQuadra', async (_, tournamentId, ids) => {
             try {
               const { data: scores } = await supabase.from('live_scores')
                 .select('*').in('match_id', wrongStatus);
-              const finished = new Map((scores || []).filter(s => s.winner && s.final_score).map(s => [s.match_id, s]));
+              // final = vencedor + final_score; o "Sem jogo" (ambos ausentes) vem sem vencedor
+              const finished = new Map((scores || []).filter(s => s.final_score && (s.winner || /^sem jogo$/i.test(String(s.final_score).trim()))).map(s => [s.match_id, s]));
               staleWrong = wrongStatus.filter(id => !finished.has(id));
               finished.forEach(s => {
                 log('INFO', 'Reconcile: adotando resultado do referee p/', s.match_id);
