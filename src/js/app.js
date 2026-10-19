@@ -2791,7 +2791,7 @@ function showScoreModal(idx) {
   const c=document.getElementById('score-sets-container');let h='';
   h+=`<div class="score-row score-row-header"><div class="score-cell-name" style="color:var(--fabd-blue);font-weight:700">${esc(m.player1)}</div><div class="score-cell-label"></div><div class="score-cell-name" style="color:var(--fabd-red);font-weight:700">${esc(m.player2)}</div></div>`;
   for(let s=1;s<=sets;s++){
-    h+=`<div class="score-row"><div class="score-cell"><input type="number" id="set-${s}-p1" min="0" max="30" value="" placeholder="0" data-action="autoDetectWinner" data-event="change input"></div><div class="score-cell-label">SET ${s}</div><div class="score-cell"><input type="number" id="set-${s}-p2" min="0" max="30" value="" placeholder="0" data-action="autoDetectWinner" data-event="change input"></div></div>`;
+    h+=`<div class="score-row"><div class="score-cell"><input type="number" id="set-${s}-p1" min="0" max="30" value="" placeholder="0" data-action="onScoreInput" data-event="change input" data-arg-1="$event"></div><div class="score-cell-label">SET ${s}</div><div class="score-cell"><input type="number" id="set-${s}-p2" min="0" max="30" value="" placeholder="0" data-action="onScoreInput" data-event="change input" data-arg-1="$event"></div></div>`;
   }
   c.innerHTML=h;setScoreSituacao('Finalizada');openModal('modal-score');
 }
@@ -2909,6 +2909,25 @@ async function saveEditFinished(){
 }
 
 // propagateResultToDraws extraida pra src/js/modules/bracket-mutators.js (issue #14.L)
+// Placar automatico (Weslley, 18/10/2026): digitou os pontos de quem PERDEU o
+// game com o campo do outro lado vazio -> ao sair do campo (change), completa
+// os de quem ganhou pela regra do torneio (winnerPointsFor). O campo completado
+// fica marcado e acompanha o que ele digitar no outro, ate ele mexer nele. So na
+// situacao Normal: na desistencia/desqualificacao o ultimo game fica pela metade.
+function onScoreInput(ev){
+  const el=ev?.target,[,s,p]=/^set-(\d+)-p([12])$/.exec(el?.id||'')||[];
+  if(s&&ev.type==='input')el.classList.remove('auto-filled');
+  if(s&&ev.type==='change'&&document.getElementById('score-status').value==='Finalizada'){
+    const other=document.getElementById(`set-${s}-p${p==='1'?2:1}`);
+    if(other&&(other.value===''||other.classList.contains('auto-filled'))){
+      const w=winnerPointsFor(el.value,tournament?.scoring?.points||21,tournament?.scoring?.maxPoints||30);
+      other.value=w==null?'':w;
+      other.classList.toggle('auto-filled',w!=null);
+    }
+  }
+  autoDetectWinner();
+}
+
 function autoDetectWinner(){
   const numSets=tournament?.scoring?.sets||3;
   const pts=tournament?.scoring?.points||21;
