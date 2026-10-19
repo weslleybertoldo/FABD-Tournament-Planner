@@ -57,6 +57,7 @@ function printReport(type){
     case 'atletasPorClube': body=reportAtletasPorClube(); break;
     case 'medalhasPorClube': body=reportMedalhasPorClube(); break;
     case 'players': body=reportPlayers(); break;
+    case 'scheduleValidation': body=reportScheduleValidation(); break;
     default: body='<p>Relatorio nao encontrado.</p>';
   }
 
@@ -140,6 +141,22 @@ async function exportReportXlsx(type,w){
   const slug=(tournament.name||'torneio').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,50)||'torneio';
   const ok=await window.api.xlsxExportReport({fileName:`${slug}-${type}.xlsx`,sheets});
   if(ok)showToast('Planilha exportada!');
+}
+
+// Validar programacao (Agenda): a lista do dia escolhido na janela, por
+// checagem (botao Imprimir da janela)
+function reportScheduleValidation(){
+  const day=Number(document.getElementById('sv-day')?.value);
+  const rows=(_svRows||[]).filter(r=>r.day===day);
+  let h=`<div class="cat-title">Valida&ccedil;&atilde;o da programa&ccedil;&atilde;o &mdash; ${esc(_svDayLabel(day))}</div>`;
+  if(!rows.length)return h+'<p>Nenhum problema neste dia.</p>';
+  scheduleValidationGroups().forEach(g=>{
+    const rs=rows.filter(r=>r.grupo===g.id);if(!rs.length)return;
+    h+=`<div class="cat-title">${esc(g.titulo)} (${rs.length})</div><table><thead><tr><th>Nome</th><th>Chave</th><th>Rodada</th><th>Jogo</th><th>Hora</th><th>Coment&aacute;rio</th></tr></thead><tbody>`;
+    h+=rs.map(r=>`<tr><td>${esc(r.nome)}</td><td>${esc(r.drawName||'-')}</td><td>${esc(r.roundName||'-')}</td><td>${r.num!=null?'#'+r.num:'-'}</td><td>${esc(r.time||'-')}</td><td>${esc(r.texto)}</td></tr>`).join('');
+    h+='</tbody></table>';
+  });
+  return h;
 }
 
 function reportEntries(){
@@ -853,11 +870,11 @@ function reportPlayers(){
 // === RANKING / PREMIACAO ===
 // Atualizar matches de eliminatoria na lista de partidas quando jogadores ficam disponiveis
 
-// === SUMULAS (igual ao BTP: Report > Scoresheets) ===
+// === SUMULAS ===
 // Janela de filtros (tipo, dia, quadra, horario, pular "A definir" e ja
 // impressas) -> folhas A4 paisagem (scoresheet.js). Em branco: ao clicar
-// Imprimir, os jogos ficam marcados como impressos (m.scoresheetPrintedAt),
-// igual ao BTP. Preenchidas: os jogos finalizados com o resultado e o ponto a
+// Imprimir, os jogos ficam marcados como impressos (m.scoresheetPrintedAt).
+// Preenchidas: os jogos finalizados com o resultado e o ponto a
 // ponto do arbitro (nao marcam impressa).
 function _scoresheetFilters(){
   const v=id=>document.getElementById(id);

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { loadModule } from './_loader.js';
 
-// Situacao do jogo igual ao BTP: W.O., desistencia (Ret.), desqualificacao (Dis.)
+// Situacao do jogo: W.O., desistencia (Ret.), desqualificacao (Dis.)
 // e ambos ausentes (No Match), com as regras que o Weslley escolheu em 18/10/2026.
 const R = loadModule('src/js/modules/match-result.js');
 const G = loadModule('src/js/modules/bracket-roundrobin-groups.js');

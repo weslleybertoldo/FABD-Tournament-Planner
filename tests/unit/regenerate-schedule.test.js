@@ -216,7 +216,7 @@ describe('regenerateDrawSchedule — eliminatoria provisoria por rodada', () => 
   });
 });
 
-describe('regenerateDrawSchedule — rodadas por dia (igual ao BTP)', () => {
+describe('regenerateDrawSchedule — rodadas por dia', () => {
   it('semis escolhidas pro dia 2 (a final vai junto) e cada dia so ve os jogos dele', async () => {
     const dia = (date) => ({ date, startTime: '08:00', endTime: '18:00', breakStart: '00:00', breakEnd: '00:00', draws: ['SM X', 'DX Y'] });
     const t = {

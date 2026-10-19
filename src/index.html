@@ -294,6 +294,7 @@
             <div class="toolbar">
               <button class="btn btn-secondary" data-action="renderSchedule">&#128260; Atualizar</button>
               <button class="btn btn-secondary" data-action="regenerateSchedule" style="background:#F59E0B;color:#000;border-color:#F59E0B">&#128337; Regenerar Horarios</button>
+              <button class="btn btn-secondary" id="btn-schedule-validation" data-action="showScheduleValidation">&#9989; Validar programa&ccedil;&atilde;o</button>
               <span id="schedule-info" style="font-size:13px;color:var(--fabd-gray-600)"></span>
             </div>
             <div id="schedule-grid-container"></div>
@@ -793,6 +794,24 @@
     </div>
   </div>
 
+  <!-- MODAL: VALIDAR PROGRAMACAO (Agenda) -->
+  <div class="modal-overlay" id="modal-schedule-validation">
+    <div class="modal" style="width:920px;max-width:96vw">
+      <div class="modal-header"><h3>&#9989; Validar programa&ccedil;&atilde;o</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-schedule-validation">&times;</button></div>
+      <div class="modal-body">
+        <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px">
+          <div class="form-group" style="margin:0;min-width:280px"><label>Dia</label><select class="form-control" id="sv-day" data-action="renderScheduleValidation" data-event="change"></select></div>
+          <div style="flex:1"></div>
+          <button class="btn btn-sm btn-primary" id="sv-tab-list" data-action="setScheduleValidationTab" data-arg-1="list">Lista</button>
+          <button class="btn btn-sm btn-secondary" id="sv-tab-settings" data-action="setScheduleValidationTab" data-arg-1="settings">Configura&ccedil;&otilde;es</button>
+        </div>
+        <div id="sv-list"></div>
+        <div id="sv-settings" style="display:none"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" id="sv-show-draw" data-action="scheduleValidationShowDraw" disabled>Ver chave</button><button class="btn btn-secondary" id="sv-show-match" data-action="scheduleValidationShowMatch" disabled>Ver jogo</button><button class="btn btn-secondary" data-action="printScheduleValidation">&#128424; Imprimir</button><button class="btn btn-primary" data-action="closeModal" data-arg-1="modal-schedule-validation">Fechar</button></div>
+    </div>
+  </div>
+
   <!-- MODAL: SUMULAS (em branco pro arbitro ou preenchidas dos jogos finalizados) -->
   <div class="modal-overlay" id="modal-scoresheet">
     <div class="modal" style="width:520px">
@@ -839,7 +858,7 @@
       <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-edit-finished">Cancelar</button><button class="btn btn-primary" data-action="saveEditFinished">&#128190; Salvar</button></div>
     </div>
   </div>
-  <!-- MODAL: TROCAR ATLETA (botao Trocar do Inscritos; igual ao "Replace Partner" do BTP) -->
+  <!-- MODAL: TROCAR ATLETA (botao Trocar do Inscritos) -->
   <div class="modal-overlay" id="modal-swap-athlete">
     <div class="modal" style="width:780px">
       <div class="modal-header"><h3 id="swap-title">&#8644; Trocar atleta</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-swap-athlete">&times;</button></div>
@@ -1157,6 +1176,7 @@
   <script src="js/modules/bracket-mutators.js"></script>
   <script src="js/modules/bracket-reconcile.js"></script>
   <script src="js/modules/schedule-slots.js"></script>
+  <script src="js/modules/schedule-validation.js"></script>
   <script src="js/modules/regenerate-schedule.js"></script>
   <script src="js/modules/csv-parser.js"></script>
   <script src="js/modules/scoring-profiles.js"></script>

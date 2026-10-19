@@ -1,6 +1,6 @@
 // =====================================================================
 // Schedule Slots — grade de horarios do dia e regras pra encaixar jogos.
-// Regras (Weslley, 18/10/2026 — iguais as do BTP no torneio grande):
+// Regras (Weslley, 18/10/2026, conferidas no torneio grande):
 // - a quadra recebe jogo novo a cada `dur` min: o descanso NAO segura a
 //   quadra (antes o horario andava jogo + descanso e a quadra ficava parada);
 // - o atleta descansa `rest` min entre o fim de um jogo e o inicio do outro;
@@ -192,14 +192,23 @@ function scheduleIsDone(m) {
 // pode chegar num "A definir" e se a chave tem fases). [] = sem aviso.
 // Regra (Weslley, 18/10/2026): avisa e deixa ele confirmar — nao bloqueia.
 function scheduleConflicts(m, t, others, cfg, drawOf) {
+  return scheduleConflictItems(m, t, others, cfg, drawOf).map(i => i.texto);
+}
+
+// Os mesmos avisos com o tipo de cada um (a Validacao da programacao liga e
+// desliga por tipo): { tipo, texto, athletes?, other?, dist? }. tipo = 'fora-do-dia' |
+// 'pausa' | 'quadras' | 'fase-anterior' | 'fase-seguinte' | 'atleta-possivel' |
+// 'atleta-2-jogos' | 'descanso'.
+function scheduleConflictItems(m, t, others, cfg, drawOf) {
   const dur = Math.max(1, cfg.dur || 30), rest = Math.max(0, cfg.rest || 0), courts = cfg.courts || 1;
   const out = [];
-  if (t < cfg.start || t + dur > cfg.end) out.push(`Fora do horário do dia (${scheduleClock(cfg.start)} às ${scheduleClock(cfg.end)}).`);
-  else if (cfg.breakEnd > cfg.breakStart && t < cfg.breakEnd && t + dur > cfg.breakStart) out.push(`Cai na pausa (${scheduleClock(cfg.breakStart)} às ${scheduleClock(cfg.breakEnd)}).`);
+  const add = (tipo, texto, extra) => out.push({ tipo, texto, ...extra });
+  if (t < cfg.start || t + dur > cfg.end) add('fora-do-dia', `Fora do horário do dia (${scheduleClock(cfg.start)} às ${scheduleClock(cfg.end)}).`);
+  else if (cfg.breakEnd > cfg.breakStart && t < cfg.breakEnd && t + dur > cfg.breakStart) add('pausa', `Cai na pausa (${scheduleClock(cfg.breakStart)} às ${scheduleClock(cfg.breakEnd)}).`);
 
   const list = others.filter(x => x !== m && x.time && !scheduleIsDone(x)).map(x => ({ x, s: scheduleMinutes(x.time) }));
   if (list.filter(o => Math.abs(o.s - t) < dur).length >= courts) {
-    out.push(courts === 1 ? 'A quadra já tem jogo nesse horário.' : `As ${courts} quadras já têm jogo nesse horário.`);
+    add('quadras', courts === 1 ? 'A quadra já tem jogo nesse horário.' : `As ${courts} quadras já têm jogo nesse horário.`);
   }
 
   // Fases da chave em ordem (no Todos contra Todos uma rodada nao depende da outra)
@@ -209,8 +218,8 @@ function scheduleConflicts(m, t, others, cfg, drawOf) {
     const same = list.filter(o => o.x.drawName === m.drawName);
     const prev = same.filter(o => scheduleStageOf(o.x) < stage).map(o => o.s);
     const next = same.filter(o => scheduleStageOf(o.x) > stage).map(o => o.s);
-    if (prev.length && t < Math.max(...prev) + dur) out.push(`Começa antes de acabar a fase anterior da chave (último jogo às ${scheduleClock(Math.max(...prev))}).`);
-    if (next.length && t + dur > Math.min(...next)) out.push(`Acaba depois do início da fase seguinte da chave (1º jogo às ${scheduleClock(Math.min(...next))}).`);
+    if (prev.length && t < Math.max(...prev) + dur) add('fase-anterior', `Começa antes de acabar a fase anterior da chave (último jogo às ${scheduleClock(Math.max(...prev))}).`);
+    if (next.length && t + dur > Math.min(...next)) add('fase-seguinte', `Acaba depois do início da fase seguinte da chave (1º jogo às ${scheduleClock(Math.min(...next))}).`);
   }
 
   // Atletas: os certos e os que podem chegar num "A definir"
@@ -226,14 +235,15 @@ function scheduleConflicts(m, t, others, cfg, drawOf) {
     if (!shared.length) return;
     const quem = shared.length > 3 ? `${shared.slice(0, 3).join(', ')} e mais ${shared.length - 3}` : shared.join(', ');
     const ref = `(jogo ${x.num ? '#' + x.num + ' ' : ''}às ${x.time}, ${x.drawName || 'sem chave'})`;
-    if (r.possivel || role.possivel) out.push(`Atleta que pode chegar nos 2 jogos, sem descanso ${ref}: ${quem}.`);
-    else if (dist < dur) out.push(`Atleta em 2 jogos ao mesmo tempo ${ref}: ${quem}.`);
-    else out.push(`Descanso de ${dist - dur} min, o mínimo é ${rest} ${ref}: ${quem}.`);
+    const extra = { athletes: shared, other: x, dist };
+    if (r.possivel || role.possivel) add('atleta-possivel', `Atleta que pode chegar nos 2 jogos, sem descanso ${ref}: ${quem}.`, extra);
+    else if (dist < dur) add('atleta-2-jogos', `Atleta em 2 jogos ao mesmo tempo ${ref}: ${quem}.`, extra);
+    else add('descanso', `Descanso de ${dist - dur} min, o mínimo é ${rest} ${ref}: ${quem}.`, extra);
   });
   return out;
 }
 
-// Dia (indice em days) de UM jogo. Rodadas por dia, igual ao BTP (Weslley,
+// Dia (indice em days) de UM jogo. Rodadas por dia (Weslley,
 // 18/10/2026): roundDays[chave][fase] = data do dia escolhido na Programacao
 // (fase = scheduleStageOf: 0 grupos, 1.. rodadas). Sem escolha ("Automatico")
 // ou dia que nao existe mais -> o 1o dia que tem a chave, igual antes. A rodada
