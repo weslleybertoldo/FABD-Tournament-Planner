@@ -2683,7 +2683,7 @@ async function updateMatchField(idx, field, value) {
   prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
 }
 
-// Dia da chave do jogo e a grade dele (as mesmas contas do Regenerar)
+// Dia do jogo (rodadas por dia) e a grade dele (as mesmas contas do Regenerar)
 function matchDayGrid(m) {
   ensureDayScheduleDraws();
   const days = tournament.daySchedule || [], ctx = tournament.roundDays;
