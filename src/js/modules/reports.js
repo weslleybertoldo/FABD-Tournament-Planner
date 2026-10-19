@@ -257,9 +257,12 @@ function reportRoundRobinTable(d){
       const m=(d.matches||[]).find(x=>(x.player1===p&&x.player2===q)||(x.player1===q&&x.player2===p));
       if(!m||m.winner===undefined){h+='<td>-</td>';return;}
       const isP1=m.player1===p;
-      if(m.score1==='W.O.'||m.score2==='W.O.'){
+      // W.O., desistencia, desqualificacao, Sem jogo: a marca no lugar do placar
+      const _st=typeof drawMatchStatus==='function'?drawMatchStatus(m):((m.score1==='W.O.'||m.score2==='W.O.')?'WO':'');
+      if(_st&&_st!=='Finalizada'){
         const iWon=(isP1&&m.winner===1)||(!isP1&&m.winner===2);
-        h+=`<td style="color:${iWon?'#10B981':'#DC2626'};font-weight:700">${iWon?'W':'L'}</td>`;
+        const mark={WO:'W.O.',Desistencia:'Desist.',Desqualificacao:'Desq.',SemJogo:'Sem jogo'}[_st]||_st;
+        h+=`<td style="color:${_st==='SemJogo'?'#64748B':iWon?'#10B981':'#DC2626'};font-weight:700">${iWon?'V · ':''}${mark}</td>`;
         return;
       }
       h+=`<td>${m.score1!==undefined&&m.score1!==''?(isP1?`${m.score1}-${m.score2}`:`${m.score2}-${m.score1}`):'-'}</td>`;
@@ -280,7 +283,7 @@ function reportRoundRobinTable(d){
 
 function reportResults(){
   const matches=tournament.matches||[];
-  const finished=matches.filter(m=>m.status==='Finalizada'||m.status==='WO'||m.status==='Desistencia'||m.status==='Desqualificacao');
+  const finished=matches.filter(m=>['Finalizada','WO','Desistencia','Desqualificacao','SemJogo'].includes(m.status));
   if(!finished.length)return'<p>Nenhum resultado registrado.</p>';
   let h='<h2 style="color:#1E3A8A;margin-bottom:12px">Resultados</h2>';
   const groups={};
@@ -308,7 +311,7 @@ function reportOOP(){
   const renderMatchTable=(list)=>{
     let t='<table><thead><tr><th>Hora</th><th>Jogo</th><th>Chave</th><th>Rodada</th><th>Jogador 1</th><th>x</th><th>Jogador 2</th><th>Quadra</th><th>Status</th></tr></thead><tbody>';
     list.forEach(m=>{
-      const done=m.status==='Finalizada'||m.status==='WO';
+      const done=['Finalizada','WO','Desistencia','Desqualificacao','SemJogo'].includes(m.status);
       const p1Style=m.winner===1?'class="winner"':'';
       const p2Style=m.winner===2?'class="winner"':'';
       t+=`<tr${done?' style="color:#888"':''}>

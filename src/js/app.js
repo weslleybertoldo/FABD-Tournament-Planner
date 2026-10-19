@@ -700,7 +700,7 @@ function updateOverview() {
   document.getElementById('stat-tournaments').textContent = tournament ? '1' : '0';
   document.getElementById('stat-players').textContent = players.length;
   const tm = tournament?.matches?.length || 0;
-  const done = (tournament?.matches||[]).filter(m=>m.status==='Finalizada'||m.status==='WO').length;
+  const done = (tournament?.matches||[]).filter(m=>isMatchDone(m)).length;
   document.getElementById('stat-matches').textContent = tm;
   // Calcular total de inscricoes arrecadadas
   let totalArrecadado=0;
@@ -926,7 +926,7 @@ function syncDrawsPlayers(){
       const typeChanged=idealType!==d.type;
       if(playersChanged||typeChanged){
         // Verificar se tem jogos finalizados — NÃO resetar se tiver
-        const hasFinished=(tournament.matches||[]).some(m=>m.drawName===d.name&&(m.status==='Finalizada'||m.status==='WO'));
+        const hasFinished=(tournament.matches||[]).some(m=>m.drawName===d.name&&isMatchDone(m));
         if(hasFinished){
           // Apenas atualizar lista de jogadores sem resetar matches
           d.players=newPlayers;
@@ -1200,13 +1200,19 @@ async function updateEntryStatus(idx, status) {
     return matchPlayer.split('/').some(n => n.trim() === playerName);
   };
 
+  // O inscrito e de UMA chave (entry.key = "SM Sub 15"): W.O. numa categoria nao
+  // tira das outras (CBBd: "podera jogar as demais categorias/modalidades em que
+  // estiver inscrito sem nenhum prejuizo") — antes o Ausente dava W.O. em todas
+  const inEntryDraw = name => !entry.key || name === entry.key;
+
   // Se marcou como AUSENTE, aplicar WO apenas nas partidas DIRETAS deste jogador
   if (status === 'ausente') {
     const playerName = entry.playerName;
     // Coletar partidas a marcar WO primeiro (para nao modificar durante iteracao)
     const toWO = [];
     (tournament.matches || []).forEach(m => {
-      if (m.status === 'Finalizada' || m.status === 'WO') return;
+      if (!inEntryDraw(m.drawName)) return;
+      if (isMatchDone(m)) return;
       if (m.status === 'A definir') return; // Nao aplicar WO em jogos futuros
       if (playerInMatch(playerName, m.player1)) toWO.push({match:m, winner:2});
       else if (playerInMatch(playerName, m.player2)) toWO.push({match:m, winner:1});
@@ -1215,15 +1221,15 @@ async function updateEntryStatus(idx, status) {
       m.status = 'WO'; m.score = 'W.O.'; m.winner = winner; m.finishedAt = new Date().toISOString();
       propagateResultToDraws(m);
     });
-    // Tambem atualizar round robin draws
+    // Tambem atualizar round robin draws (a marca fica do lado de quem faltou)
     (tournament.draws||[]).forEach(d=>{
-      if(d.type!=='Eliminatoria'){
+      if(d.type!=='Eliminatoria'&&inEntryDraw(d.name)){
         (d.matches||[]).forEach(dm=>{
           if(dm.winner)return;
           const p1Has=dm.player1&&dm.player1.split('/').some(n=>n.trim()===playerName);
           const p2Has=dm.player2&&dm.player2.split('/').some(n=>n.trim()===playerName);
-          if(p1Has){dm.winner=2;dm.score1='W.O.';dm.score2='';}
-          else if(p2Has){dm.winner=1;dm.score1='';dm.score2='W.O.';}
+          if(p1Has){dm.winner=2;dm.score1='W.O.';dm.score2='';dm.status='WO';}
+          else if(p2Has){dm.winner=1;dm.score1='';dm.score2='W.O.';dm.status='WO';}
         });
       }
     });
@@ -1235,7 +1241,7 @@ async function updateEntryStatus(idx, status) {
     const playerName = entry.playerName;
     // Reverter em tournament.matches
     (tournament.matches || []).forEach(m => {
-      if (m.status === 'WO' && m.score === 'W.O.') {
+      if (m.status === 'WO' && m.score === 'W.O.' && inEntryDraw(m.drawName)) {
         if (playerInMatch(playerName, m.player1) || playerInMatch(playerName, m.player2)) {
           reverseResultInDraws(m);
           m.status = 'Pendente'; m.score = ''; m.winner = undefined; m.finishedAt = undefined;
@@ -1244,12 +1250,12 @@ async function updateEntryStatus(idx, status) {
     });
     // Reverter em round robin draws
     (tournament.draws||[]).forEach(d=>{
-      if(d.type!=='Eliminatoria'){
+      if(d.type!=='Eliminatoria'&&inEntryDraw(d.name)){
         (d.matches||[]).forEach(dm=>{
           const p1Has=dm.player1&&dm.player1.split('/').some(n=>n.trim()===playerName);
           const p2Has=dm.player2&&dm.player2.split('/').some(n=>n.trim()===playerName);
           if((p1Has||p2Has)&&dm.winner&&(dm.score1==='W.O.'||dm.score2==='W.O.')){
-            dm.winner=undefined;dm.score1='';dm.score2='';
+            dm.winner=undefined;dm.score1='';dm.score2='';delete dm.status;
           }
         });
       }
@@ -1466,7 +1472,7 @@ async function syncDrawsWithPlayers() {
   if (added > 0) {
     // Coletar partidas existentes com dados (preservar)
     const existingMatches = (tournament.matches || []).filter(m =>
-      m.score || m.status === 'Finalizada' || m.status === 'WO' || m.status === 'Em Quadra'
+      m.score || isMatchDone(m) || m.status === 'Em Quadra'
     );
     const existingKeys = new Set(existingMatches.map(m => `${m.drawName}|${m.player1}|${m.player2}|${m.round}`));
 
@@ -1609,7 +1615,7 @@ async function generateSingleDraw(idx) {
   // perda acidental de resultado. Em quadra = bloqueio total. Finalizada = aviso forte.
   if (d.matches?.length) {
     const inProgress = (tournament.matches || []).filter(m => m.drawName === d.name && m.status === 'Em Quadra').length;
-    const finished = (tournament.matches || []).filter(m => m.drawName === d.name && (m.status === 'Finalizada' || m.status === 'WO' || m.status === 'Desistencia' || m.status === 'Desqualificacao')).length;
+    const finished = (tournament.matches || []).filter(m => m.drawName === d.name && isMatchDone(m)).length;
     if (inProgress > 0) { showToast(`Não pode re-sortear "${d.name}": ${inProgress} jogo(s) em quadra agora.`, 'error'); return; }
     if (finished > 0) {
       if (!confirm(`ATENÇÃO: a chave "${d.name}" tem ${finished} jogo(s) finalizado(s).\n\nRe-sortear vai PERDER esses resultados.\n\nConfirmar mesmo assim?`)) return;
@@ -1864,9 +1870,12 @@ function renderRoundRobin(d) {
       if(!m||m.winner===undefined){h+='<td>-</td>';return;}
       const isP1=m.player1===p;
       // WO
-      if(m.score1==='W.O.'||m.score2==='W.O.'){
+      // W.O., desistencia, desqualificacao, Sem jogo: a marca no lugar do placar
+      const _st=typeof drawMatchStatus==='function'?drawMatchStatus(m):((m.score1==='W.O.'||m.score2==='W.O.')?'WO':'');
+      if(_st&&_st!=='Finalizada'){
         const iWon=(isP1&&m.winner===1)||(!isP1&&m.winner===2);
-        h+=`<td style="color:${iWon?'#10B981':'#DC2626'};font-weight:700;font-size:11px">${iWon?'W':'L'}</td>`;
+        const mark={WO:'W.O.',Desistencia:'Desist.',Desqualificacao:'Desq.',SemJogo:'Sem jogo'}[_st]||_st;
+        h+=`<td style="color:${_st==='SemJogo'?'#64748B':iWon?'#10B981':'#DC2626'};font-weight:700;font-size:11px">${iWon?'V · ':''}${mark}</td>`;
         return;
       }
       h+=`<td>${m.score1!==undefined&&m.score1!==''?(isP1?`${m.score1}-${m.score2}`:`${m.score2}-${m.score1}`):'-'}</td>`;
@@ -1939,9 +1948,12 @@ function renderGroupsElimination(d) {
         const m = g.matches.find(x => (x.player1 === p && x.player2 === q) || (x.player1 === q && x.player2 === p));
         if (!m || m.winner === undefined) { h += '<td style="text-align:center">-</td>'; return; }
         const isP1 = m.player1 === p;
-        if (m.score1 === 'W.O.' || m.score2 === 'W.O.') {
+        // W.O., desistencia, desqualificacao, Sem jogo: a marca no lugar do placar
+        const _st = drawMatchStatus(m);
+        if (_st && _st !== 'Finalizada') {
           const iWon = (isP1 && m.winner === 1) || (!isP1 && m.winner === 2);
-          h += `<td style="text-align:center;color:${iWon ? '#10B981' : '#DC2626'};font-weight:700;font-size:11px">${iWon ? 'W' : 'L'}</td>`;
+          const mark = { WO: 'W.O.', Desistencia: 'Desist.', Desqualificacao: 'Desq.', SemJogo: 'Sem jogo' }[_st] || _st;
+          h += `<td style="text-align:center;color:${_st === 'SemJogo' ? '#64748B' : iWon ? '#10B981' : '#DC2626'};font-weight:700;font-size:11px">${iWon ? 'V · ' : ''}${mark}</td>`;
           return;
         }
         h += `<td style="text-align:center">${m.score1 !== undefined && m.score1 !== '' ? (isP1 ? `${m.score1}-${m.score2}` : `${m.score2}-${m.score1}`) : '-'}</td>`;
@@ -2200,7 +2212,7 @@ function assignAutoTimes(matches) {
   const bS = timeToMin(tournament.breakStart || '12:00'), bE = timeToMin(tournament.breakEnd || '13:30');
   const slots = scheduleDaySlots({ start, end, breakStart: bS, breakEnd: bE, dur });
   const book = scheduleBook({ dur, rest, courts: tournament.courts || 4 });
-  const fixed = m => ['Finalizada', 'WO', 'Em Quadra', 'Desistencia', 'Desqualificacao'].includes(m.status);
+  const fixed = m => ['Finalizada', 'WO', 'Em Quadra', 'Desistencia', 'Desqualificacao', 'SemJogo'].includes(m.status);
   const athletesOf = m => scheduleIsToDefine(m)
     ? schedulePossibleAthletes(m, (tournament.draws || []).find(d => d.name === m.drawName))
     : scheduleAthletes(m.player1, m.player2);
@@ -2427,7 +2439,7 @@ async function regenerateSchedule() {
 
   // Limpar horarios dos jogos pendentes
   tournament.matches.forEach(m=>{
-    if(m.status!=='Finalizada'&&m.status!=='WO'&&m.status!=='Em Quadra'&&m.status!=='Desistencia'&&m.status!=='Desqualificacao'){
+    if(!isMatchDone(m)&&m.status!=='Em Quadra'){
       m.time='';
     }
   });
@@ -2913,11 +2925,44 @@ function autoDetectWinner(){
   else if(w2>=needed)sel.value='2';
 }
 
+// Desqualificacao (BWF 31.5): o atleta sai de TODAS as categorias e mantem os
+// pontos ja ganhos — os jogos pendentes dele nas outras chaves viram W.O. que
+// pontua a rodada (porDesq). Pergunta atleta por atleta (na dupla, so quem
+// levou o cartao sai). Desfazer a desqualificacao desfaz esses W.O.
+function applyDisqualificationElsewhere(m){
+  const side=m.winner===1?m.player2:m.winner===2?m.player1:'';
+  const names=String(side||'').split('/').map(n=>n.trim()).filter(Boolean);
+  const origem=`${m.drawName}|${m.player1}|${m.player2}`;
+  const has=(mp,n)=>String(mp||'').split('/').some(x=>x.trim()===n);
+  let count=0;
+  names.forEach(n=>{
+    const pend=(tournament.matches||[]).filter(x=>x!==m&&x.drawName!==m.drawName&&(x.status==='Pendente'||x.status==='Em Quadra')&&(has(x.player1,n)||has(x.player2,n)));
+    if(!pend.length)return;
+    if(!confirm(`Desqualificação: tirar ${n} das outras categorias?\n\n${pend.length} jogo(s) pendente(s) viram W.O. (ele mantém os pontos já ganhos).`))return;
+    pend.forEach(x=>{
+      x.status='WO';x.score='W.O.';x.winner=has(x.player1,n)?2:1;x.finishedAt=new Date().toISOString();
+      x.porDesq=true;x.porDesqDe=origem;delete x.atestado;
+      propagateResultToDraws(x);count++;
+    });
+  });
+  if(count)showToast(`${count} jogo(s) de outras categorias viraram W.O. pela desqualificação`,'warning');
+  return count;
+}
+
 async function resetMatch(idx){
   const m=tournament.matches[idx];if(!m)return;
   if(!confirm(`Desfazer resultado do jogo #${m.num}?`))return;
   // Reverter avanço na draw antes de limpar o winner
   reverseResultInDraws(m);
+  // Desfazer a desqualificacao desfaz os W.O. que ela deu nas outras categorias
+  if(m.status==='Desqualificacao'){
+    const origem=`${m.drawName}|${m.player1}|${m.player2}`;
+    (tournament.matches||[]).forEach(x=>{
+      if(x.porDesqDe!==origem||x.status!=='WO')return;
+      reverseResultInDraws(x);
+      x.score='';x.status='Pendente';x.winner=undefined;x.finishedAt=undefined;delete x.porDesq;delete x.porDesqDe;
+    });
+  }
   m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;m.liveScore='';m.liveSets=[];delete m.atestado;delete m.porDesq;
   // Renderizar primeiro (UI responsiva), salvar depois
   renderMatches();renderFinishedMatches();showToast('Jogo resetado');

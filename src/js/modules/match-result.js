@@ -42,6 +42,14 @@ function resultText(m) {
   }
 }
 
+const RESULT_SPECIAL = ['WO', 'Desistencia', 'Desqualificacao', 'SemJogo'];
+function isSpecialResult(m) {
+  return !!m && RESULT_SPECIAL.includes(m.status);
+}
+function resultColor(status) {
+  return ({ Desistencia: '#D97706', SemJogo: 'var(--fabd-gray-500)' })[status] || 'var(--fabd-red)';
+}
+
 // Rotulo longo (selo de status)
 function resultStatusLabel(status) {
   return ({ Finalizada: 'Finalizada', WO: 'W.O.', Desistencia: 'Desistência', Desqualificacao: 'Desqualificação', SemJogo: 'Sem jogo' })[status] || status || '';
