@@ -3183,7 +3183,7 @@ async function closeLiveEvent(tid,name){
   else{showToast(`Erro ao fechar: ${r?.error||'desconhecido'}`,'error');}
   renderLiveEvents();
 }
-const APP_VERSION='4.115';
+const APP_VERSION='4.116';
 
 async function checkForUpdates(){
   const statusEl=document.getElementById('update-status');
