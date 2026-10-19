@@ -839,6 +839,25 @@
       <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-edit-finished">Cancelar</button><button class="btn btn-primary" data-action="saveEditFinished">&#128190; Salvar</button></div>
     </div>
   </div>
+  <!-- MODAL: TROCAR ATLETA (botao Trocar do Inscritos; igual ao "Replace Partner" do BTP) -->
+  <div class="modal-overlay" id="modal-swap-athlete">
+    <div class="modal" style="width:780px">
+      <div class="modal-header"><h3 id="swap-title">&#8644; Trocar atleta</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-swap-athlete">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label>Quem sai?</label><div id="swap-out"></div></div>
+          <div class="form-group"><label>Quem entra?</label><select class="form-control" id="swap-in" data-action="renderSwapAthlete" data-event="change"></select>
+            <p style="font-size:12px;color:var(--fabd-gray-600);margin-top:6px">N&atilde;o achou? Cadastre o atleta em Jogadores.</p></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label id="swap-mine-title">Jogos da dupla</label><div id="swap-mine"></div></div>
+          <div class="form-group"><label id="swap-his-title">Jogos de quem entra</label><div id="swap-his"></div></div>
+        </div>
+        <div id="swap-problems"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-swap-athlete">Cancelar</button><button class="btn btn-primary" id="swap-ok" data-action="confirmSwapAthlete">&#8644; Trocar</button></div>
+    </div>
+  </div>
 
   <!-- MODAL: CONFIGURACAO DO TORNEIO -->
   <div class="modal-overlay" id="modal-tournament-config">
@@ -1143,6 +1162,7 @@
   <script src="js/modules/scoring-profiles.js"></script>
   <script src="js/modules/umpires.js"></script>
   <script src="js/modules/players.js"></script>
+  <script src="js/modules/athlete-swap.js"></script>
   <script src="js/modules/draws-ui.js"></script>
   <script src="js/modules/matches-forecast.js"></script>
   <script src="js/modules/live-recovery.js"></script>
