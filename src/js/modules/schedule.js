@@ -201,11 +201,17 @@ function renderDaySchedule(){
     // Mostrar quais categorias ficam neste dia
     const modeDraws=mode==='simples'?simples:mode==='duplas'?duplas:drawNames;
     if(modeDraws.length)h+=`<div style="margin-top:8px;font-size:12px;color:var(--fabd-gray-500)">Categorias: ${modeDraws.map(esc).join(', ')}</div>`;
+    // Fases por dia (Weslley, 18/10/2026): opcional; "Todas as fases" = igual antes.
+    // Ex.: sabado "Ate as quartas" e domingo "Semis e finais" (scheduleDayOf)
+    const phases=saved.phases||'todas';
+    const phaseBtn=(v,txt)=>`<label style="font-size:14px;display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;background:${phases===v?'#2563EB':'#fff'};color:${phases===v?'#fff':'#333'};border-radius:8px;border:2px solid ${phases===v?'#2563EB':'#cbd5e1'}"><input type="radio" name="ds-phases-${idx}" class="ds-phases" value="${v}" ${phases===v?'checked':''} style="display:none"> ${txt}</label>`;
+    h+=`<label style="font-weight:600;font-size:13px;margin:12px 0 8px;display:block">Fases neste dia:</label>`;
+    h+=`<div style="display:flex;gap:12px;flex-wrap:wrap">${phaseBtn('todas','Todas as fases')}${phaseBtn('ate-quartas','Até as quartas')}${phaseBtn('semis-finais','Semis e finais')}</div>`;
     h+=`</div></div>`;
   });
   container.innerHTML=h;
   // Listener: ao trocar radio, salvar estado atual e re-renderizar
-  container.querySelectorAll('.ds-mode').forEach(r=>{
+  container.querySelectorAll('.ds-mode, .ds-phases').forEach(r=>{
     r.addEventListener('change',()=>{
       tournament.daySchedule=collectDaySchedule();
       renderDaySchedule();
@@ -237,8 +243,9 @@ function collectDaySchedule(){
     const breakEnd=noBreak?'00:00':(panel.querySelector('.ds-break-end')?.value||'13:30');
     const modeEl=panel.querySelector('.ds-mode:checked');
     const mode=modeEl?.value||'todas';
+    const phases=panel.querySelector('.ds-phases:checked')?.value||'todas';
     const draws=mode==='simples'?simples:mode==='duplas'?duplas:drawNames;
-    schedule.push({date,startTime,endTime,breakStart,breakEnd,noBreak,mode,draws});
+    schedule.push({date,startTime,endTime,breakStart,breakEnd,noBreak,mode,phases,draws});
   });
   return schedule;
 }
@@ -260,15 +267,9 @@ function ensureDayScheduleDraws() {
 
 function getMatchDay(match){
   if(!tournament?.daySchedule?.length)return null;
-  const dn=match.drawName||'';
-  const isSimples=dn.startsWith('SM ')||dn.startsWith('SF ');
-  const isDupla=dn.startsWith('DM ')||dn.startsWith('DF ')||dn.startsWith('DX ');
-  for(const day of tournament.daySchedule){
-    const mode=day.mode||'todas';
-    if(mode==='todas')return day;
-    if(mode==='simples'&&isSimples)return day;
-    if(mode==='duplas'&&isDupla)return day;
-  }
-  return null;
+  ensureDayScheduleDraws();
+  // Dia do JOGO (fases por dia; antes: pelo modo + prefixo, e 2 dias "todas" davam tudo no dia 1)
+  const i=scheduleDayOf(match,tournament.daySchedule,scheduleDayContext(tournament.matches,tournament.draws));
+  return i>=0?tournament.daySchedule[i]:null;
 }
 
