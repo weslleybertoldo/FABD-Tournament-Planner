@@ -299,6 +299,14 @@ process.on('unhandledRejection', (e) => { log('ERROR', 'Unhandled:', String(e));
 // sem telas quando o app for fechado.
 // =====================================================================
 function setupAutoUpdater() {
+  // Canal beta: sem atualizacao automatica (achado em 19/10/2026). A versao "-beta.N" liga o
+  // allowPrerelease do electron-updater, que pega a release mais nova do GitHub — quando e a
+  // oficial, o beta baixava e, ao fechar, virava o app oficial. O beta avisa versao nova so pela
+  // faixa do topo (app:checkUpdate, que olha so as pre-releases).
+  if (IS_BETA_CHANNEL) {
+    log('INFO', '[updater] canal beta: sem atualizacao automatica');
+    return;
+  }
   try {
     const { autoUpdater } = require('electron-updater');
     autoUpdater.autoDownload = true; // baixa sozinho, sem perguntar
