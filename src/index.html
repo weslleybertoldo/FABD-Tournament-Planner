@@ -313,6 +313,7 @@
             <div class="quick-action" data-action="printReport" data-arg-1="draws"><div class="icon">&#127960;</div><div class="label">Chaves / Brackets</div></div>
             <div class="quick-action" data-action="printReport" data-arg-1="results"><div class="icon">&#128200;</div><div class="label">Resultados</div></div>
             <div class="quick-action" data-action="printReport" data-arg-1="oop"><div class="icon">&#128197;</div><div class="label">Ordem de Jogo</div></div>
+            <div class="quick-action" data-action="showScoresheetModal"><div class="icon">&#128221;</div><div class="label">S&uacute;mulas</div></div>
             <div class="quick-action" data-action="printReport" data-arg-1="winners"><div class="icon">&#127942;</div><div class="label">Premiacao</div></div>
             <div class="quick-action" data-action="printReport" data-arg-1="classification"><div class="icon">&#127941;</div><div class="label">Classificacao Geral</div></div>
             <div class="quick-action" data-action="printReport" data-arg-1="rankingFederados"><div class="icon">&#127913;</div><div class="label">Ranking Federados</div></div>
@@ -793,6 +794,27 @@
   </div>
 
   <!-- MODAL: EDITAR JOGO FINALIZADO (lapis da aba Finalizadas) -->
+  <div class="modal-overlay" id="modal-scoresheet">
+    <div class="modal" style="width:520px">
+      <div class="modal-header"><h3>&#128221; S&uacute;mulas em branco</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-scoresheet">&times;</button></div>
+      <div class="modal-body">
+        <p style="font-size:12px;color:var(--fabd-gray-600);margin-bottom:12px">1 s&uacute;mula por folha A4 paisagem, com o cabe&ccedil;alho do jogo preenchido. O &aacute;rbitro preenche o resto &agrave; m&atilde;o.</p>
+        <div class="form-row">
+          <div class="form-group"><label>Dia</label><select class="form-control" id="ss-day" data-action="updateScoresheetCount" data-event="change"></select></div>
+          <div class="form-group"><label>Quadra</label><select class="form-control" id="ss-court" data-action="updateScoresheetCount" data-event="change"></select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Hor&aacute;rio de</label><input type="time" class="form-control" id="ss-from" data-action="updateScoresheetCount" data-event="change input"></div>
+          <div class="form-group"><label>at&eacute;</label><input type="time" class="form-control" id="ss-to" data-action="updateScoresheetCount" data-event="change input"></div>
+        </div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:4px"><input type="checkbox" id="ss-skip-unknown" checked data-action="updateScoresheetCount" data-event="change"> Pular jogos com atleta a definir</label>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="ss-skip-printed" checked data-action="updateScoresheetCount" data-event="change"> Pular as j&aacute; impressas</label>
+        <p style="font-size:12px;color:var(--fabd-gray-600);margin-top:8px">A quadra s&oacute; filtra os jogos que j&aacute; t&ecirc;m quadra; jogo sem quadra sai com a quadra em branco.</p>
+        <p id="ss-count" style="font-size:14px;font-weight:700;color:var(--fabd-blue);margin-top:10px"></p>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-scoresheet">Cancelar</button><button class="btn btn-primary" data-action="printScoresheets">&#128424; Gerar s&uacute;mulas</button></div>
+    </div>
+  </div>
   <div class="modal-overlay" id="modal-edit-finished">
     <div class="modal" style="width:520px">
       <div class="modal-header"><h3>&#9998; Editar jogo finalizado</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-edit-finished">&times;</button></div>
@@ -1104,6 +1126,7 @@
   <!-- Modules: funcoes puras extraidas de app.js (issue #14, modular incremental) -->
   <script src="js/modules/match-helpers.js"></script>
   <script src="js/modules/match-result.js"></script>
+  <script src="js/modules/scoresheet.js"></script>
   <script src="js/modules/bracket-roundrobin-groups.js"></script>
   <script src="js/modules/bracket-best-thirds.js"></script>
   <script src="js/modules/bracket-elim.js"></script>
