@@ -2241,7 +2241,12 @@ function assignToDefineTimes(placed, adefs, sched) {
     const before = [...placed, ...adefs]
       .filter(x => x.drawName === m.drawName && x.time && scheduleStageOf(x) < scheduleStageOf(m))
       .map(x => timeToMin(x.time));
-    if (!before.length) return;
+    if (!before.length) {
+      // Fase anterior em OUTRO dia (fases por dia): comeca no inicio deste dia
+      const antes = (tournament.matches || []).some(x => x.drawName === m.drawName && scheduleStageOf(x) < scheduleStageOf(m));
+      if (!antes || !sched.slots.length) return;
+      before.push(sched.slots[0] - (tournament.matchDuration || 30));
+    }
     const ps = schedulePossibleAthletes(m, (tournament.draws || []).find(d => d.name === m.drawName));
     const si = schedulePlaceToDefine(sched.book, sched.slots, ps, Math.max(...before), scheduleRole(m));
     if (si < 0) return;
@@ -2429,16 +2434,13 @@ async function regenerateSchedule() {
 
   if(hasDays){
     // Atribuir horarios POR DIA (cada dia comeca do horario configurado)
-    const dayDraws=[];
-    tournament.daySchedule.forEach(day=>{dayDraws.push(new Set(day.draws||[]));});
-
-    // Separar matches por dia
+    // Dia de cada JOGO (fases por dia: semis e finais podem ir pra outro dia)
+    const dayCtx=scheduleDayContext(tournament.matches,tournament.draws);
     const matchesByDay=tournament.daySchedule.map(()=>[]);
     const orphans=[];
     tournament.matches.forEach(m=>{
-      let assigned=false;
-      dayDraws.forEach((s,i)=>{if(s.has(m.drawName)&&!assigned){matchesByDay[i].push(m);assigned=true;}});
-      if(!assigned)orphans.push(m);
+      const i=scheduleDayOf(m,tournament.daySchedule,dayCtx);
+      if(i>=0)matchesByDay[i].push(m);else orphans.push(m);
     });
 
     // Atribuir horarios para cada dia separadamente
@@ -2467,16 +2469,8 @@ async function regenerateSchedule() {
     // Orfaos (sem dia): atribuir com config padrao
     if(orphans.length)assignAutoTimes(orphans);
 
-    // Ordenar: dia -> horario
-    tournament.matches.sort((a,b)=>{
-      let dayA=dayDraws.length,dayB=dayDraws.length;
-      dayDraws.forEach((s,i)=>{if(s.has(a.drawName))dayA=i;if(s.has(b.drawName))dayB=i;});
-      if(dayA!==dayB)return dayA-dayB;
-      const ta=a.time?timeToMin(a.time):9999;
-      const tb=b.time?timeToMin(b.time):9999;
-      if(ta!==tb)return ta-tb;
-      return(a.num||0)-(b.num||0);
-    });
+    // Ordenar: dia do jogo -> horario
+    tournament.matches=scheduleSortByDay(tournament.matches,tournament.daySchedule,dayCtx);
   } else {
     // Sem daySchedule: separar definidos vs eliminatoria "A definir"
     const definidos = tournament.matches.filter(m => m.status !== 'A definir');
@@ -2689,9 +2683,11 @@ async function updateMatchField(idx, field, value) {
 // Dia da chave do jogo e a grade dele (as mesmas contas do Regenerar)
 function matchDayGrid(m) {
   ensureDayScheduleDraws();
-  const day = (tournament.daySchedule || []).find(d => (d.draws || []).includes(m.drawName)) || null;
+  const days = tournament.daySchedule || [], ctx = scheduleDayContext(tournament.matches, tournament.draws);
+  const i = days.length ? scheduleDayOf(m, days, ctx) : -1;
+  const day = i >= 0 ? days[i] : null;
   return {
-    inDay: x => !day || (day.draws || []).includes(x.drawName),
+    inDay: x => !day || scheduleDayOf(x, days, ctx) === i,
     cfg: {
       start: timeToMin(day?.startTime || tournament.startTime || '08:00'),
       end: timeToMin(day?.endTime || tournament.endTime || '18:00'),
@@ -2734,7 +2730,7 @@ async function setMatchTime(idx, value) {
     if (avisos.length && !confirm(`Jogo #${m.num} (${m.drawName}) às ${value}:\n\n${avisos.map(a => '⚠ ' + a).join('\n')}\n\nMudar o horário mesmo assim?`)) { renderMatches(); return; }
   }
   m.time = value;
-  tournament.matches = scheduleSortByDay(tournament.matches, tournament.daySchedule);
+  tournament.matches = scheduleSortByDay(tournament.matches, tournament.daySchedule, scheduleDayContext(tournament.matches, tournament.draws));
   await window.api.saveTournament(tournament);
   prepareRankingsForSync(); window.api.supabaseUpsertTournament(tournament.id, tournament.name, tournament);
   renderMatches();
