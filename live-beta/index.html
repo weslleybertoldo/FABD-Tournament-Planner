@@ -547,6 +547,11 @@
     // So troca o HTML quando mudou: a cada ponto a pagina redesenha e o que nao
     // mudou fica parado (sem piscar, sem perder o lugar da rolagem)
     function setHTML(el,h){if(el&&el.__h!==h){el.innerHTML=h;el.__h=h;}}
+    // Logo que nao carrega (endereco velho no banco) vira a sigla, igual a federacao
+    // sem logo; o endereco fica marcado e os proximos desenhos ja saem com a sigla
+    const BAD_LOGOS=new Set();
+    const logoHTML=(url,fb,alt='')=>url&&!BAD_LOGOS.has(url)?`<img src="${esc(url)}" alt="${esc(alt)}" data-fb="${esc(fb)}">`:fb;
+    document.addEventListener('error',e=>{const t=e.target;if(t&&t.tagName==='IMG'&&t.dataset&&t.dataset.fb!==undefined){BAD_LOGOS.add(t.getAttribute('src'));t.outerHTML=t.dataset.fb;}},true);
     const pad=n=>String(n).padStart(2,'0');
     const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
 
@@ -816,7 +821,7 @@
     function applyFederationBranding(fed){
       currentFederation=fed||null;
       document.documentElement.style.setProperty('--brand',fed?.primary_color||'#1E3A8A');
-      setHTML($('brand-logo'),fed?.logo_url?`<img src="${esc(fed.logo_url)}" alt="${esc(fed.short_name||'')}">`:esc((fed?.short_name||'').slice(0,4))||ic('radio'));
+      setHTML($('brand-logo'),logoHTML(fed?.logo_url,esc((fed?.short_name||'').slice(0,4))||ic('radio'),fed?.short_name||''));
       $('brand-name').textContent=fed?.short_name?`${fed.short_name} · Torneios`:'Torneios ao vivo';
     }
     function courtList(){
@@ -1453,7 +1458,7 @@
       setHTML(cnt,list.map(t=>{
         const fed=t.federations||{};
         const n=liveCounts[t.id]||0;
-        const logo=fed.logo_url?`<img src="${esc(fed.logo_url)}" alt="">`:esc((fed.short_name||'?').slice(0,4));
+        const logo=logoHTML(fed.logo_url,esc((fed.short_name||'?').slice(0,4)));
         return `<a class="card hc" href="?t=${encodeURIComponent(t.id)}" data-tournament="${esc(t.id)}">`
           +`<div class="fed"><div class="logo" style="color:${esc(fed.primary_color||'#1E3A8A')}">${logo}</div><div><b>${esc(fed.short_name||'-')}</b><span>${esc(fed.city||'')}${fed.city&&fed.state?' - ':''}${esc(fed.state||'')}</span></div></div>`
           +`<h3>${esc(t.name||'Torneio')}</h3>`
