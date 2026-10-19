@@ -216,6 +216,47 @@ describe('regenerateDrawSchedule — eliminatoria provisoria por rodada', () => 
   });
 });
 
+describe('regenerateDrawSchedule — rodadas por dia (igual ao BTP)', () => {
+  it('semis escolhidas pro dia 2 (a final vai junto) e cada dia so ve os jogos dele', async () => {
+    const dia = (date) => ({ date, startTime: '08:00', endTime: '18:00', breakStart: '00:00', breakEnd: '00:00', draws: ['SM X', 'DX Y'] });
+    const t = {
+      id: 't1', courts: 2, matchDuration: 30, restMinBetweenGames: 20,
+      startTime: '08:00', endTime: '18:00', breakStart: '00:00', breakEnd: '00:00',
+      daySchedule: [dia('2026-11-07'), dia('2026-11-08')],
+      roundDays: { 'SM X': { 2: '2026-11-08' }, 'DX Y': { 1: '2026-11-08' } },
+      draws: [
+        { id: 'd1', name: 'SM X', type: 'Eliminatoria', event: 'SM', matches: [
+          { round: 1, player1: 'A', player2: 'B' }, { round: 1, player1: 'C', player2: 'D' },
+          { round: 1, player1: 'E', player2: 'F' }, { round: 1, player1: 'G', player2: 'H' },
+          { round: 2 }, { round: 2 }, { round: 3 },
+        ] },
+        { id: 'd2', name: 'DX Y', type: 'Eliminatoria', event: 'DX', matches: [] },
+      ],
+      matches: [
+        // DX Y no dia 2 as 08:00 nas 2 quadras: segura o dia 2, nao o dia 1
+        { drawName: 'DX Y', player1: 'P / Q', player2: 'R / S', round: 1, status: 'Pendente', time: '08:00' },
+        { drawName: 'DX Y', player1: 'T / U', player2: 'V / W', round: 1, status: 'Pendente', time: '08:00' },
+      ],
+    };
+    const { regenerateDrawSchedule } = loadRegen(t);
+    await regenerateDrawSchedule(0, true);
+    const sm = idx => t.matches.find(m => m.drawName === 'SM X' && m.drawMatchIdx === idx).time;
+    // Dia 1: R1 nas 2 quadras desde 08:00 (o DX do dia 2 nao ocupa o dia 1)
+    expect([0, 1, 2, 3].map(sm)).toEqual(['08:00', '08:00', '08:30', '08:30']);
+    // Dia 2: R1 foi ontem -> semis desde o inicio do dia, depois do DX (quadras cheias 08:00)
+    expect([4, 5].map(sm)).toEqual(['08:30', '08:30']);
+    // Final (Automatico) vai junto pro dia 2, depois das semis + descanso
+    expect(sm(6)).toBe('09:30');
+    // Nome das rodadas igual ao da lista de Partidas (antes a 1a rodada de 8 virava 'R1')
+    expect([0, 4, 6].map(i => t.matches.find(m => m.drawName === 'SM X' && m.drawMatchIdx === i).roundName)).toEqual(['Quartas', 'Semifinal', 'Final']);
+    // Ordem da lista: dia 1 (R1) e depois o dia 2 (DX, semis, final)
+    expect(t.matches.map(m => `${m.drawName} ${m.time}`)).toEqual([
+      'SM X 08:00', 'SM X 08:00', 'SM X 08:30', 'SM X 08:30',
+      'DX Y 08:00', 'DX Y 08:00', 'SM X 08:30', 'SM X 08:30', 'SM X 09:30',
+    ]);
+  });
+});
+
 describe('fillMissingTimesByDay — torneio de 2 dias', () => {
   it('da horario so ao definido sem horario, no proprio dia, sem mexer nos outros', () => {
     const t = {

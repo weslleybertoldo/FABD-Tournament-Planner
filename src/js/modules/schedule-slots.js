@@ -233,11 +233,28 @@ function scheduleConflicts(m, t, others, cfg, drawOf) {
   return out;
 }
 
-// Lista na ordem de Partidas/Agenda: dia da chave (daySchedule), horario (sem
+// Dia (indice em days) de UM jogo. Rodadas por dia, igual ao BTP (Weslley,
+// 18/10/2026): roundDays[chave][fase] = data do dia escolhido na Programacao
+// (fase = scheduleStageOf: 0 grupos, 1.. rodadas). Sem escolha ("Automatico")
+// ou dia que nao existe mais -> o 1o dia que tem a chave, igual antes. A rodada
+// nunca fica antes de uma rodada anterior escolhida: so a semi no dia 2 leva a
+// final junto (senao a final ficava no dia 1, antes da semi). -1 = nenhum.
+function scheduleDayOf(m, days, roundDays) {
+  const list = days || [];
+  const stage = scheduleStageOf(m);
+  const chosen = (roundDays && roundDays[m.drawName]) || {};
+  const idxOf = date => (date ? list.findIndex(d => d.date === date) : -1);
+  let prev = -1;
+  Object.keys(chosen).forEach(k => { if (Number(k) < stage) prev = Math.max(prev, idxOf(chosen[k])); });
+  const own = idxOf(chosen[stage]);
+  return Math.max(own >= 0 ? own : list.findIndex(d => (d.draws || []).includes(m.drawName)), prev);
+}
+
+// Lista na ordem de Partidas/Agenda: dia do jogo (scheduleDayOf), horario (sem
 // horario no fim) e numero do jogo. Devolve uma copia; nao renumera.
-function scheduleSortByDay(matches, days) {
-  const sets = (days || []).map(day => new Set(day.draws || []));
-  const dayOf = m => { let i = sets.length; sets.forEach((s, k) => { if (s.has(m.drawName)) i = k; }); return i; };
+function scheduleSortByDay(matches, days, roundDays) {
+  const n = (days || []).length;
+  const dayOf = m => { const i = scheduleDayOf(m, days, roundDays); return i < 0 ? n : i; };
   const at = m => (m.time ? scheduleMinutes(m.time) : 9999);
   return [...matches].sort((a, b) => dayOf(a) - dayOf(b) || at(a) - at(b) || (a.num || 0) - (b.num || 0));
 }

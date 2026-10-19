@@ -4,7 +4,7 @@ import { loadModule } from './_loader.js';
 const {
   scheduleStageOf, scheduleDaySlots, scheduleAthletes, schedulePossibleAthletes,
   scheduleBook, schedulePlaceDefined, schedulePlaceToDefine, scheduleRole,
-  scheduleConflicts, scheduleSortByDay,
+  scheduleConflicts, scheduleSortByDay, scheduleDayOf,
 } = loadModule('src/js/modules/schedule-slots.js');
 
 const H = hhmm => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
@@ -328,5 +328,47 @@ describe('scheduleSortByDay', () => {
     ];
     expect(scheduleSortByDay(ms, days).map(m => m.num)).toEqual([4, 5, 3, 2, 1]);
     expect(scheduleSortByDay(ms, []).map(m => m.num)).toEqual([1, 4, 5, 3, 2]);
+  });
+});
+
+describe('scheduleDayOf — rodadas por dia, igual ao BTP (Weslley, 18/10/2026)', () => {
+  const dias = [{ date: '2026-11-07', draws: ['SM A', 'SF A'] }, { date: '2026-11-08', draws: ['DX A'] }];
+  const ms = [
+    { drawName: 'SM A', round: 1 }, { drawName: 'SM A', round: 2 }, { drawName: 'SM A', round: 3 },
+    { drawName: 'DX A', phase: 'group', round: 2 }, { drawName: 'DX A', phase: 'elimination', round: 1 },
+  ];
+  const dia = (m, rd) => scheduleDayOf(m, dias, rd);
+
+  it('Automatico (sem escolha): o 1o dia que tem a chave, igual antes', () => {
+    expect(ms.map(m => dia(m))).toEqual([0, 0, 0, 1, 1]);
+    expect(dia({ drawName: 'XX' })).toBe(-1);
+  });
+
+  it('rodada com dia escolhido vai pra ele, mesmo que o dia seja de outra modalidade', () => {
+    const rd = { 'SM A': { 2: '2026-11-08', 3: '2026-11-08' }, 'DX A': { 0: '2026-11-07' } };
+    expect(ms.map(m => dia(m, rd))).toEqual([0, 1, 1, 0, 1]);
+  });
+
+  it('dia escolhido que nao existe mais: volta pro Automatico', () => {
+    expect(dia(ms[2], { 'SM A': { 3: '2026-12-25' } })).toBe(0);
+  });
+
+  it('Automatico depois de uma rodada escolhida vai junto: so a semi no dia 2 leva a final', () => {
+    const rd = { 'SM A': { 2: '2026-11-08' } };
+    expect(ms.slice(0, 3).map(m => dia(m, rd))).toEqual([0, 1, 1]);
+  });
+
+  it('rodada escolhida nunca fica antes de uma rodada anterior escolhida', () => {
+    const rd = { 'SM A': { 2: '2026-11-08', 3: '2026-11-07' } };
+    expect(dia(ms[2], rd)).toBe(1);
+  });
+
+  it('scheduleSortByDay usa o dia de cada jogo: a final escolhida pro dia 2 vai pro fim', () => {
+    const lista = [
+      { num: 1, drawName: 'SM A', round: 3, time: '08:00' },
+      { num: 2, drawName: 'SM A', round: 1, time: '09:00' },
+      { num: 3, drawName: 'DX A', round: 1, phase: 'elimination', time: '08:30' },
+    ];
+    expect(scheduleSortByDay(lista, dias, { 'SM A': { 3: '2026-11-08' } }).map(m => m.num)).toEqual([2, 1, 3]);
   });
 });

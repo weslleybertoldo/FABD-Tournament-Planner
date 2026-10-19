@@ -100,20 +100,15 @@ function renderMatches() {
 
   // Pre-calcular filtro de dia para evitar flash ao renderizar
   const _dayVal=document.getElementById('match-day-filter')?.value||'';
-  let _dayDraws=null;
-  if(_dayVal&&tournament?.daySchedule){
-    const _day=tournament.daySchedule.find(d=>d.date===_dayVal);
-    if(_day)_dayDraws=new Set(_day.draws||[]);
-  }
 
   const _nc = tournament.courts || 4;
   const _cn = tournament.courtNames || [];
   let _lastMatchTime = '';
   let _matchesAtTime = 0;
-  let _lastMatchDraw = '';
-  // Horarios do seletor: um calculo por chave (a grade e a do dia da chave)
+  let _lastMatchDraw = '', _lastMatchDay = '';
+  // Horarios do seletor: um calculo por chave e dia (a grade e a do dia do jogo)
   const _timeChoices = {};
-  const _choicesOf = m => _timeChoices[m.drawName] || (_timeChoices[m.drawName] = matchTimeChoices(m));
+  const _choicesOf = m => { const k = m.drawName + '|' + (getMatchDay(m)?.date || ''); return _timeChoices[k] || (_timeChoices[k] = matchTimeChoices(m)); };
 
   let h='';
   pendingMatches.forEach(m=>{
@@ -125,7 +120,7 @@ function renderMatches() {
         const _livres = _nc - _matchesAtTime;
         for (let _q = 0; _q < _livres; _q++) {
           const _courtName = _cn[_matchesAtTime + _q] || `Quadra ${_matchesAtTime + _q + 1}`;
-          h += `<tr class="court-free-row" data-time="${esc(_lastMatchTime)}" data-draw="${esc(_lastMatchDraw)}" style="background:#F8FAFC"><td></td><td style="font-size:11px;color:#94A3B8">${esc(_lastMatchTime)}</td><td colspan="10" style="font-size:11px;color:#94A3B8;font-style:italic">${esc(_courtName)} - livre</td></tr>`;
+          h += `<tr class="court-free-row" data-time="${esc(_lastMatchTime)}" data-draw="${esc(_lastMatchDraw)}" data-day="${esc(_lastMatchDay)}" style="background:#F8FAFC"><td></td><td style="font-size:11px;color:#94A3B8">${esc(_lastMatchTime)}</td><td colspan="10" style="font-size:11px;color:#94A3B8;font-style:italic">${esc(_courtName)} - livre</td></tr>`;
         }
       }
       _lastMatchTime = m.time;
@@ -133,6 +128,7 @@ function renderMatches() {
     }
     _matchesAtTime++;
     _lastMatchDraw = m.drawName || '';
+    _lastMatchDay = getMatchDay(m)?.date || '';
 
     const stMap={'Finalizada':'tag-green','WO':'tag-red','Desqualificacao':'tag-red','Desistencia':'tag-yellow','Em Quadra':'tag-blue','A definir':'tag-gray','Pendente':'tag-gray'};
     const st=stMap[m.status]||'tag-gray';
@@ -198,17 +194,17 @@ function renderMatches() {
     const resetBtn=isFinished?`<button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA;margin-left:4px;padding:2px 6px;font-size:11px" data-action="resetMatch" data-arg-1="${i}" title="Desfazer resultado">&#8635;</button>`:'';
     const matchDay=getMatchDay(m);
     const dayLabel=matchDay?((d)=>{const o=new Date(d+'T00:00:00');return`${String(o.getDate()).padStart(2,'0')}/${String(o.getMonth()+1).padStart(2,'0')}`;})(matchDay.date):'-';
-    const _hideRow=_dayDraws&&!_dayDraws.has(m.drawName||'')?'display:none;':'';
+    const _hideRow=_dayVal&&(matchDay?.date||'')!==_dayVal?'display:none;':''; // dia do JOGO
     // Texto da busca: so o conteudo da linha (sem as opcoes das listas de quadra/arbitro)
     const _search=normSearch([dayLabel,m.time,m.drawName,m.roundName||'R'+m.round,m.num,m.player1,m.player2,d1,d2,m.court,m.umpire,m.status].join(' '));
-    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" data-search="${esc(_search)}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${isEQ?(esc(m.time)||'-'):`<select class="form-control" style="width:auto;padding:2px 4px;font-size:11px" title="Mudar o horário" data-action="setMatchTime" data-event="change" data-arg-1="${i}" data-arg-2="$value">${getTimeOptions(m,_choicesOf(m))}</select>`}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" data-action="assignCourt" data-event="change" data-arg-1="${i}" data-arg-2="$value"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" data-action="updateMatchField" data-event="change" data-arg-1="${i}" data-arg-2="umpire" data-arg-3="$value"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" data-action="showScoreModal" data-arg-1="${i}">Placar</button>${resetBtn}`}</td></tr>`;
+    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" data-day="${esc(matchDay?.date||'')}" data-search="${esc(_search)}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${isEQ?(esc(m.time)||'-'):`<select class="form-control" style="width:auto;padding:2px 4px;font-size:11px" title="Mudar o horário" data-action="setMatchTime" data-event="change" data-arg-1="${i}" data-arg-2="$value">${getTimeOptions(m,_choicesOf(m))}</select>`}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" data-action="assignCourt" data-event="change" data-arg-1="${i}" data-arg-2="$value"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" data-action="updateMatchField" data-event="change" data-arg-1="${i}" data-arg-2="umpire" data-arg-3="$value"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" data-action="showScoreModal" data-arg-1="${i}">Placar</button>${resetBtn}`}</td></tr>`;
   });
   // Quadras livres do ultimo horario
   if (_lastMatchTime && _matchesAtTime < _nc) {
     const _livres = _nc - _matchesAtTime;
     for (let _q = 0; _q < _livres; _q++) {
       const _courtName = _cn[_matchesAtTime + _q] || `Quadra ${_matchesAtTime + _q + 1}`;
-      h += `<tr class="court-free-row" data-time="${esc(_lastMatchTime)}" data-draw="${esc(_lastMatchDraw)}" style="background:#F8FAFC"><td></td><td style="font-size:11px;color:#94A3B8">${esc(_lastMatchTime)}</td><td colspan="10" style="font-size:11px;color:#94A3B8;font-style:italic">${esc(_courtName)} - livre</td></tr>`;
+      h += `<tr class="court-free-row" data-time="${esc(_lastMatchTime)}" data-draw="${esc(_lastMatchDraw)}" data-day="${esc(_lastMatchDay)}" style="background:#F8FAFC"><td></td><td style="font-size:11px;color:#94A3B8">${esc(_lastMatchTime)}</td><td colspan="10" style="font-size:11px;color:#94A3B8;font-style:italic">${esc(_courtName)} - livre</td></tr>`;
     }
   }
   tb.innerHTML=h;
@@ -241,7 +237,7 @@ function renderMatchesProgress() {
   const statusSub=s=>[s.inCourt?`${s.inCourt} em quadra`:'',s.pending?`${s.pending} pendente${s.pending>1?'s':''}`:'',s.toDefine?`${s.toDefine} a definir`:''].filter(Boolean).join(' · ')||'nenhum jogo faltando';
   const avgSub=a=>a.source==='torneio'?`media do torneio (${a.count} jogo${a.count>1?'s':''})`:'duracao configurada (sem jogo medido)';
   const selDay=dayVal?days.find(d=>d.date===dayVal):null;
-  const list=selDay?matches.filter(m=>(selDay.draws||[]).includes(m.drawName)):matches;
+  const list=selDay?matches.filter(m=>getMatchDay(m)?.date===selDay.date):matches;
   const s=summarize(list,selDay);
   const pct=s.total?Math.round(s.done/s.total*100):0;
   let h=tile('green','&#9989;','Finalizadas',`${s.done}<small>/${s.total}</small>`,statusSub(s),`<div class="mp-bar"><span style="width:${pct}%"></span></div>`);
@@ -258,7 +254,7 @@ function renderMatchesProgress() {
     }
   } else {
     // Todos os dias: o que falta no total + previsao de cada dia
-    const perDay=days.map(day=>({day,s:summarize(matches.filter(m=>(day.draws||[]).includes(m.drawName)),day)}));
+    const perDay=days.map(day=>({day,s:summarize(matches.filter(m=>getMatchDay(m)?.date===day.date),day)}));
     // Uma linha por dia (o total sozinho confundia: somava os 2 dias)
     const leftRows=perDay.map(({day,s:ds})=>`<div><span>${esc(dayLabel(day))}</span><strong>${ds.remaining?`${ds.remaining} jogo${ds.remaining>1?'s':''} · ~${dur(ds.remainingMin)}`:ds.total?'encerrado':'-'}</strong></div>`).join('');
     h+=tile('yellow','&#9203;','Restante',`<div class="mp-days">${leftRows}</div>`,s.remaining?`${s.remaining} jogo${s.remaining>1?'s':''} no total`:'tudo finalizado');
@@ -285,18 +281,12 @@ function filterMatches() {
     const q=normSearch(document.getElementById('search-matches')?.value||'');
     const st=document.getElementById('match-status-filter')?.value||'';
     const dayVal=document.getElementById('match-day-filter')?.value||'';
-    // Build set of draw names for selected day
-    let dayDraws=null;
-    if(dayVal&&tournament?.daySchedule){
-      const day=tournament.daySchedule.find(d=>d.date===dayVal);
-      if(day)dayDraws=new Set(day.draws||[]);
-    }
     // Primeiro: filtrar jogos normais
     const visibleTimes = new Set();
     document.querySelectorAll('#matches-table-body tr:not(.court-free-row)').forEach(r=>{
       const matchQ=!q||(r.dataset.search??normSearch(r.textContent)).includes(q);
       const matchSt=!st||(r.dataset.status||'')===st;
-      const matchDay=!dayDraws||(dayDraws.has(r.dataset.draw||''));
+      const matchDay=!dayVal||(r.dataset.day||'')===dayVal; // dia do JOGO (rodadas por dia)
       const visible = matchQ&&matchSt&&matchDay;
       r.style.display=visible?'':'none';
       // Rastrear horarios visiveis para mostrar/esconder quadras livres
@@ -307,7 +297,7 @@ function filterMatches() {
     });
     // Segundo: mostrar/esconder quadras livres baseado no filtro de dia
     document.querySelectorAll('#matches-table-body tr.court-free-row').forEach(r=>{
-      const matchDay = !dayDraws || (dayDraws.has(r.dataset.draw||''));
+      const matchDay = !dayVal || (r.dataset.day||'') === dayVal;
       r.style.display = matchDay ? '' : 'none';
     });
     // Painel de progresso acompanha o dia escolhido

@@ -32,9 +32,10 @@ function renderSchedule() {
   let h='';
 
   if(hasDaySchedule){
-    // Agrupar matches por dia
+    // Agrupar matches pelo dia de CADA jogo (rodadas por dia; antes pela
+    // chave: 2 dias "Todas" repetiam todos os jogos nos 2 dias)
     tournament.daySchedule.forEach((day,dayIdx)=>{
-      const dayMatches=matches.filter(m=>day.draws?.includes(m.drawName));
+      const dayMatches=matches.filter(m=>getMatchDay(m)===day);
       if(!dayMatches.length)return;
       const dObj=new Date(day.date+'T00:00:00');
       const dayLabel=`Dia ${dayIdx+1} - ${String(dObj.getDate()).padStart(2,'0')}/${String(dObj.getMonth()+1).padStart(2,'0')}/${dObj.getFullYear()}`;
@@ -79,8 +80,7 @@ function renderSchedule() {
       if(!pausaRendered&&dayBs<end&&!day.noBreak)h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${day.breakStart||bS} - ${day.breakEnd||bE})</div>`;
     });
     // Matches sem dia atribuido
-    const assignedDraws=new Set();tournament.daySchedule.forEach(d=>(d.draws||[]).forEach(n=>assignedDraws.add(n)));
-    const unassigned=matches.filter(m=>!assignedDraws.has(m.drawName));
+    const unassigned=matches.filter(m=>!getMatchDay(m));
     if(unassigned.length){
       h+=`<div style="background:#334155;color:white;padding:12px 16px;border-radius:8px;margin:16px 0 8px;font-weight:700">Sem dia definido</div>`;
       unassigned.sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;}).forEach(m=>{h+=renderScheduleMatch(m);});
@@ -203,11 +203,12 @@ function renderDaySchedule(){
     if(modeDraws.length)h+=`<div style="margin-top:8px;font-size:12px;color:var(--fabd-gray-500)">Categorias: ${modeDraws.map(esc).join(', ')}</div>`;
     h+=`</div></div>`;
   });
-  container.innerHTML=h;
+  container.innerHTML=h+renderRoundDaysTable(days);
   // Listener: ao trocar radio, salvar estado atual e re-renderizar
   container.querySelectorAll('.ds-mode').forEach(r=>{
     r.addEventListener('change',()=>{
       tournament.daySchedule=collectDaySchedule();
+      tournament.roundDays=collectRoundDays();
       renderDaySchedule();
     });
   });
@@ -215,9 +216,44 @@ function renderDaySchedule(){
   container.querySelectorAll('.ds-no-break').forEach(c=>{
     c.addEventListener('change',()=>{
       tournament.daySchedule=collectDaySchedule();
+      tournament.roundDays=collectRoundDays();
       renderDaySchedule();
     });
   });
+}
+
+// Rodadas por dia, igual ao BTP (Weslley, 18/10/2026): 1 linha por chave
+// sorteada, 1 seletor por rodada ("Automatico" = o dia da modalidade, igual
+// antes). Grava tournament.roundDays[chave][fase] = data (scheduleDayOf).
+function renderRoundDaysTable(dates){
+  if(dates.length<2)return '';
+  const rd=tournament.roundDays||{};
+  const byDraw={};
+  (tournament.matches||[]).forEach(m=>{
+    const st=scheduleStageOf(m), r=(byDraw[m.drawName]=byDraw[m.drawName]||{});
+    if(!(st in r))r[st]=st===0?'Grupos':(m.roundName||`Rodada ${st}`);
+  });
+  const box='background:var(--fabd-gray-100);border-radius:8px;padding:16px;margin-bottom:12px';
+  const names=Object.keys(byDraw);
+  if(!names.length)return `<div style="${box};font-size:13px;color:var(--fabd-gray-500)">Rodadas por dia: sorteie as chaves pra escolher o dia de cada rodada.</div>`;
+  let h=`<div style="${box}"><h4 style="margin-bottom:4px;color:var(--fabd-blue)">Rodadas por dia</h4><div style="font-size:12px;color:var(--fabd-gray-500);margin-bottom:12px">Escolha em que dia vai cada rodada (igual ao BTP). "Automático" = o dia da modalidade ou, se uma rodada anterior foi escolhida, o dia dela.</div>`;
+  names.forEach(n=>{
+    h+=`<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #e5e7eb"><strong style="min-width:140px;font-size:13px">${esc(n)}</strong>`;
+    Object.keys(byDraw[n]).map(Number).sort((a,b)=>a-b).forEach(st=>{
+      const cur=(rd[n]||{})[st]||'';
+      h+=`<label style="font-size:12px;display:flex;align-items:center;gap:4px">${esc(byDraw[n][st])}<select class="form-control rd-select" data-draw="${esc(n)}" data-stage="${st}" style="width:auto;padding:2px 4px;font-size:12px"><option value="">Automático</option>${dates.map((d,i)=>`<option value="${d}"${cur===d?' selected':''}>Dia ${i+1}</option>`).join('')}</select></label>`;
+    });
+    h+=`</div>`;
+  });
+  return h+`</div>`;
+}
+
+function collectRoundDays(){
+  const out={};
+  document.querySelectorAll('#tc-day-schedule-container .rd-select').forEach(s=>{
+    if(s.value)(out[s.dataset.draw]=out[s.dataset.draw]||{})[s.dataset.stage]=s.value;
+  });
+  return out;
 }
 
 function collectDaySchedule(){
@@ -260,15 +296,9 @@ function ensureDayScheduleDraws() {
 
 function getMatchDay(match){
   if(!tournament?.daySchedule?.length)return null;
-  const dn=match.drawName||'';
-  const isSimples=dn.startsWith('SM ')||dn.startsWith('SF ');
-  const isDupla=dn.startsWith('DM ')||dn.startsWith('DF ')||dn.startsWith('DX ');
-  for(const day of tournament.daySchedule){
-    const mode=day.mode||'todas';
-    if(mode==='todas')return day;
-    if(mode==='simples'&&isSimples)return day;
-    if(mode==='duplas'&&isDupla)return day;
-  }
-  return null;
+  ensureDayScheduleDraws();
+  // Dia do JOGO (fases por dia; antes: pelo modo + prefixo, e 2 dias "todas" davam tudo no dia 1)
+  const i=scheduleDayOf(match,tournament.daySchedule,tournament.roundDays);
+  return i>=0?tournament.daySchedule[i]:null;
 }
 
