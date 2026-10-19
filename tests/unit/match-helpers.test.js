@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { loadModule } from './_loader.js';
 
-// match-helpers usa globals: getCatIdx, EVENT_ORDER_BTP, tournament
+// match-helpers usa globals: getCatIdx, EVENT_ORDER, tournament
 // Vou injetar mocks pra testes.
 function loadMatchHelpers(extraCtx = {}) {
   const baseCtx = {
@@ -11,7 +11,7 @@ function loadMatchHelpers(extraCtx = {}) {
       for (let i = 0; i < cats.length; i++) if (drawName.includes(cats[i])) return i;
       return cats.length;
     },
-    EVENT_ORDER_BTP: ['SM','SF','DM','DF','DX'],
+    EVENT_ORDER: ['SM','SF','DM','DF','DX'],
     tournament: null,
     ...extraCtx
   };
@@ -62,43 +62,43 @@ describe('_stableMatchId', () => {
   });
 });
 
-describe('sortMatchesByBTPOrder', () => {
+describe('sortMatchesByRoundOrder', () => {
   it('ordena por round primeiro', () => {
-    const { sortMatchesByBTPOrder } = loadMatchHelpers();
+    const { sortMatchesByRoundOrder } = loadMatchHelpers();
     const matches = [
       { round: 2, drawName: 'SM Principal', drawMatchIdx: 0 },
       { round: 1, drawName: 'SM Principal', drawMatchIdx: 0 }
     ];
-    const sorted = sortMatchesByBTPOrder(matches);
+    const sorted = sortMatchesByRoundOrder(matches);
     expect(sorted[0].round).toBe(1);
     expect(sorted[1].round).toBe(2);
   });
 
   it('ordena por categoria dentro do mesmo round (Sub 11 antes Master II)', () => {
-    const { sortMatchesByBTPOrder } = loadMatchHelpers();
+    const { sortMatchesByRoundOrder } = loadMatchHelpers();
     const matches = [
       { round: 1, drawName: 'SM Master II', drawMatchIdx: 0 },
       { round: 1, drawName: 'SM Sub 11', drawMatchIdx: 0 }
     ];
-    const sorted = sortMatchesByBTPOrder(matches);
+    const sorted = sortMatchesByRoundOrder(matches);
     expect(sorted[0].drawName).toBe('SM Sub 11');
   });
 
   it('ordena por modalidade SM antes SF', () => {
-    const { sortMatchesByBTPOrder } = loadMatchHelpers();
+    const { sortMatchesByRoundOrder } = loadMatchHelpers();
     const matches = [
       { round: 1, drawName: 'SF Sub 11', drawMatchIdx: 0 },
       { round: 1, drawName: 'SM Sub 11', drawMatchIdx: 0 }
     ];
-    const sorted = sortMatchesByBTPOrder(matches);
+    const sorted = sortMatchesByRoundOrder(matches);
     expect(sorted[0].drawName).toBe('SM Sub 11');
   });
 
   it('NAO muta array original', () => {
-    const { sortMatchesByBTPOrder } = loadMatchHelpers();
+    const { sortMatchesByRoundOrder } = loadMatchHelpers();
     const orig = [{ round: 2, drawName: 'A' }, { round: 1, drawName: 'A' }];
     const copy = [...orig];
-    sortMatchesByBTPOrder(orig);
+    sortMatchesByRoundOrder(orig);
     expect(orig).toEqual(copy);
   });
 });

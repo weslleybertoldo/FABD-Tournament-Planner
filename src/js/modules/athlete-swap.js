@@ -1,12 +1,12 @@
 // =====================================================================
-// Trocar atleta igual ao BTP ("Replace Partner" + trocar a linha da chave),
-// pedido do Weslley em 19/10/2026 ("como é feito no BTP?").
+// Trocar atleta (o parceiro da dupla ou o atleta da linha da chave),
+// pedido do Weslley em 19/10/2026.
 //
 // Numa inscricao (key = "SM Principal", "DF Sub 15"...) sai um atleta e entra
 // outro: na dupla troca so o parceiro escolhido, na simples o atleta. A
 // inscricao passa pra quem entra (com substituiu = nome de quem saiu) e o nome
 // da LINHA muda em TUDO: chave, cabecas, grupos, mata-mata, lista de Partidas
-// (inclusive jogos ja feitos, igual ao BTP) e o W.O. por desqualificacao.
+// (inclusive jogos ja feitos) e o W.O. por desqualificacao.
 //
 // O nome novo e IGUAL ao que o syncDrawsPlayers (app.js) monta — dupla na
 // ordem do players[] — senao o proximo sincronismo achava a chave diferente
@@ -15,7 +15,7 @@
 //
 // Bloqueios (swapProblems): jogo da linha em quadra; atleta da linha marcado
 // Ausente (o W.O. automatico tem que ser desfeito antes); quem entra com jogo
-// pendente no mesmo dia e horario de um jogo pendente da linha (texto do BTP).
+// pendente no mesmo dia e horario de um jogo pendente da linha.
 //
 // Usa isMatchDone (match-result.js). Cobertura: tests/unit/athlete-swap.test.js
 // =====================================================================

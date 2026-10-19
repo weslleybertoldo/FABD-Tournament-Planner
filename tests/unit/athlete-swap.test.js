@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { loadModule } from './_loader.js';
 
-// Trocar atleta igual ao BTP ("Replace Partner" + trocar a linha da chave):
+// Trocar atleta (o parceiro da dupla ou o atleta da linha da chave):
 // quem sai, quem entra, bloqueios e a troca em todos os lugares do torneio.
 const R = loadModule('src/js/modules/match-result.js');
 const S = loadModule('src/js/modules/athlete-swap.js', { isMatchDone: R.isMatchDone });
@@ -249,7 +249,7 @@ describe('swapProblems', () => {
     expect(p[0]).toMatch(/Tiago Costa/);
     expect(p[0]).toMatch(/Ausente/);
   });
-  it('quem entra com jogo pendente no mesmo dia e horario bloqueia (texto do BTP)', () => {
+  it('quem entra com jogo pendente no mesmo dia e horario bloqueia', () => {
     const { tournament, players } = torneio();
     tournament.matches.push({ num: 9, drawName: 'SF Sub 15', player1: 'Eva Prado', player2: 'Ana Lima', status: 'Pendente', time: '09:00' });
     tournament.matches[2].status = 'Pendente';

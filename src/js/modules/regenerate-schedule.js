@@ -176,8 +176,8 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
     newDrawMatches.push(match);
   });
 
-  // 5. Encaixar os jogos desta chave no dia de CADA jogo (rodadas por dia,
-  // igual ao BTP: semis e final podem ir pra outro dia). schedule-slots.js: a
+  // 5. Encaixar os jogos desta chave no dia de CADA jogo (rodadas por dia:
+  // semis e final podem ir pra outro dia). schedule-slots.js: a
   // quadra recebe jogo a cada duracao do jogo, o descanso e so do atleta e
   // atleta nunca fica em 2 jogos — sem horario que sirva, o jogo fica sem
   const _dur = tournament.matchDuration || 30;

@@ -1,6 +1,6 @@
 /* ============================================
    FABD Tournament Planner - Estilos v2.0
-   Baseado nas boas praticas do BTP original
+   Baseado nas boas praticas de planejamento de torneios
    ============================================ */
 
 :root {
@@ -775,7 +775,7 @@ select, textarea {
 }
 
 /* === SCORE INPUT === */
-/* Situacao do jogo na janela do Placar (W.O., desistencia... igual ao BTP) */
+/* Situacao do jogo na janela do Placar (W.O., desistencia...) */
 .sit-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 .sit-pill { padding: 6px 12px; border-radius: 8px; border: 2px solid #cbd5e1; background: #fff; color: #333; font-size: 13px; font-weight: 600; cursor: pointer; }
 .sit-pill.active { background: var(--fabd-blue); border-color: var(--fabd-blue); color: #fff; }
@@ -1057,3 +1057,22 @@ select, textarea {
 ::-webkit-scrollbar-track { background: var(--fabd-gray-100); }
 ::-webkit-scrollbar-thumb { background: var(--fabd-gray-400); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--fabd-gray-500); }
+
+/* Validar programacao (Agenda) */
+.sv-scroll{max-height:52vh;overflow:auto;border:1px solid var(--fabd-gray-200);border-radius:6px}
+.sv-table{width:100%;border-collapse:collapse;font-size:12px}
+.sv-table th{position:sticky;top:0;background:var(--fabd-gray-100);text-align:left;padding:6px 8px;font-size:11px;text-transform:uppercase;color:var(--fabd-gray-600);z-index:1}
+.sv-table td{padding:5px 8px;border-bottom:1px solid var(--fabd-gray-200);vertical-align:top}
+.sv-group td{font-weight:700;padding:6px 10px}
+.sv-regra td{background:#FEE2E2;color:#991B1B}
+.sv-extra td{background:#FEF3C7;color:#92400E}
+.sv-row{cursor:pointer}
+.sv-row:hover td{background:#F1F5F9}
+.sv-row.selected td{background:#DBEAFE}
+.sv-empty{text-align:center;padding:32px;color:#059669;font-weight:600}
+.sv-opt{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;margin:6px 0}
+.sv-hint{font-size:12px;color:var(--fabd-gray-600)}
+.sv-num{width:80px;display:inline-block;padding:2px 6px}
+.sv-time{width:110px;display:inline-block;padding:2px 6px}
+@keyframes sv-flash{0%,60%{background:#FDE68A}100%{background:transparent}}
+tr.sv-flash td{animation:sv-flash 2.6s ease-out}

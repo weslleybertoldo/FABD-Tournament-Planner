@@ -1,5 +1,5 @@
 // =====================================================================
-// Situacao do jogo (igual ao BTP) — funcoes puras, sem globals.
+// Situacao do jogo — funcoes puras, sem globals.
 //
 // status do jogo encerrado:
 //   'Finalizada'      jogo normal                       winner 1|2

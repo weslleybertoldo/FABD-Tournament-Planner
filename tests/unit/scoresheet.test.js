@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { loadModule } from './_loader.js';
 
-// Sumula em branco (igual ao BTP, Report > Scoresheets): A4 paisagem, 1 por
+// Sumula em branco: A4 paisagem, 1 por
 // folha, filtro de dia/quadra/horario, pula "A definir" e as ja impressas.
 // Modelo validado pelo Weslley em 18/10/2026 ("1-1-2").
 const S = loadModule('src/js/modules/scoresheet.js');
@@ -23,7 +23,7 @@ describe('scoresheetSelect (quais jogos ganham sumula em branco)', () => {
     expect(nums(S.scoresheetSelect(ms, base, ctx))).toEqual([1, 3]);
   });
 
-  it('pula jogo com atleta "A definir" (igual ao BTP: "Skip if not all players are known")', () => {
+  it('pula jogo com atleta "A definir"', () => {
     const ms = [jogo(1), jogo(2, { status: 'A definir', player1: '', player2: '' }), jogo(3, { isDefinida: false }), jogo(4, { player2: '' })];
     expect(nums(S.scoresheetSelect(ms, base, ctx))).toEqual([1]);
     expect(nums(S.scoresheetSelect(ms, { ...base, skipUnknown: false }, ctx))).toEqual([1, 2, 3, 4]);
@@ -34,7 +34,7 @@ describe('scoresheetSelect (quais jogos ganham sumula em branco)', () => {
     expect(nums(S.scoresheetSelect(ms, { ...base, skipUnknown: false }, ctx))).toEqual([2]);
   });
 
-  it('pula as ja impressas (igual ao BTP: "Skip if already printed")', () => {
+  it('pula as ja impressas', () => {
     const ms = [jogo(1, { scoresheetPrintedAt: '2026-10-18T10:00:00Z' }), jogo(2)];
     expect(nums(S.scoresheetSelect(ms, base, ctx))).toEqual([2]);
     expect(nums(S.scoresheetSelect(ms, { ...base, skipPrinted: false }, ctx))).toEqual([1, 2]);
