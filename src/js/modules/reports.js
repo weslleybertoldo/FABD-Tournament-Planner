@@ -327,34 +327,20 @@ function reportOOP(){
       const dObj=new Date(day.date+'T00:00:00');
       const dayLabel=`Dia ${idx+1} - ${String(dObj.getDate()).padStart(2,'0')}/${String(dObj.getMonth()+1).padStart(2,'0')}/${dObj.getFullYear()}`;
       const modLabel=modeLabels[day.mode||'todas']||'Todas';
-      // Filtrar matches deste dia pelo mode
-      const mode=day.mode||'todas';
-      const dayMatches=matches.filter(m=>{
-        const dn=m.drawName||'';
-        if(mode==='todas')return true;
-        if(mode==='simples')return dn.startsWith('SM ')||dn.startsWith('SF ');
-        if(mode==='duplas')return dn.startsWith('DM ')||dn.startsWith('DF ')||dn.startsWith('DX ');
-        return false;
-      });
+      // Jogos deste dia: o dia de CADA jogo (rodadas por dia; antes pelo modo,
+      // e 2 dias "Todas" repetiam todos os jogos nos 2 dias)
+      const dayMatches=matches.filter(m=>getMatchDay(m)===day);
       if(!dayMatches.length)return;
       const sorted=[...dayMatches].sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;});
       h+=`<div class="cat-title" style="margin-top:${idx?'24':'0'}px">${dayLabel} - ${modLabel}</div>`;
       h+=renderMatchTable(sorted);
     });
     // Matches sem dia
-    const assignedModes=tournament.daySchedule.map(d=>d.mode||'todas');
-    if(!assignedModes.includes('todas')){
-      const unassigned=matches.filter(m=>{
-        const dn=m.drawName||'';
-        const isSimples=dn.startsWith('SM ')||dn.startsWith('SF ');
-        const isDupla=dn.startsWith('DM ')||dn.startsWith('DF ')||dn.startsWith('DX ');
-        return !(assignedModes.includes('simples')&&isSimples)&&!(assignedModes.includes('duplas')&&isDupla);
-      });
-      if(unassigned.length){
-        const sorted=[...unassigned].sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;});
-        h+=`<div class="cat-title" style="margin-top:24px">Sem dia definido</div>`;
-        h+=renderMatchTable(sorted);
-      }
+    const unassigned=matches.filter(m=>!getMatchDay(m));
+    if(unassigned.length){
+      const sorted=[...unassigned].sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;});
+      h+=`<div class="cat-title" style="margin-top:24px">Sem dia definido</div>`;
+      h+=renderMatchTable(sorted);
     }
   } else {
     // Sem programacao: lista unica
