@@ -2238,15 +2238,18 @@ function assignAutoTimes(matches) {
 // retorno do assignAutoTimes do mesmo dia; `placed` = os jogos dele.
 function assignToDefineTimes(placed, adefs, sched) {
   [...adefs].sort((a, b) => scheduleStageOf(a) - scheduleStageOf(b)).forEach(m => {
-    const before = [...placed, ...adefs]
-      .filter(x => x.drawName === m.drawName && x.time && scheduleStageOf(x) < scheduleStageOf(m))
-      .map(x => timeToMin(x.time));
-    if (!before.length) {
-      // Fase anterior em OUTRO dia (fases por dia): comeca no inicio deste dia
-      const antes = (tournament.matches || []).some(x => x.drawName === m.drawName && scheduleStageOf(x) < scheduleStageOf(m));
-      if (!antes || !sched.slots.length) return;
+    const prevOf = list => list.filter(x => x.drawName === m.drawName && scheduleStageOf(x) < scheduleStageOf(m));
+    const here = prevOf([...placed, ...adefs]);
+    const before = here.filter(x => x.time).map(x => timeToMin(x.time));
+    if (!here.length) {
+      // Fase anterior toda em dia ANTERIOR (rodadas por dia): comeca no inicio
+      // deste dia; em dia posterior (escolha invertida): fica sem horario
+      const days = tournament.daySchedule || [], rd = tournament.roundDays, dm = scheduleDayOf(m, days, rd);
+      const prev = prevOf(tournament.matches || []);
+      if (!prev.length || prev.some(x => scheduleDayOf(x, days, rd) > dm) || !sched.slots.length) return;
       before.push(sched.slots[0] - (tournament.matchDuration || 30));
     }
+    if (!before.length) return;
     const ps = schedulePossibleAthletes(m, (tournament.draws || []).find(d => d.name === m.drawName));
     const si = schedulePlaceToDefine(sched.book, sched.slots, ps, Math.max(...before), scheduleRole(m));
     if (si < 0) return;
