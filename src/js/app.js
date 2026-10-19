@@ -2527,7 +2527,8 @@ async function handleRealtimeScoreUpdate(data){
       if(matchNum)m=tournament.matches.find(x=>x.num===matchNum);
     }
     if(!m)return;
-    const _isFinalUpdate = !!(data.winner && data.final_score);
+    // Final do arbitro: vencedor + final_score; o Sem jogo vem sem vencedor
+    const _isFinalUpdate = isFinalScoreUpdate(data);
     // Deduplicacao: ignorar updates com timestamp igual ou anterior ao ultimo processado
     // — menos o resultado final: o arbitro grava o ultimo ponto e o resultado quase
     // juntos e o ponto pode chegar com a hora mais nova. O final era descartado como
@@ -2537,8 +2538,10 @@ async function handleRealtimeScoreUpdate(data){
     const updateTs = data.updated_at;
     if (!_isFinalUpdate && lastScoreUpdateTimestamp[updateKey] && lastScoreUpdateTimestamp[updateKey] >= updateTs) return;
     lastScoreUpdateTimestamp[updateKey] = updateTs;
-    // Se jogo ja foi finalizado localmente, ignorar
-    if(m.status==='Finalizada'||m.status==='WO')return;
+    // Se jogo ja foi encerrado localmente, ignorar — inclusive desistencia e
+    // desqualificacao: o eco do proprio envio do Planner voltava pelo tempo
+    // real e regravava como 'Finalizada' (achado de 18/10/2026)
+    if(isMatchDone(m))return;
     // Se arbitro finalizou (winner+final_score), aceita independente do status local —
     // cobre caso onde organizador nao marcou "Em Quadra" no Planner mas o referee
     // pegou e finalizou direto. Antes desse fix, finalizacao ficava presa local.
@@ -2553,11 +2556,14 @@ async function handleRealtimeScoreUpdate(data){
     // Atualizar arbitro em tempo real
     if(data.umpire_name)m.umpire=data.umpire_name;
 
-    // Se arbitro finalizou o jogo (winner definido)
-    if(data.winner&&data.final_score){
-      m.score=data.final_score;
-      m.status='Finalizada';
-      m.winner=data.winner;
+    // Se arbitro encerrou o jogo: a situacao (W.O., desistencia,
+    // desqualificacao, Sem jogo) vem no texto do final_score (match-result.js)
+    if(_isFinalUpdate){
+      const fin=parseFinalScore(data.final_score);
+      m.score=fin.score;
+      m.status=fin.status;
+      m.winner=fin.status==='SemJogo'?0:data.winner;
+      if(fin.atestado)m.atestado=true;else delete m.atestado;
       // Hora em que o arbitro finalizou: no tempo real e agora; na recuperacao
       // ao abrir e no reconcile e a hora de verdade, nao a da leitura
       const finAt=data.updated_at?new Date(data.updated_at):null;
@@ -2574,7 +2580,8 @@ async function handleRealtimeScoreUpdate(data){
       _registerEmQuadraIds();
       if(!(tournament.matches||[]).some(x=>x.status==='Em Quadra')){window.api.supabaseUnsubscribe();console.log('Realtime desativado (nenhum jogo em quadra)');}
       // Supabase ja sincronizado acima, apenas log
-      showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${m.score}`);
+      if(m.status==='Desqualificacao')applyDisqualificationElsewhere(m);
+      showToast(`Jogo #${m.num} finalizado pelo arbitro! ${m.player1} vs ${m.player2}: ${resultText(m)}`);
     }
 
     // Coalesce + defer-when-typing: nao re-renderiza durante digitacao
@@ -2740,12 +2747,30 @@ async function setMatchTime(idx, value) {
   showToast(value ? `Jogo #${m.num} agora às ${value}.` : `Jogo #${m.num} ficou sem horário.`);
 }
 
+// Situacao do jogo na janela do Placar (igual ao BTP): Normal, W.O.,
+// Desistencia e Desqualificacao (com placar parcial) e Ambos ausentes
+const _SIT_HELP={
+  Finalizada:'',
+  WO:'Quem não veio perde sem placar. Escolha como vencedor quem veio.',
+  Desistencia:'Lance o placar até a desistência (o último game pode ficar pela metade). Vencedor = quem ficou.',
+  Desqualificacao:'Lance o placar até a desqualificação. Vencedor = o outro lado. O desqualificado sai das outras categorias.',
+  SemJogo:'Os dois não vieram: ninguém avança e ninguém pontua.'
+};
+function setScoreSituacao(st){
+  document.getElementById('score-status').value=st;
+  document.querySelectorAll('#score-situacao .sit-pill').forEach(b=>b.classList.toggle('active',b.dataset.sit===st));
+  document.getElementById('score-situacao-help').textContent=_SIT_HELP[st]||'';
+  document.getElementById('score-sets-container').style.display=(st==='WO'||st==='SemJogo')?'none':'';
+  document.getElementById('score-winner-group').style.display=st==='SemJogo'?'none':'';
+  document.getElementById('score-atestado-group').style.display=st==='WO'?'':'none';
+  if(st!=='WO')document.getElementById('score-atestado').checked=false;
+}
+
 function showScoreModal(idx) {
   const m=tournament.matches[idx];if(!m)return;scoringMatchIdx=idx;
   document.getElementById('score-p1').textContent=m.player1;
   document.getElementById('score-p2').textContent=m.player2;
   document.getElementById('score-winner').value='';
-  document.getElementById('score-status').value='Finalizada';
   const sets=tournament?.scoring?.sets||3;
   // Atualizar select de vencedor com nomes dos jogadores
   const wSel=document.getElementById('score-winner');
@@ -2755,37 +2780,50 @@ function showScoreModal(idx) {
   for(let s=1;s<=sets;s++){
     h+=`<div class="score-row"><div class="score-cell"><input type="number" id="set-${s}-p1" min="0" max="30" value="" placeholder="0" data-action="autoDetectWinner" data-event="change input"></div><div class="score-cell-label">SET ${s}</div><div class="score-cell"><input type="number" id="set-${s}-p2" min="0" max="30" value="" placeholder="0" data-action="autoDetectWinner" data-event="change input"></div></div>`;
   }
-  c.innerHTML=h;openModal('modal-score');
+  c.innerHTML=h;setScoreSituacao('Finalizada');openModal('modal-score');
 }
 
 async function saveScore() {
   try{
     const m=tournament.matches[scoringMatchIdx];if(!m)return;
-    const status=document.getElementById('score-status').value,winner=document.getElementById('score-winner').value;
-    if(status==='WO'||status==='Desqualificacao'){if(!winner){alert('Selecione vencedor');return;}m.score=status==='WO'?'W.O.':'DSQ';m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();propagateResultToDraws(m);await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);try{await window.api.supabaseFinalizeMatch(tournament.id,m,{winner:m.winner,final_score:m.score,umpire_name:m.umpire||''});}catch(e){console.warn('finalizeMatch:',e);}_registerEmQuadraIds();if(!(tournament.matches||[]).some(x=>x.status==='Em Quadra')){window.api.supabaseUnsubscribe();console.log('Realtime desativado');}closeModal('modal-score');renderMatches();showToast('Resultado registrado');return;}
-    if(!winner){alert('Selecione vencedor');return;}
+    const status=document.getElementById('score-status').value||'Finalizada';
     const numSets=tournament?.scoring?.sets||3,pts=tournament?.scoring?.points||21,maxP=tournament?.scoring?.maxPoints||30;
-    let scores=[];
-    for(let s=1;s<=numSets;s++){const p1=parseInt(document.getElementById(`set-${s}-p1`)?.value),p2=parseInt(document.getElementById(`set-${s}-p2`)?.value);if(isNaN(p1)||isNaN(p2))continue;const v=validateBadmintonSet(p1,p2,pts,maxP);if(!v.valid){alert(`Set ${s}: ${v.error}`);return;}scores.push(`${p1}-${p2}`);}
-    if(!scores.length&&status!=='Desistencia'){alert('Insira placar');return;}
-    m.score=scores.join(' / ')||(status==='Desistencia'?'RET':'');m.status=status;m.winner=parseInt(winner);m.finishedAt=new Date().toISOString();
+    // W.O. e Sem jogo nao tem placar; desistencia/desqualificacao guardam o parcial
+    const sets=[];
+    if(status!=='WO'&&status!=='SemJogo'){
+      for(let s=1;s<=numSets;s++){const p1=parseInt(document.getElementById(`set-${s}-p1`)?.value),p2=parseInt(document.getElementById(`set-${s}-p2`)?.value);if(isNaN(p1)||isNaN(p2))continue;sets.push([p1,p2]);}
+    }
+    const winner=status==='SemJogo'?0:(parseInt(document.getElementById('score-winner').value)||0);
+    if(status!=='SemJogo'&&!winner){alert('Selecione vencedor');return;}
+    if(status==='Finalizada'){
+      for(let i=0;i<sets.length;i++){const v=validateBadmintonSet(sets[i][0],sets[i][1],pts,maxP);if(!v.valid){alert(`Set ${i+1}: ${v.error}`);return;}}
+      if(!sets.length){alert('Insira placar');return;}
+    }else if(status==='Desistencia'||status==='Desqualificacao'){
+      const v=validatePartialSets(sets,pts,maxP);if(!v.valid){alert(v.error);return;}
+    }
+    m.status=status;m.winner=winner;m.finishedAt=new Date().toISOString();
+    m.score=status==='WO'?'W.O.':sets.map(([a,b])=>`${a}-${b}`).join(' / ');
+    if(status==='WO'&&document.getElementById('score-atestado').checked)m.atestado=true;else delete m.atestado;
+    delete m.porDesq;
     propagateResultToDraws(m);
+    if(status==='Desqualificacao')applyDisqualificationElsewhere(m);
     await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
-    // Sincroniza Supabase: live_matches.status='Finalizada' + live_scores.winner — site Ao Vivo e Referee param de mostrar
+    // Sincroniza Supabase: live_matches.status='Finalizada' + live_scores (o
+    // final_score leva a situacao, igual ao arbitro) — site Ao Vivo e Referee param de mostrar
     try {
-      const setsP1=[],setsP2=[];let setsWonP1=0,setsWonP2=0;
-      for(const sc of scores){const [a,b]=sc.split('-').map(n=>parseInt(n));setsP1.push(isNaN(a)?0:a);setsP2.push(isNaN(b)?0:b);if(!isNaN(a)&&!isNaN(b)){if(a>b)setsWonP1++;else if(b>a)setsWonP2++;}}
-      const last=scores.length?scores[scores.length-1].split('-').map(n=>parseInt(n)):[0,0];
+      const closed=([a,b])=>{const hi=Math.max(a,b),lo=Math.min(a,b);return (hi>=pts&&hi-lo>=2)||hi===maxP;};
+      const last=sets[sets.length-1]||[0,0];
       await window.api.supabaseFinalizeMatch(tournament.id,m,{
-        winner:m.winner,final_score:m.score,umpire_name:m.umpire||'',
-        current_set:scores.length||1,score_p1:last[0]||0,score_p2:last[1]||0,
-        sets_p1:setsP1,sets_p2:setsP2,sets_won_p1:setsWonP1,sets_won_p2:setsWonP2,
+        winner:m.winner,final_score:resultText(m),umpire_name:m.umpire||'',
+        current_set:sets.length||1,score_p1:last[0],score_p2:last[1],
+        sets_p1:sets.map(x=>x[0]),sets_p2:sets.map(x=>x[1]),
+        sets_won_p1:sets.filter(x=>closed(x)&&x[0]>x[1]).length,sets_won_p2:sets.filter(x=>closed(x)&&x[1]>x[0]).length,
       });
     } catch(e) { console.warn('finalizeMatch:',e); }
     // Desativar Realtime se nao tem mais jogos em quadra
     _registerEmQuadraIds(); // v3.97
     if(!(tournament.matches||[]).some(x=>x.status==='Em Quadra')){window.api.supabaseUnsubscribe();console.log('Realtime desativado (nenhum jogo em quadra)');}
-    closeModal('modal-score');renderMatches();showToast('Placar salvo!');
+    closeModal('modal-score');renderMatches();showToast(status==='Finalizada'?'Placar salvo!':`Resultado registrado: ${resultText(m)}`);
   }catch(e){console.error(e);showToast('Erro: '+e.message,'error');}
 }
 
@@ -2793,7 +2831,7 @@ async function saveScore() {
 // O vencedor nao muda por aqui: trocar o vencedor mexe em quem avancou na
 // chave, e isso continua pelo desfazer (↻) + placar novo.
 let editingMatchIdx=null;
-const _isSpecialScore=m=>!m.score||m.score==='W.O.'||m.score==='DSQ'||m.score==='RET';
+const _isSpecialScore=m=>!matchSetsText(m)||m.status==='WO'||m.status==='SemJogo';
 function showEditFinishedModal(idx){
   const m=tournament?.matches?.[idx];if(!m)return;editingMatchIdx=idx;
   document.getElementById('edit-p1').textContent=m.player1Display||m.player1||'';
@@ -2810,7 +2848,7 @@ function showEditFinishedModal(idx){
   }
   document.getElementById('edit-sets-container').innerHTML=h;
   document.getElementById('edit-sets-note').textContent=special
-    ?`Placar ${m.score||'-'}: aqui da pra trocar so a quadra e o arbitro.`
+    ?`${resultText(m)||'-'}: aqui da pra trocar so a quadra e o arbitro.`
     :'O vencedor nao muda por aqui. Pra trocar o vencedor, use o desfazer (↻) e lance o placar de novo.';
   document.getElementById('edit-court').innerHTML=`<option value="">-</option>${getCourtOptions(m.court)}`;
   document.getElementById('edit-umpire').innerHTML=`<option value="">-</option>${getUmpireOptions(m.umpire)}`;
@@ -2832,6 +2870,7 @@ async function saveEditFinished(){
         scores.push(`${p1}-${p2}`);if(p1>p2)w1++;else if(p2>p1)w2++;
       }
       if(!scores.length){alert('Insira placar');return;}
+      if((m.status==='Desistencia'||m.status==='Desqualificacao')&&!validatePartialSets(scores.map(x=>x.split('-').map(Number)),pts,maxP).valid){alert('So o ultimo game pode ficar pela metade');return;}
       if(m.status==='Finalizada'){
         const newWinner=w1>w2?1:w2>w1?2:0;
         if(!newWinner){alert('O placar precisa ter um vencedor.');return;}
@@ -2849,7 +2888,7 @@ async function saveEditFinished(){
         const setsP1=[],setsP2=[];let setsWonP1=0,setsWonP2=0;
         for(const sc of scores){const [a,b]=sc.split('-').map(n=>parseInt(n));setsP1.push(a);setsP2.push(b);if(a>b)setsWonP1++;else if(b>a)setsWonP2++;}
         const last=scores[scores.length-1].split('-').map(n=>parseInt(n));
-        await window.api.supabaseFinalizeMatch(tournament.id,m,{winner:m.winner,final_score:m.score,umpire_name:m.umpire||'',current_set:scores.length,score_p1:last[0]||0,score_p2:last[1]||0,sets_p1:setsP1,sets_p2:setsP2,sets_won_p1:setsWonP1,sets_won_p2:setsWonP2});
+        await window.api.supabaseFinalizeMatch(tournament.id,m,{winner:m.winner,final_score:resultText(m),umpire_name:m.umpire||'',current_set:scores.length,score_p1:last[0]||0,score_p2:last[1]||0,sets_p1:setsP1,sets_p2:setsP2,sets_won_p1:setsWonP1,sets_won_p2:setsWonP2});
       }catch(e){console.warn('finalizeMatch (edicao):',e);}
     }
     closeModal('modal-edit-finished');renderFinishedMatches();renderMatches();showToast('Jogo atualizado');
@@ -2879,7 +2918,7 @@ async function resetMatch(idx){
   if(!confirm(`Desfazer resultado do jogo #${m.num}?`))return;
   // Reverter avanço na draw antes de limpar o winner
   reverseResultInDraws(m);
-  m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;m.liveScore='';m.liveSets=[];
+  m.score='';m.status='Pendente';m.winner=undefined;m.court='';m.startedAt=undefined;m.finishedAt=undefined;m.liveScore='';m.liveSets=[];delete m.atestado;delete m.porDesq;
   // Renderizar primeiro (UI responsiva), salvar depois
   renderMatches();renderFinishedMatches();showToast('Jogo resetado');
   await window.api.saveTournament(tournament);
@@ -3833,11 +3872,14 @@ function computeRoundRobinRanking(d){
   if(!d.players?.length)return null;
   // Compute stats for each player
   const stats={};
+  // Quem nao completou (W.O., desistencia...) nao conta e vai por ultimo (BWF 16.2.5)
+  const out=groupWithdrawnPlayers(d.matches);
   d.players.forEach(p=>{stats[p]={name:p,wins:0,losses:0,ptsFor:0,ptsAgainst:0,headToHead:{}};});
   (d.matches||[]).forEach(m=>{
     if(m.winner===undefined)return;
     const p1=m.player1,p2=m.player2;
     if(!stats[p1]||!stats[p2])return;
+    if(out.has(p1)||out.has(p2))return;
     // Parse scores for point difference
     let p1Pts=0,p2Pts=0;
     if(m.score1&&m.score2&&m.score1!=='W.O.'&&m.score2!=='W.O.'){
@@ -3861,6 +3903,8 @@ function computeRoundRobinRanking(d){
   // Ordenar: 1) mais vitorias, 2) diferenca de pontos, 3) mais pontos marcados, 4) confronto direto
   const arr=Object.values(stats);
   arr.sort((a,b)=>{
+    // 0. Quem nao completou vai por ultimo
+    if(out.has(a.name)!==out.has(b.name))return out.has(a.name)?1:-1;
     // 1. Mais vitorias
     if(b.wins!==a.wins)return b.wins-a.wins;
     // 2. Diferenca de pontos

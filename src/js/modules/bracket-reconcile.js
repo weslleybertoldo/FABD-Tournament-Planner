@@ -273,7 +273,17 @@ function repropagateAllResults(){
         } else if(dm.winner&&(!tm.winner||tm.status==='Pendente')){
           // draw → tournament.match (draw tem resultado mas tournament nao)
           const s1=dm.score1||'',s2=dm.score2||'';
-          if(s1||s2){
+          // Situacao (W.O., desistencia...) volta da chave com o placar parcial
+          const st=typeof drawMatchStatus==='function'?drawMatchStatus(dm):'';
+          if(st&&st!=='Finalizada'){
+            const num=x=>String(x||'').split(' ').filter(v=>/^\d+$/.test(v));
+            const p1=num(s1),p2=num(s2);
+            tm.status=st;tm.winner=dm.winner;
+            tm.score=st==='WO'?'W.O.':p1.map((v,idx)=>v+'-'+(p2[idx]||'0')).join(' / ');
+            if(dm.atestado)tm.atestado=true;if(dm.porDesq)tm.porDesq=true;
+            tm.finishedAt=tm.finishedAt||new Date().toISOString();
+            changed=true;
+          } else if(s1||s2){
             // Converter scores da draw para formato de placar
             const s1Parts=String(s1).split(' ').filter(x=>x);
             const s2Parts=String(s2).split(' ').filter(x=>x);
@@ -302,6 +312,16 @@ function repropagateAllResults(){
         // BYE: avançar automaticamente
         if(dm.player2==='BYE'&&dm.player1&&!dm.advancer){dm.winner=1;dm.advancer=dm.player1;changed=true;}
         if(dm.player1==='BYE'&&dm.player2&&!dm.advancer){dm.winner=2;dm.advancer=dm.player2;changed=true;}
+        // BYE que chegou depois do sorteio (Sem jogo na fase anterior): o jogo
+        // da lista fecha como W.O. pra quem esta la — ninguem perde ponto
+        if(dm.advancer&&dm.advancer!=='BYE'&&(dm.player1==='BYE')!==(dm.player2==='BYE')){
+          const btm=findTournamentMatch(d.name,entry.globalIdx,dm);
+          if(btm&&(btm.player1==='BYE'||btm.player2==='BYE')&&!['Finalizada','WO','Desistencia','Desqualificacao','SemJogo'].includes(btm.status)){
+            btm.status='WO';btm.score='W.O.';btm.winner=dm.winner;btm.finishedAt=btm.finishedAt||new Date().toISOString();
+            dm.status='WO';dm.score1=dm.winner===2?'W.O.':'';dm.score2=dm.winner===1?'W.O.':'';
+            changed=true;
+          }
+        }
 
         // Buscar resultado em tournament.matches se draw nao tem
         if(!dm.winner){

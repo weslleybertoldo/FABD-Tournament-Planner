@@ -12,7 +12,7 @@
 // Cobertura: tests/unit/live-history.test.js
 // =====================================================================
 
-const LIVE_HISTORY_DONE = ['Finalizada', 'WO', 'Desistencia', 'Desqualificacao'];
+const LIVE_HISTORY_DONE = ['Finalizada', 'WO', 'Desistencia', 'Desqualificacao', 'SemJogo'];
 
 // Linha de live_scores no mesmo formato do arbitro/finalizeMatch.
 // "21-15 / 15-21 / 21-18" -> sets_p1 [21,15,21], sets_p2 [15,21,18].
@@ -32,7 +32,8 @@ function liveHistoryScore(m) {
     sets_won_p1: sets.filter(([a, b]) => a > b).length,
     sets_won_p2: sets.filter(([a, b]) => b > a).length,
     winner: m.winner,
-    final_score: m.score || '',
+    // a situacao (W.O., Desist., Desq., Sem jogo) vai no texto, igual ao arbitro
+    final_score: (typeof resultText === 'function' ? resultText(m) : m.score) || '',
     umpire_name: m.umpire || ''
   };
 }
@@ -43,6 +44,6 @@ function liveHistoryScore(m) {
 function planLiveHistory(matches, liveMatches, idOf) {
   const onSite = new Set((liveMatches || []).map(lm => lm.id));
   return (matches || [])
-    .filter(m => LIVE_HISTORY_DONE.includes(m.status) && m.startedAt && m.winner && !onSite.has(idOf(m)))
+    .filter(m => LIVE_HISTORY_DONE.includes(m.status) && m.startedAt && (m.winner || m.status === 'SemJogo') && !onSite.has(idOf(m)))
     .map(m => ({ match: m, score: liveHistoryScore(m) }));
 }

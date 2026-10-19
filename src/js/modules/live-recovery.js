@@ -13,7 +13,7 @@
 // Cobertura: tests/unit/live-recovery.test.js
 // =====================================================================
 
-const LIVE_RECOVERY_DONE = ['Finalizada', 'WO', 'Desistencia', 'Desqualificacao'];
+const LIVE_RECOVERY_DONE = ['Finalizada', 'WO', 'Desistencia', 'Desqualificacao', 'SemJogo'];
 
 // matches: tournament.matches · liveMatches: linhas de live_matches do torneio
 // liveScores: linhas de live_scores · idOf(m): id estavel do jogo local
@@ -26,7 +26,8 @@ function planLiveRecovery(matches, liveMatches, liveScores, idOf) {
   (liveScores || []).forEach(s => {
     const m = byId.get(s.match_id);
     if (!m || LIVE_RECOVERY_DONE.includes(m.status)) return;
-    if (!s.winner || !s.final_score) return;
+    // final = vencedor + final_score; o "Sem jogo" (ambos ausentes) vem sem vencedor
+    if (!s.final_score || (!s.winner && !/^sem jogo$/i.test(String(s.final_score).trim()))) return;
     finals.push(s);
     finalIds.add(s.match_id);
   });

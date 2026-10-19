@@ -767,13 +767,24 @@
           <span style="color:var(--fabd-gray-500);margin:0 12px">vs</span>
           <strong id="score-p2" style="color:var(--fabd-red);font-size:16px"></strong>
         </div>
+        <div class="form-group" style="margin-bottom:12px"><label>Situação</label>
+          <div class="sit-pills" id="score-situacao">
+            <button type="button" class="sit-pill" data-sit="Finalizada" data-action="setScoreSituacao" data-arg-1="Finalizada">Normal</button>
+            <button type="button" class="sit-pill" data-sit="WO" data-action="setScoreSituacao" data-arg-1="WO">W.O.</button>
+            <button type="button" class="sit-pill" data-sit="Desistencia" data-action="setScoreSituacao" data-arg-1="Desistencia">Desistência</button>
+            <button type="button" class="sit-pill" data-sit="Desqualificacao" data-action="setScoreSituacao" data-arg-1="Desqualificacao">Desqualificação</button>
+            <button type="button" class="sit-pill" data-sit="SemJogo" data-action="setScoreSituacao" data-arg-1="SemJogo">Ambos ausentes</button>
+          </div>
+          <input type="hidden" id="score-status" value="Finalizada">
+          <p class="sit-help" id="score-situacao-help"></p>
+        </div>
         <div class="score-sets" id="score-sets-container"></div>
         <div class="form-row" style="margin-top:16px">
-          <div class="form-group"><label>Vencedor</label>
+          <div class="form-group" id="score-winner-group"><label id="score-winner-label">Vencedor</label>
             <select class="form-control" id="score-winner"><option value="">Selecione...</option><option value="1">Jogador 1</option><option value="2">Jogador 2</option></select>
           </div>
-          <div class="form-group"><label>Status</label>
-            <select class="form-control" id="score-status"><option value="Finalizada">Finalizada</option><option value="WO">W.O.</option><option value="Desistencia">Desistencia</option></select>
+          <div class="form-group" id="score-atestado-group" style="display:none"><label>&nbsp;</label>
+            <label class="sit-check"><input type="checkbox" id="score-atestado"> Com atestado médico (pontua a rodada)</label>
           </div>
         </div>
       </div>
@@ -1092,6 +1103,7 @@
 
   <!-- Modules: funcoes puras extraidas de app.js (issue #14, modular incremental) -->
   <script src="js/modules/match-helpers.js"></script>
+  <script src="js/modules/match-result.js"></script>
   <script src="js/modules/bracket-roundrobin-groups.js"></script>
   <script src="js/modules/bracket-best-thirds.js"></script>
   <script src="js/modules/bracket-elim.js"></script>

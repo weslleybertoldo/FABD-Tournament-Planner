@@ -102,3 +102,67 @@ describe('buildRankingExportRows', () => {
     expect(r2[10]).toBe('Era 2o na chave');
   });
 });
+
+// Regras do W.O. escolhidas pelo Weslley em 18/10/2026 (CBBd 9.6.1.4)
+describe('pontos com W.O. (classificacao e ranking exportado)', () => {
+  const R = loadModule('src/js/modules/match-result.js');
+  const G = loadModule('src/js/modules/bracket-roundrobin-groups.js');
+  function loadWith(draws) {
+    return loadModule('src/js/modules/reports.js', {
+      tournament: { ...tournament, draws }, players,
+      getCurrentScoringTable: () => scoringTable,
+      pointsForPosition: mockPointsForPosition,
+      lostByUnjustifiedWO: R.lostByUnjustifiedWO,
+      groupWithdrawnPlayers: G.groupWithdrawnPlayers,
+      _normalizeClubKey: (s) => String(s || '').toLowerCase().trim().replace(/\s+/g, ' '),
+      _isInvalidClubName: (s) => !s,
+      esc: (s) => String(s ?? ''), fmtDate: (s) => String(s ?? ''),
+      showToast: () => {}, window: { api: {} },
+    });
+  }
+  const elim = (woExtra = {}) => ({
+    name: 'SM Sub 15', event: 'SM', type: 'Eliminatoria',
+    players: ['Ana Alves', 'Bia Braga', 'Caio Costa', 'Davi Dias'],
+    matches: [
+      { round: 1, player1: 'Ana Alves', player2: 'Bia Braga', winner: 1, score1: '', score2: 'W.O.', status: 'WO', ...woExtra },
+      { round: 1, player1: 'Caio Costa', player2: 'Davi Dias', winner: 1, score1: '21 21', score2: '3 4', status: 'Finalizada' },
+      { round: 2, player1: 'Ana Alves', player2: 'Caio Costa', winner: 1, score1: '21 21', score2: '19 19', status: 'Finalizada' },
+    ],
+  });
+  const ptsOf = (rows, name) => rows.find(r => r[5] === name)[9];
+
+  it('quem deu W.O. sem atestado fica com 0; quem perdeu jogando pontua a rodada', () => {
+    const rows = loadWith([elim()]).buildRankingExportRows(false);
+    expect(ptsOf(rows, 'Bia Braga')).toBe(0);
+    expect(rows.find(r => r[5] === 'Bia Braga')[10]).toBe('W.O.');
+    expect(ptsOf(rows, 'Davi Dias')).toBe(700);
+    expect(ptsOf(rows, 'Ana Alves')).toBe(1000);
+  });
+
+  it('W.O. com atestado pontua a rodada, como derrota', () => {
+    const rows = loadWith([elim({ atestado: true })]).buildRankingExportRows(false);
+    expect(ptsOf(rows, 'Bia Braga')).toBe(700);
+  });
+
+  it('ranking federados: o 0 do W.O. continua 0 depois de reordenar', () => {
+    const rows = loadWith([elim()]).buildRankingExportRows(true);
+    const bia = rows.find(r => r[5] === 'Bia Braga');
+    if (bia) expect(bia[9]).toBe(0);
+  });
+
+  it('todos contra todos: quem deu W.O. vai por ultimo e os jogos dele nao contam', () => {
+    const rr = {
+      name: 'SF Sub 11', event: 'SF', type: 'Todos contra Todos',
+      players: ['Ana Alves', 'Bia Braga', 'Caio Costa'],
+      matches: [
+        { player1: 'Ana Alves', player2: 'Bia Braga', winner: 2, score1: '10 10', score2: '21 21', status: 'Finalizada' },
+        { player1: 'Bia Braga', player2: 'Caio Costa', winner: 1, score1: '', score2: 'W.O.', status: 'WO' },
+        { player1: 'Ana Alves', player2: 'Caio Costa', winner: 1, score1: '21 21', score2: '5 5', status: 'Finalizada' },
+      ],
+    };
+    const rows = loadWith([rr]).buildRankingExportRows(false);
+    const names = rows.slice(1).map(r => r[5]);
+    expect(names).toEqual(['Bia Braga', 'Ana Alves', 'Caio Costa']);
+    expect(ptsOf(rows, 'Caio Costa')).toBe(0);
+  });
+});
