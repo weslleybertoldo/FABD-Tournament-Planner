@@ -46,6 +46,11 @@
     .badge-yellow{background:#F59E0B;color:#000}
     .badge-red{background:#EF4444;color:#fff}
     .badge-orange{background:#D97706;color:#fff}
+    /* Marca da situacao do jogo (W.O., Desist., Desq., Sem jogo) */
+    .sit-mark{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:800;white-space:nowrap;vertical-align:middle}
+    .sit-mark-wo,.sit-mark-desq{background:rgba(239,68,68,.18);color:#F87171}
+    .sit-mark-desist{background:rgba(245,158,11,.18);color:#FBBF24}
+    .sit-mark-semjogo{background:#334155;color:#94A3B8}
     .scoreboard{display:flex;align-items:center;justify-content:space-between;gap:12px}
     .player{flex:1;text-align:center}
     .player .name{font-size:15px;font-weight:700;margin-bottom:8px;min-height:36px;display:flex;align-items:center;justify-content:center}
@@ -65,6 +70,9 @@
     .hist-match .hist-name.win{color:#10B981}
     .hist-match .hist-score{font-size:16px;font-weight:800;color:#F59E0B;min-width:80px;text-align:center}
     .hist-match .hist-meta{display:flex;gap:12px;margin-top:6px;font-size:11px;color:#64748B;flex-wrap:wrap}
+    .hist-match.hist-wo,.hist-match.hist-desq{border-left-color:#EF4444}
+    .hist-match.hist-desist{border-left-color:#F59E0B}
+    .hist-match.hist-semjogo{border-left-color:#64748B}
 
     /* Tabela de jogos (schedule) */
     .sched-table{width:100%;border-collapse:collapse;font-size:13px}
@@ -74,7 +82,11 @@
     .sched-table tr:hover{background:#334155}
     .sched-table tr.status-quadra{background:rgba(245,158,11,0.1);border-left:3px solid #F59E0B}
     .sched-table tr.status-finalizada{opacity:0.6}
-    .sched-table tr.status-wo{opacity:0.4}
+    /* W.O., desistencia, desqualificacao e Sem jogo: encerrado + faixa da cor do selo */
+    .sched-table tr.status-wo,.sched-table tr.status-desist,.sched-table tr.status-desq,.sched-table tr.status-semjogo{opacity:0.6}
+    .sched-table tr.status-wo,.sched-table tr.status-desq{border-left:3px solid #EF4444}
+    .sched-table tr.status-desist{border-left:3px solid #F59E0B}
+    .sched-table tr.status-semjogo{border-left:3px solid #64748B}
     .sched-table .sched-num{color:#64748B;font-weight:700;width:40px}
     .sched-table .sched-players{font-weight:600}
     .sched-table .sched-vs{color:#475569;font-size:11px;margin:0 4px}
@@ -110,6 +122,11 @@
     .group-card td{padding:6px 10px;border-top:1px solid #0F172A}
     .group-card tr.qualified td{background:rgba(16,185,129,.12)}
     .q-badge{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;color:#10B981;border:1px solid rgba(16,185,129,.5);vertical-align:middle;white-space:nowrap}
+    /* Quem nao completou o grupo (W.O., desistencia, desqualificacao, Sem jogo) */
+    .group-card tr.withdrawn td{opacity:.45}
+    .group-card tr.withdrawn td:first-child{opacity:1;color:#64748B}
+    .group-card tr.withdrawn .gp-name{text-decoration:line-through}
+    .out-badge{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;color:#F87171;border:1px solid rgba(239,68,68,.45);vertical-align:middle;white-space:nowrap}
     .group-matches{margin-bottom:24px}
     .group-matches .gm-title{font-size:13px;font-weight:700;color:#94A3B8;margin-bottom:8px}
     .group-match-item{display:flex;align-items:center;gap:8px;padding:6px 12px;background:#1E293B;border-radius:6px;margin-bottom:4px;font-size:12px}
@@ -302,6 +319,84 @@
     }
 
     function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;'):''}
+
+    // === SITUACAO DO JOGO: W.O., desistencia, desqualificacao, Sem jogo ===
+    // Mesmo contrato do Planner (src/js/modules/match-result.js, 18/10/2026),
+    // copiado aqui porque o live-beta busca ../src/js/modules no master (arquivo
+    // novo dava 404). status: 'Finalizada' | 'WO' | 'Desistencia' |
+    // 'Desqualificacao' | 'SemJogo' (winner 0: ninguem avanca). Texto do
+    // resultado, igual no Planner, no site e no live_scores.final_score:
+    // "21-15 / 21-18" · "W.O." ("W.O. (atestado)") · "<parcial> Desist." ·
+    // "<parcial> Desq." · "Sem jogo". Dado antigo: 'DSQ'/'RET' = sem placar.
+    // (sem prototype: LIVE_SIT[status] so acha as 4 situacoes)
+    const LIVE_SIT=Object.assign(Object.create(null),{
+      WO:{mark:'W.O.',label:'W.O.',badge:'badge-red',key:'wo',color:'#F87171'},
+      Desistencia:{mark:'Desist.',label:'Desistência',badge:'badge-yellow',key:'desist',color:'#FBBF24'},
+      Desqualificacao:{mark:'Desq.',label:'Desqualificação',badge:'badge-red',key:'desq',color:'#F87171'},
+      SemJogo:{mark:'Sem jogo',label:'Sem jogo',badge:'badge-gray',key:'semjogo',color:'#94A3B8'}
+    });
+
+    // Texto do resultado -> {status, score (so o placar, sem a marca), atestado}
+    function liveParseResult(text){
+      const t=String(text||'').trim();
+      if(/^W\.O\./i.test(t))return{status:'WO',score:'',atestado:/atestado/i.test(t)};
+      if(/^sem jogo$/i.test(t))return{status:'SemJogo',score:'',atestado:false};
+      let mm=/^(.*?)\s*Desist\.$/i.exec(t);
+      if(mm)return{status:'Desistencia',score:mm[1].trim(),atestado:false};
+      mm=/^(.*?)\s*Desq\.$/i.exec(t);
+      if(mm)return{status:'Desqualificacao',score:mm[1].trim(),atestado:false};
+      if(t==='DSQ')return{status:'Desqualificacao',score:'',atestado:false};
+      if(t==='RET')return{status:'Desistencia',score:'',atestado:false};
+      return{status:'Finalizada',score:t==='-'?'':t,atestado:false};
+    }
+
+    // {status, score, atestado} -> texto do resultado (W.O. e Sem jogo sem placar)
+    function liveSitText(r){
+      if(r.status==='WO')return r.atestado?'W.O. (atestado)':'W.O.';
+      if(r.status==='SemJogo')return'Sem jogo';
+      const sit=LIVE_SIT[r.status];
+      if(!sit)return r.score||'';
+      return r.score?`${r.score} ${sit.mark}`:sit.mark;
+    }
+
+    // Situacao de um jogo da agenda (tournaments.data.matches) ou null se for
+    // jogo normal/em aberto. Sem status especial, vale a marca no placar (dado
+    // antigo, ou final_score novo do arbitro gravado por um Planner antigo).
+    function liveMatchSituation(m){
+      const p=liveParseResult(m.score);
+      if(LIVE_SIT[m.status])return{status:m.status,score:p.score,atestado:!!(m.atestado||p.atestado)};
+      if((!m.status||m.status==='Finalizada')&&LIVE_SIT[p.status])return p;
+      return null;
+    }
+
+    // Jogo da chave/grupo (draws[].matches, groupsData): placar de cada lado
+    // (so numeros) + a marca do lado de quem deu W.O./desistiu/foi desqualificado
+    // (o perdedor); no Sem jogo, dos dois lados. text = texto do resultado no
+    // sentido lado 1 x lado 2. Dado antigo: 'W.O.'/'DSQ'/'RET' inteiro no score1
+    // (sempre o lado 1) e sem status — o perdedor sai do winner.
+    function liveDrawSides(m){
+      const r1=liveParseResult(m.score1),r2=liveParseResult(m.score2);
+      const nums=r=>r.score.split(/\s+/).filter(x=>/^\d+$/.test(x));
+      const n1=nums(r1),n2=nums(r2);
+      let status=LIVE_SIT[m.status]?m.status:null;
+      if(!status&&(!m.status||m.status==='Finalizada'))status=LIVE_SIT[r1.status]?r1.status:LIVE_SIT[r2.status]?r2.status:null;
+      if(!status)return{status:null,score1:n1.join(' '),score2:n2.join(' '),mark1:'',mark2:'',text:n1.map((v,i)=>`${v}-${n2[i]||0}`).join(' / ')};
+      const noScore=status==='WO'||status==='SemJogo';
+      const partial=!noScore&&n1.length&&n1.length===n2.length?n1.map((v,i)=>`${v}-${n2[i]}`).join(' / '):'';
+      const text=liveSitText({status,score:partial,atestado:!!(m.atestado||r1.atestado||r2.atestado)});
+      const mark=status==='WO'?text:LIVE_SIT[status].mark;
+      const loser=status==='SemJogo'?0:m.winner===1?2:m.winner===2?1:LIVE_SIT[r2.status]?2:LIVE_SIT[r1.status]?1:0;
+      return{
+        status,text,
+        score1:noScore?'':n1.join(' '),score2:noScore?'':n2.join(' '),
+        mark1:status==='SemJogo'||loser===1?mark:'',
+        mark2:status==='SemJogo'||loser===2?mark:''
+      };
+    }
+
+    function liveSitMark(status,text,style){
+      return `<span class="sit-mark sit-mark-${LIVE_SIT[status].key}"${style?` style="${style}"`:''}>${esc(text)}</span>`;
+    }
 
     // === NAVEGACAO ===
     function switchSection(sec){
@@ -518,7 +613,10 @@
           let h='<div class="section-title"><span class="live-dot"></span> Jogos em Andamento</div>';
           matches.forEach(m=>{
             const s=sm[m.id];
-            const isActive=s&&!s.winner;
+            // Encerrado: vencedor ou situacao no final_score (Sem jogo vem sem vencedor)
+            const sit=LIVE_SIT[liveParseResult(s?.final_score).status];
+            const ended=!!s&&(!!s.winner||!!sit);
+            const isActive=s&&!ended;
             const p1S=s?s.score_p1:0,p2S=s?s.score_p2:0,curSet=s?s.current_set:1;
             const s1=s?.sets_p1||[],s2=s?.sets_p2||[],sw1=s?.sets_won_p1||0,sw2=s?.sets_won_p2||0,w=s?.winner;
             h+=`<div class="match-live${isActive?' active':''}">`;
@@ -528,11 +626,14 @@
             h+=`<div class="player"><div class="name${w===1?' winner':''}">${esc(m.player1)}</div><div class="points">${p1S}</div>${(sw1||sw2)?`<div class="sets-won">${sw1} sets</div>`:''}</div>`;
             h+=`<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:70px">`;
             if(s1.length){s1.forEach((v,i)=>{h+=`<div style="font-size:11px;color:#64748B">Set ${i+1}</div><div class="set-score" style="font-size:15px">${v} : ${s2[i]}</div>`;});}
-            if(!w){h+=`<div style="font-size:11px;color:#F59E0B;font-weight:700;margin-top:4px">Set ${curSet}</div>`;}
+            if(!ended){h+=`<div style="font-size:11px;color:#F59E0B;font-weight:700;margin-top:4px">Set ${curSet}</div>`;}
             h+=`</div>`;
             h+=`<div class="player"><div class="name${w===2?' winner':''}">${esc(m.player2)}</div><div class="points">${p2S}</div>${(sw1||sw2)?`<div class="sets-won">${sw2} sets</div>`:''}</div>`;
             h+=`</div>`;
-            if(w){h+=`<div style="text-align:center;margin-top:8px"><span class="badge badge-green">Finalizada - ${esc(w===1?m.player1:m.player2)} venceu</span></div>`;}
+            if(ended){
+              const who=w===1?m.player1:w===2?m.player2:'';
+              h+=`<div style="text-align:center;margin-top:8px"><span class="badge ${sit?sit.badge:'badge-green'}">${esc(sit?sit.label:'Finalizada')}${who?` - ${esc(who)} venceu`:''}</span></div>`;
+            }
             h+=`</div>`;
           });
           document.getElementById('live-content').innerHTML=h;
@@ -551,14 +652,23 @@
             h+=`<div class="cat-group"><div class="cat-title">${esc(cat)}</div>`;
             groups[cat].forEach(m=>{
               const s=sm[m.id];const w=s?.winner;const setsP1=s?.sets_p1||[],setsP2=s?.sets_p2||[];
+              // Situacao (W.O., Desist., Desq., Sem jogo) vem no texto do final_score
+              const fin=liveParseResult(s?.final_score);
+              const sit=LIVE_SIT[fin.status];
               const umpire=s?.umpire_name||m.umpire||'';
               let duration='';
               if(m.created_at&&m.updated_at){const diff=Math.floor((new Date(m.updated_at)-new Date(m.created_at))/1000);if(diff>0){const mins=Math.floor(diff/60),secs=diff%60;duration=`${mins}min ${String(secs).padStart(2,'0')}s`;}}
-              h+=`<div class="hist-match"><div class="hist-players">`;
+              h+=`<div class="hist-match${sit?' hist-'+sit.key:''}"><div class="hist-players">`;
               h+=`<div class="hist-name left${w===1?' win':''}">${esc(m.player1)}</div>`;
               h+=`<div class="hist-score" style="display:flex;flex-direction:column;align-items:center;gap:2px">`;
-              if(setsP1.length){setsP1.forEach((v,i)=>{h+=`<div style="font-size:10px;color:#64748B">Set ${i+1}</div><div style="font-size:15px;font-weight:700">${v} : ${setsP2[i]}</div>`;});}
-              else{h+=`<div>-</div>`;}
+              if(setsP1.length){
+                setsP1.forEach((v,i)=>{h+=`<div style="font-size:10px;color:#64748B">Set ${i+1}</div><div style="font-size:15px;font-weight:700">${v} : ${setsP2[i]}</div>`;});
+                // Placar parcial nos sets e a situacao embaixo
+                if(sit)h+=liveSitMark(fin.status,fin.status==='WO'?liveSitText(fin):sit.mark,'margin-top:2px');
+              }
+              // Sem sets (W.O., Sem jogo ou finalizado pelo Planner): o texto do resultado
+              else if(sit){h+=`<div style="font-size:14px;color:${sit.color}">${esc(liveSitText(fin))}</div>`;}
+              else{h+=`<div>${esc(fin.score||'-')}</div>`;}
               h+=`</div>`;
               h+=`<div class="hist-name right${w===2?' win':''}">${esc(m.player2)}</div></div>`;
               h+=`<div class="hist-meta"><span>${esc(roundLabel(m.draw_name,m.round,m.round_name))}</span>`;
@@ -608,7 +718,9 @@
       h+=`</tr></thead><tbody>`;
 
       filtered.forEach(m=>{
-        const statusClass=m.status==='Em Quadra'?'status-quadra':m.status==='Finalizada'?'status-finalizada':(m.status==='WO'||m.status==='Desqualificacao')?'status-wo':'';
+        // W.O., desistencia, desqualificacao ou Sem jogo (null = jogo normal/em aberto)
+        const sitR=liveMatchSituation(m),sit=sitR&&LIVE_SIT[sitR.status];
+        const statusClass=m.status==='Em Quadra'?'status-quadra':sit?'status-'+sit.key:m.status==='Finalizada'?'status-finalizada':'';
         const p1=m.player1||m.player1Display||'A definir';
         const p2=m.player2||m.player2Display||'A definir';
         const isWinner1=m.winner===1;
@@ -619,13 +731,14 @@
         h+=`<td><span class="badge badge-gray">${esc(m.drawName||'')}</span></td>`;
         h+=`<td style="color:#94A3B8;font-size:12px">${esc(roundLabel(m.drawName,m.round,m.roundName))}</td>`;
         h+=`<td class="sched-players"><span class="${isWinner1?'sched-winner':''}">${esc(p1)}</span><span class="sched-vs"> vs </span><span class="${isWinner2?'sched-winner':''}">${esc(p2)}</span></td>`;
-        h+=`<td style="color:#F59E0B;font-weight:700;font-size:12px">${esc(m.score||'')}</td>`;
+        // No celular a coluna e estreita: quebra entre os sets, nunca no meio de um "3-6"
+        const placar=esc(sit?liveSitText(sitR):(m.score||'')).replace(/\d+-\d+/g,'<span style="white-space:nowrap">$&</span>');
+        h+=`<td style="color:${sit?sit.color:'#F59E0B'};font-weight:700;font-size:12px">${placar}</td>`;
 
         let statusBadge='';
         if(m.status==='Em Quadra')statusBadge=`<span class="badge badge-yellow"><span class="live-dot"></span>Em Quadra</span>`;
+        else if(sit)statusBadge=`<span class="badge ${sit.badge}">${sit.label}</span>`;
         else if(m.status==='Finalizada')statusBadge=`<span class="badge badge-green">Finalizada</span>`;
-        else if(m.status==='WO')statusBadge=`<span class="badge badge-red">W.O.</span>`;
-        else if(m.status==='Desqualificacao')statusBadge=`<span class="badge badge-red">DSQ</span>`;
         else if(!m.isDefinida||p1==='A definir'||p2==='A definir')statusBadge=`<span class="badge badge-gray">A definir</span>`;
         else statusBadge=`<span class="badge badge-gray">Pendente</span>`;
         h+=`<td>${statusBadge}</td>`;
@@ -789,9 +902,16 @@
           :[...(g.players||[])].sort((a,b)=>(stats[b]?.w||0)-(stats[a]?.w||0));
         const done=full&&groupDone(g);
         sorted.forEach((p,i)=>{
-          const s=stats[p]||{w:0,l:0,games:0};
-          const tag=!done?'':i<qualifiers?'Classif.':bestThirdNames.has(p)?'Melhor 3&ordm;':'';
-          h+=`<tr${tag?' class="qualified"':''}><td style="font-weight:600">${esc(p)}${tag?`<span class="q-badge">${tag}</span>`:''}</td><td style="text-align:center">${s.games}</td><td style="text-align:center;color:#10B981">${s.w}</td><td style="text-align:center;color:#EF4444">${s.l}</td>`;
+          const st=full?standings[i]:null;
+          // Nao completou o grupo (deu W.O., desistiu, foi desqualificado ou Sem
+          // jogo): vem por ultimo, apagado, e nunca se classifica
+          const out=!!st?.withdrawn;
+          // V/D da classificacao do Planner (sem os jogos de quem nao completou);
+          // sem o modulo, a contagem local
+          const s=st&&st.wins!=null&&st.losses!=null?{w:st.wins,l:st.losses,games:st.wins+st.losses}:(stats[p]||{w:0,l:0,games:0});
+          const tag=!done||out?'':i<qualifiers?'Classif.':bestThirdNames.has(p)?'Melhor 3&ordm;':'';
+          const cls=out?'withdrawn':tag?'qualified':'';
+          h+=`<tr${cls?` class="${cls}"`:''}><td style="font-weight:600"><span class="gp-name">${esc(p)}</span>${tag?`<span class="q-badge">${tag}</span>`:''}${out?'<span class="out-badge">não completou</span>':''}</td><td style="text-align:center">${s.games}</td><td style="text-align:center;color:#10B981">${s.w}</td><td style="text-align:center;color:#EF4444">${s.l}</td>`;
           if(full){
             const diff=standings[i].ptsDiff;
             h+=`<td style="text-align:center;font-weight:600;color:${diff>0?'#10B981':diff<0?'#EF4444':'#94A3B8'}">${diff>0?'+':''}${diff}</td>`;
@@ -809,17 +929,13 @@
         h+=`<div class="gm-title">${esc(g.name)} - Jogos</div>`;
         g.matches.forEach(m=>{
           const w=m.winner;
-          const score1=m.score1||'';
-          const score2=m.score2||'';
-          // Formatar "21 18" + "15 21" -> "21-15 / 18-21"
-          let scoreStr='';
-          if(score1||score2){
-            const s1=score1.split(' '),s2=score2.split(' ');
-            scoreStr=s1.map((v,i)=>`${v}-${s2[i]||0}`).join(' / ');
-          }
+          // "21 18" + "15 21" -> "21-15 / 18-21"; W.O., Desist., Desq. (com o
+          // placar parcial) e Sem jogo pelo texto do resultado
+          const v=liveDrawSides(m);
+          const sit=LIVE_SIT[v.status];
           h+=`<div class="group-match-item">`;
           h+=`<div class="gm-p left${w===1?' win':''}">${esc(m.player1||'')}</div>`;
-          h+=`<div class="gm-score">${w?esc(scoreStr):'-'}</div>`;
+          h+=`<div class="gm-score"${sit?` style="color:${sit.color}"`:''}>${sit?esc(v.text):w&&v.text?esc(v.text):'-'}</div>`;
           h+=`<div class="gm-p right${w===2?' win':''}">${esc(m.player2||'')}</div>`;
           h+=`</div>`;
         });
@@ -851,11 +967,15 @@
       return (tournamentData.matches||[])
         .filter(m=>m.drawName===draw.name&&m.phase==='elimination')
         .map(m=>{
-          // "15-4 / 15-13" -> score1 "15 15", score2 "4 13" (formato do bracket)
-          const sets=String(m.score||'').split('/').map(s=>s.trim().split('-'));
+          // "15-4 / 15-13" -> score1 "15 15", score2 "4 13" (formato do bracket);
+          // W.O./desistencia/desqualificacao/Sem jogo vao no status (a marca e
+          // posta do lado de quem perdeu na hora de desenhar)
+          const sit=liveMatchSituation(m);
+          const sets=String(sit?sit.score:(m.score||'')).split('/').map(s=>s.trim().split('-'));
           const hasScore=!!m.winner&&sets.every(p=>p.length===2&&p[0]!==''&&p[1]!=='');
           return {
             round:m.round||1, slotIdx:m.drawMatchIdx??m.num??0, winner:m.winner,
+            status:sit?sit.status:m.status, atestado:!!sit?.atestado,
             player1:label(m.player1,m.player1Display), player2:label(m.player2,m.player2Display),
             score1:hasScore?sets.map(p=>p[0]).join(' '):'', score2:hasScore?sets.map(p=>p[1]).join(' '):''
           };
@@ -909,8 +1029,6 @@
           const p1=m.player1||'A definir';
           const p2=m.player2||'A definir';
           const isBye=m.isBye;
-          const score1=m.score1||'';
-          const score2=m.score2||'';
 
           h+=`<div class="bracket-match${w?' has-winner':''}">`;
 
@@ -918,8 +1036,16 @@
             h+=`<div class="bracket-player bye"><span>${esc(p1)}</span><span class="bp-score">BYE</span></div>`;
             h+=`<div class="bracket-player bye"><span>-</span></div>`;
           } else {
-            h+=`<div class="bracket-player${w===1?' win':''}"><span>${esc(p1)}</span>${score1?`<span class="bp-score">${esc(score1)}</span>`:''}</div>`;
-            h+=`<div class="bracket-player${w===2?' win':''}"><span>${esc(p2)}</span>${score2?`<span class="bp-score">${esc(score2)}</span>`:''}</div>`;
+            // Placar de cada lado + a marca (W.O., Desist., Desq.) do lado de
+            // quem perdeu; Sem jogo nos dois. Vaga que virou BYE (Sem jogo, quem
+            // nao completou o grupo) no estilo do bye
+            const v=liveDrawSides(m);
+            const side=(name,win,score,mark)=>{
+              const right=(score?`<span class="bp-score">${esc(score)}</span>`:'')+(mark?liveSitMark(v.status,mark,score?'margin-left:6px':''):'');
+              return `<div class="bracket-player${win?' win':''}${name==='BYE'?' bye':''}"><span>${esc(name)}</span>${right?`<span style="white-space:nowrap;margin-left:8px">${right}</span>`:''}</div>`;
+            };
+            h+=side(p1,w===1,v.score1,v.mark1);
+            h+=side(p2,w===2,v.score2,v.mark2);
           }
           h+=`</div>`;
         });
@@ -1098,8 +1224,9 @@
         // Finalizacao (winner+final_score no live_scores ou status Finalizada no
         // live_matches) = Planner vai re-publicar tournaments.data em seguida —
         // arma a checagem de convergencia pra nao ficar com a tabela velha.
+        // O Sem jogo vem sem vencedor (winner 0), so com o final_score.
         const n=payload&&payload.new;
-        if(n&&((n.winner&&n.final_score)||n.status==='Finalizada'))expectFreshData(n.updated_at);
+        if(n&&((n.final_score&&(n.winner||liveParseResult(n.final_score).status==='SemJogo'))||n.status==='Finalizada'))expectFreshData(n.updated_at);
         refreshCurrent();
       };
 
