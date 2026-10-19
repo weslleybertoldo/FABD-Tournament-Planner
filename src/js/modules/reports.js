@@ -853,13 +853,15 @@ function reportPlayers(){
 // === RANKING / PREMIACAO ===
 // Atualizar matches de eliminatoria na lista de partidas quando jogadores ficam disponiveis
 
-// === SUMULAS EM BRANCO (igual ao BTP: Report > Scoresheets) ===
-// Janela de filtros (dia, quadra, horario, pular "A definir" e ja impressas)
-// -> folhas A4 paisagem (scoresheet.js). Ao clicar Imprimir, os jogos ficam
-// marcados como impressos (m.scoresheetPrintedAt), igual ao BTP.
+// === SUMULAS (igual ao BTP: Report > Scoresheets) ===
+// Janela de filtros (tipo, dia, quadra, horario, pular "A definir" e ja
+// impressas) -> folhas A4 paisagem (scoresheet.js). Em branco: ao clicar
+// Imprimir, os jogos ficam marcados como impressos (m.scoresheetPrintedAt),
+// igual ao BTP. Preenchidas: os jogos finalizados com o resultado e o ponto a
+// ponto do arbitro (nao marcam impressa).
 function _scoresheetFilters(){
   const v=id=>document.getElementById(id);
-  return {day:v('ss-day').value,court:v('ss-court').value,from:v('ss-from').value,to:v('ss-to').value,
+  return {filled:v('ss-kind').value==='filled',day:v('ss-day').value,court:v('ss-court').value,from:v('ss-from').value,to:v('ss-to').value,
     skipUnknown:v('ss-skip-unknown').checked,skipPrinted:v('ss-skip-printed').checked};
 }
 function _scoresheetCtx(){
@@ -874,19 +876,24 @@ function showScoresheetModal(){
   openModal('modal-scoresheet');
 }
 function updateScoresheetCount(){
-  const n=scoresheetSelect(tournament?.matches||[],_scoresheetFilters(),_scoresheetCtx()).length;
-  document.getElementById('ss-count').textContent=n?`${n} súmula${n===1?'':'s'} pra gerar`:'Nenhum jogo com esses filtros';
+  const f=_scoresheetFilters();
+  ['ss-blank-opts','ss-help-blank'].forEach(id=>{document.getElementById(id).style.display=f.filled?'none':'';});
+  document.getElementById('ss-help-filled').style.display=f.filled?'':'none';
+  const n=scoresheetSelect(tournament?.matches||[],f,_scoresheetCtx()).length;
+  document.getElementById('ss-count').textContent=n?`${n} súmula${n===1?'':'s'}${f.filled?(n===1?' preenchida':' preenchidas'):''} pra gerar`:(f.filled?'Nenhum jogo finalizado com esses filtros':'Nenhum jogo com esses filtros');
 }
 function printScoresheets(){
-  const list=scoresheetSelect(tournament?.matches||[],_scoresheetFilters(),_scoresheetCtx());
-  if(!list.length){showToast('Nenhum jogo com esses filtros','warning');return;}
+  const f=_scoresheetFilters();
+  const list=scoresheetSelect(tournament?.matches||[],f,_scoresheetCtx());
+  if(!list.length){showToast(f.filled?'Nenhum jogo finalizado com esses filtros':'Nenhum jogo com esses filtros','warning');return;}
   const t={name:tournament.name||'',
     dateText:fmtDate(tournament.startDate)+(tournament.endDate&&tournament.endDate!==tournament.startDate?' a '+fmtDate(tournament.endDate):''),
     location:[tournament.location,tournament.city].filter(Boolean).join(' - ')};
   const days=tournament.daySchedule||[];
   const sheets=list.map(m=>{
     const d=days[scheduleDayOf(m,days,tournament.roundDays)];
-    return scoresheetSheet(m,t,{day:d?.date?fmtDate(d.date):'',clubOf:_getPlayerClub});
+    return scoresheetSheet(m,t,{day:d?.date?fmtDate(d.date):'',clubOf:_getPlayerClub,filled:f.filled,
+      points:tournament.scoring?.points,maxPoints:tournament.scoring?.maxPoints});
   });
   const w=window.open('','_blank','width=1200,height=800');
   if(!w){showToast('Popup bloqueado. Permita popups para imprimir.','warning');return;}
@@ -897,9 +904,11 @@ function printScoresheets(){
     const tg=e.target?.nodeType===1?e.target:e.target?.parentElement;
     const action=tg?.closest?.('[data-action]')?.getAttribute('data-action');
     if(action==='print'){
-      const now=new Date().toISOString();
-      list.forEach(m=>{m.scoresheetPrintedAt=now;});
-      await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
+      if(!f.filled){
+        const now=new Date().toISOString();
+        list.forEach(m=>{m.scoresheetPrintedAt=now;});
+        await window.api.saveTournament(tournament);prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
+      }
       w.print();
     }else if(action==='close')w.close();
   });

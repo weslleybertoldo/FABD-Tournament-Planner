@@ -793,12 +793,14 @@
     </div>
   </div>
 
-  <!-- MODAL: EDITAR JOGO FINALIZADO (lapis da aba Finalizadas) -->
+  <!-- MODAL: SUMULAS (em branco pro arbitro ou preenchidas dos jogos finalizados) -->
   <div class="modal-overlay" id="modal-scoresheet">
     <div class="modal" style="width:520px">
-      <div class="modal-header"><h3>&#128221; S&uacute;mulas em branco</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-scoresheet">&times;</button></div>
+      <div class="modal-header"><h3>&#128221; S&uacute;mulas</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-scoresheet">&times;</button></div>
       <div class="modal-body">
-        <p style="font-size:12px;color:var(--fabd-gray-600);margin-bottom:12px">1 s&uacute;mula por folha A4 paisagem, com o cabe&ccedil;alho do jogo preenchido. O &aacute;rbitro preenche o resto &agrave; m&atilde;o.</p>
+        <div class="form-group"><label>Tipo</label><select class="form-control" id="ss-kind" data-action="updateScoresheetCount" data-event="change"><option value="blank">Em branco (pro &aacute;rbitro)</option><option value="filled">Preenchidas (jogos finalizados)</option></select></div>
+        <p id="ss-help-blank" style="font-size:12px;color:var(--fabd-gray-600);margin-bottom:12px">1 s&uacute;mula por folha A4 paisagem, com o cabe&ccedil;alho do jogo preenchido. O &aacute;rbitro preenche o resto &agrave; m&atilde;o.</p>
+        <p id="ss-help-filled" style="display:none;font-size:12px;color:var(--fabd-gray-600);margin-bottom:12px">1 s&uacute;mula por folha A4 paisagem com o resultado: vencedor, placar, hor&aacute;rios e a grade ponto a ponto do app do &aacute;rbitro (jogo lan&ccedil;ado no Planner sai s&oacute; com o placar de cada game).</p>
         <div class="form-row">
           <div class="form-group"><label>Dia</label><select class="form-control" id="ss-day" data-action="updateScoresheetCount" data-event="change"></select></div>
           <div class="form-group"><label>Quadra</label><select class="form-control" id="ss-court" data-action="updateScoresheetCount" data-event="change"></select></div>
@@ -807,14 +809,17 @@
           <div class="form-group"><label>Hor&aacute;rio de</label><input type="time" class="form-control" id="ss-from" data-action="updateScoresheetCount" data-event="change input"></div>
           <div class="form-group"><label>at&eacute;</label><input type="time" class="form-control" id="ss-to" data-action="updateScoresheetCount" data-event="change input"></div>
         </div>
-        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:4px"><input type="checkbox" id="ss-skip-unknown" checked data-action="updateScoresheetCount" data-event="change"> Pular jogos com atleta a definir</label>
-        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="ss-skip-printed" checked data-action="updateScoresheetCount" data-event="change"> Pular as j&aacute; impressas</label>
+        <div id="ss-blank-opts">
+          <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:4px"><input type="checkbox" id="ss-skip-unknown" checked data-action="updateScoresheetCount" data-event="change"> Pular jogos com atleta a definir</label>
+          <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="ss-skip-printed" checked data-action="updateScoresheetCount" data-event="change"> Pular as j&aacute; impressas</label>
+        </div>
         <p style="font-size:12px;color:var(--fabd-gray-600);margin-top:8px">A quadra s&oacute; filtra os jogos que j&aacute; t&ecirc;m quadra; jogo sem quadra sai com a quadra em branco.</p>
         <p id="ss-count" style="font-size:14px;font-weight:700;color:var(--fabd-blue);margin-top:10px"></p>
       </div>
       <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-scoresheet">Cancelar</button><button class="btn btn-primary" data-action="printScoresheets">&#128424; Gerar s&uacute;mulas</button></div>
     </div>
   </div>
+  <!-- MODAL: EDITAR JOGO FINALIZADO (lapis da aba Finalizadas) -->
   <div class="modal-overlay" id="modal-edit-finished">
     <div class="modal" style="width:520px">
       <div class="modal-header"><h3>&#9998; Editar jogo finalizado</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-edit-finished">&times;</button></div>
