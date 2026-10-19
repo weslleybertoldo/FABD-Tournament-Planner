@@ -17,6 +17,7 @@
 //   schedulePossibleAthletes, scheduleIsToDefine, schedulePlaceDefined,
 //   schedulePlaceToDefine, scheduleMissingWarning, scheduleDayOf,
 //   scheduleSortByDay (schedule-slots.js)
+// - matchNumberNew (match-helpers.js)
 // - prepareRankingsForSync, renderMatches, renderDraws (app.js)
 // - window.api.saveTournament, window.api.supabaseUpsertTournament (IPC)
 //
@@ -117,7 +118,7 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
   const existingByPlayers = new Map();
   function _pairKey(p1, p2) { if (!p1 || !p2) return null; return [p1, p2].sort().join('||'); }
   drawMatches.forEach(m => {
-    const data = { time: m.time, court: m.court, umpire: m.umpire, status: m.status, score: m.score, winner: m.winner, startedAt: m.startedAt, finishedAt: m.finishedAt };
+    const data = { num: m.num, time: m.time, court: m.court, umpire: m.umpire, status: m.status, score: m.score, winner: m.winner, startedAt: m.startedAt, finishedAt: m.finishedAt };
     if (m.drawMatchIdx != null) existingSlots.set(m.drawMatchIdx, data);
     const pk = _pairKey(m.player1, m.player2);
     if (pk) existingByPlayers.set(pk, data);
@@ -125,6 +126,7 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
 
   // 4. Construir novos matches desta chave, reutilizando slots quando possivel
   const newDrawMatches = [];
+  const numsUsados = new Set(); // o mesmo jogo antigo pode ser achado pela posicao e pelo par
   const preservedStatuses = ['Finalizada', 'WO', 'Em Quadra', 'Desistencia', 'Desqualificacao', 'SemJogo'];
 
   shouldExist.forEach(s => {
@@ -171,6 +173,11 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
       match.time = existing.time;
       match.court = existing.court || '';
       match.umpire = existing.umpire || '';
+    }
+
+    // Numero do jogo fixo (19/10/2026): o jogo que ja existia fica com o numero dele
+    if (existing && Number(existing.num) > 0 && !numsUsados.has(existing.num)) {
+      match.num = existing.num; match.id = String(existing.num); numsUsados.add(existing.num);
     }
 
     newDrawMatches.push(match);
@@ -252,8 +259,9 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
   // do jogo -> horario -> numero
   tournament.matches = scheduleSortByDay([...otherMatches, ...newDrawMatches], _days, tournament.roundDays);
 
-  // 7. Renumerar
-  tournament.matches.forEach((m, i) => { m.id = (i + 1).toString(); m.num = i + 1; });
+  // 7. Numero so pros jogos novos (o proximo livre): as outras chaves e os jogos
+  // desta que ja existiam ficam com o numero deles (so o Regenerar Horarios renumera)
+  matchNumberNew(tournament.matches);
 
   // 9. Salvar e sincronizar
   await window.api.saveTournament(tournament);

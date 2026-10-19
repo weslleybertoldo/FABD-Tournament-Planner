@@ -150,3 +150,46 @@ describe('formatScoreByGames', () => {
     expect(formatScoreByGames(null)).toBe('');
   });
 });
+
+// Numero do jogo fixo (19/10/2026): depois de dado, o numero nao muda; jogo
+// novo ganha o proximo livre. So o Regenerar Horarios renumera.
+describe('matchNextNumber', () => {
+  it('lista vazia -> 1', () => {
+    const { matchNextNumber } = loadMatchHelpers();
+    expect(matchNextNumber([])).toBe(1);
+    expect(matchNextNumber(undefined)).toBe(1);
+  });
+
+  it('maior numero + 1, mesmo com a lista fora de ordem e com buracos', () => {
+    const { matchNextNumber } = loadMatchHelpers();
+    expect(matchNextNumber([{ num: 3 }, { num: 7 }, { num: 5 }])).toBe(8);
+  });
+
+  it('ignora jogo sem numero, zero ou invalido', () => {
+    const { matchNextNumber } = loadMatchHelpers();
+    expect(matchNextNumber([{ num: 2 }, {}, { num: 0 }, { num: 'x' }, null])).toBe(3);
+  });
+});
+
+describe('matchNumberNew', () => {
+  it('da numero so a quem nao tem, a partir do maior + 1, na ordem da lista', () => {
+    const { matchNumberNew } = loadMatchHelpers();
+    const lista = [{ num: 5, id: '5' }, {}, { num: 2, id: '2' }, { num: 0 }];
+    matchNumberNew(lista);
+    expect(lista.map(m => m.num)).toEqual([5, 6, 2, 7]);
+    expect(lista.map(m => m.id)).toEqual(['5', '6', '2', '7']);
+  });
+
+  it('nao mexe em quem ja tem numero (nem no id)', () => {
+    const { matchNumberNew } = loadMatchHelpers();
+    const lista = [{ num: 9, id: '9' }, { num: 4, id: '4' }];
+    matchNumberNew(lista);
+    expect(lista).toEqual([{ num: 9, id: '9' }, { num: 4, id: '4' }]);
+  });
+
+  it('lista vazia ou sem lista nao quebra', () => {
+    const { matchNumberNew } = loadMatchHelpers();
+    expect(matchNumberNew([])).toEqual([]);
+    expect(() => matchNumberNew(undefined)).not.toThrow();
+  });
+});
