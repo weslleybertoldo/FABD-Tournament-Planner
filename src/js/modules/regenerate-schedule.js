@@ -141,7 +141,7 @@ async function regenerateDrawSchedule(drawIdx, skipConfirm) {
       rn = `R${s.round}`;
     } else if (!rn) {
       const totalR = Math.max(...(d.matches || []).map(x => x.round) || [1]);
-      rn = s.round === totalR ? 'Final' : s.round === totalR - 1 ? 'Semifinal' : `R${s.round}`;
+      rn = s.round === totalR ? 'Final' : s.round === totalR - 1 ? 'Semifinal' : s.round === totalR - 2 ? 'Quartas' : `R${s.round}`; // igual ao rebuildMatchList
     }
 
     const match = {
