@@ -34,24 +34,26 @@ function rankGroupThirds(groups) {
   const thirds = [];
   (groups || []).forEach((g, groupIdx) => {
     const s = computeGroupStandings(g.players || [], g.matches || [])[2];
-    if (s) thirds.push({ name: s.name, groupIdx, wins: s.wins, ptsDiff: s.ptsDiff, ptsFor: s.ptsFor });
+    // quem nao completou o grupo (W.O., desistencia...) nao disputa a vaga
+    if (s && !s.withdrawn) thirds.push({ name: s.name, groupIdx, wins: s.wins, ptsDiff: s.ptsDiff, ptsFor: s.ptsFor });
   });
   // sort estavel: empate total fica na ordem dos grupos (A, B, C)
   return thirds.sort((a, b) => (b.wins - a.wins) || (b.ptsDiff - a.ptsDiff) || (b.ptsFor - a.ptsFor));
 }
 
 function buildBestThirdsQuarterfinals(groups) {
-  const top = groups.map(g => computeGroupStandings(g.players || [], g.matches || []).slice(0, 2).map(s => s.name));
+  // vaga de quem nao completou o grupo vira BYE: o adversario passa direto
+  const top = groups.map(g => computeGroupStandings(g.players || [], g.matches || []).slice(0, 2).map(s => s.withdrawn ? 'BYE' : s.name));
   const [A, B, C] = top;
   const [best, second] = rankGroupThirds(groups);
   // O pior dos 2 pega o 1o do A (grupo do cabeca 1) e o melhor pega o 1o do B
   let vsA = second, vsB = best;
   if ((vsA && vsA.groupIdx === 0) || (vsB && vsB.groupIdx === 1)) [vsA, vsB] = [vsB, vsA];
   return [
-    { player1: A[0] || '', player2: vsA ? vsA.name : '' },
+    { player1: A[0] || '', player2: vsA ? vsA.name : 'BYE' },
     { player1: B[1] || '', player2: C[1] || '' },
     { player1: C[0] || '', player2: A[1] || '' },
-    { player1: B[0] || '', player2: vsB ? vsB.name : '' }
+    { player1: B[0] || '', player2: vsB ? vsB.name : 'BYE' }
   ];
 }
 

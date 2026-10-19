@@ -77,8 +77,10 @@ function propagateGroupsToElimination(d) {
   // Collect top N from each group
   d.groupsData.groups.forEach(g => {
     const standings = computeGroupStandings(g.players, g.matches);
+    // Quem nao completou o grupo (W.O., desistencia...) nao se classifica:
+    // a vaga vira BYE e o adversario passa direto (BWF 16.2.5)
     const top = standings.slice(0, qualifiers);
-    top.forEach((s, i) => { qualified.push({ name: s.name, group: g.name, seed: i }); });
+    top.forEach((s, i) => { qualified.push({ name: s.withdrawn ? 'BYE' : s.name, group: g.name, seed: i }); });
   });
 
   if (qualified.length < 2) return false;
