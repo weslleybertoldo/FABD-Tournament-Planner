@@ -870,6 +870,7 @@ function syncEntriesFromPlayers() {
         category: insc.cat,
         key: insc.key,
         partner: insc.partner || '',
+        ...(insc.substituiu ? { substituiu: insc.substituiu } : {}),
         status: prevStatus || 'confirmado'
       });
     });
@@ -1167,7 +1168,7 @@ function renderRoster() {
     const st = { inscrito:'tag-gray', confirmado:'tag-green', presente:'tag-blue', ausente:'tag-red' };
     h += `<tr>
       <td>${count}</td>
-      <td><strong>${esc(e.playerName)}</strong>${partnerName ? '<br><small style="color:var(--fabd-gray-500)">Dupla: '+esc(partnerName)+'</small>':''}</td>
+      <td><strong>${esc(e.playerName)}</strong>${partnerName ? '<br><small style="color:var(--fabd-gray-500)">Dupla: '+esc(partnerName)+'</small>':''}${e.substituiu ? '<br><small style="color:var(--fabd-gray-500)">no lugar de '+esc(e.substituiu)+'</small>':''}</td>
       <td>${esc(e.club)||'-'}</td>
       <td><span class="tag tag-blue">${esc(e.key)}</span></td>
       <td><span class="tag ${st[e.status]||'tag-gray'}">${esc(e.status)}</span></td>
@@ -1177,7 +1178,7 @@ function renderRoster() {
         <option value="presente"${e.status==='presente'?' selected':''}>Presente</option>
         <option value="ausente"${e.status==='ausente'?' selected':''}>Ausente</option>
       </select></td>
-      <td></td></tr>`;
+      <td><button class="btn btn-sm btn-secondary" data-action="showSwapAthlete" data-arg-1="${i}" title="Trocar o atleta desta inscrição">&#8644; Trocar</button></td></tr>`;
   });
   if (!count) h = `<tr><td colspan="7" style="text-align:center;color:var(--fabd-gray-500);padding:20px">Nenhum inscrito nesta categoria</td></tr>`;
   tb.innerHTML = h;
@@ -1269,6 +1270,83 @@ async function updateEntryStatus(idx, status) {
   await window.api.saveTournament(tournament);
   prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
   renderRoster();
+}
+
+// === TROCAR ATLETA (igual ao BTP "Replace Partner") ===
+// Nucleo puro em src/js/modules/athlete-swap.js; aqui so a janela do Inscritos.
+let _swapEntryIdx = -1;
+
+function showSwapAthlete(idx) {
+  const e = tournament?.entries?.[idx];
+  if (!e) return;
+  _swapEntryIdx = idx;
+  const dbl = swapIsDouble(e.key);
+  document.getElementById('swap-title').innerHTML = `&#8644; Trocar atleta — ${esc(e.key)}`;
+  const ids = [e.playerId, dbl ? e.partner : ''].filter(Boolean);
+  document.getElementById('swap-out').innerHTML = ids.map((id, n) => {
+    const p = players.find(x => x.id === id);
+    return `<label style="display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;font-weight:400"><input type="radio" name="swap-out" value="${esc(id)}"${n === 0 ? ' checked' : ''} data-action="onSwapOutChange" data-event="change"> ${esc(swapName(p))}${dbl ? ` <small style="color:var(--fabd-gray-500)">Parceiro ${n + 1}</small>` : ''}</label>`;
+  }).join('');
+  onSwapOutChange();
+  openModal('modal-swap-athlete');
+}
+
+function _swapOutId() { return document.querySelector('input[name="swap-out"]:checked')?.value || ''; }
+const _swapDayOf = m => getMatchDay(m)?.date || '';
+
+function onSwapOutChange() {
+  const e = tournament?.entries?.[_swapEntryIdx];
+  if (!e) return;
+  const list = swapCandidates(players, e.key, _swapOutId());
+  document.getElementById('swap-in').innerHTML = '<option value="">Escolha quem entra</option>' + list.map(c =>
+    `<option value="${esc(c.id)}">${esc(c.name)}${c.club ? ' — ' + esc(c.club) : ''}${c.category ? ' (' + esc(c.category) + ')' : ''}</option>`).join('');
+  renderSwapAthlete();
+}
+
+// Jogos pendentes (Chave, Rodada, Dia, Hora, Situacao), igual as 2 listas do BTP
+function _swapMatchTable(list) {
+  const rows = list.filter(m => !isMatchDone(m));
+  if (!rows.length) return '<p style="font-size:12px;color:var(--fabd-gray-500);margin:4px 0">Nenhum jogo pendente.</p>';
+  const day = m => { const d = getMatchDay(m); if (!d?.date) return '-'; const o = new Date(d.date + 'T00:00:00'); return `${String(o.getDate()).padStart(2, '0')}/${String(o.getMonth() + 1).padStart(2, '0')}`; };
+  return `<table style="font-size:12px"><thead><tr><th>Chave</th><th>Rodada</th><th>Dia</th><th>Hora</th><th>Situação</th></tr></thead><tbody>${rows.map(m =>
+    `<tr><td>${esc(m.drawName)}</td><td>${esc(m.roundName || 'R' + m.round)}</td><td>${day(m)}</td><td>${esc(m.time) || '-'}</td><td>${esc(resultStatusLabel(m.status))}</td></tr>`).join('')}</tbody></table>`;
+}
+
+function renderSwapAthlete() {
+  const e = tournament?.entries?.[_swapEntryIdx];
+  if (!e) return;
+  const outId = _swapOutId(), inId = document.getElementById('swap-in').value;
+  const outP = players.find(p => p.id === outId), inP = players.find(p => p.id === inId);
+  const dbl = swapIsDouble(e.key);
+  const partnerId = dbl ? ((outP?.inscriptions || []).find(i => i.key === e.key)?.partner || '') : '';
+  const label = swapEntryLabel(players, e.key, outId, partnerId);
+  document.getElementById('swap-mine-title').textContent = dbl ? 'Jogos da dupla' : `Jogos de ${swapName(outP)}`;
+  document.getElementById('swap-mine').innerHTML = _swapMatchTable(swapLineMatches(tournament.matches, e.key, label));
+  document.getElementById('swap-his-title').textContent = inP ? `Jogos de ${swapName(inP)}` : 'Jogos de quem entra';
+  document.getElementById('swap-his').innerHTML = inP ? _swapMatchTable(swapAthleteMatches(tournament.matches, swapName(inP))) : '<p style="font-size:12px;color:var(--fabd-gray-500);margin:4px 0">Escolha quem entra.</p>';
+  const probs = swapProblems(tournament, players, { key: e.key, outId, inId }, _swapDayOf);
+  document.getElementById('swap-problems').innerHTML = probs.map(t => `<div style="background:#FEF3C7;border:1px solid #F59E0B;color:#92400E;border-radius:6px;padding:8px 10px;font-size:13px;margin-top:8px">&#9888; ${esc(t)}</div>`).join('');
+  document.getElementById('swap-ok').disabled = !inP || probs.length > 0;
+}
+
+async function confirmSwapAthlete() {
+  const e = tournament?.entries?.[_swapEntryIdx];
+  if (!e) return;
+  const outId = _swapOutId(), inId = document.getElementById('swap-in').value;
+  const outP = players.find(p => p.id === outId), inP = players.find(p => p.id === inId);
+  if (!outP || !inP) { showToast('Escolha quem entra.', 'warning'); return; }
+  const probs = swapProblems(tournament, players, { key: e.key, outId, inId }, _swapDayOf);
+  if (probs.length) { showToast(probs[0], 'warning'); return; }
+  if (!confirm(`Tem certeza que quer trocar ${swapName(outP)} por ${swapName(inP)} em ${e.key}?`)) return;
+  const r = swapApply(tournament, players, { key: e.key, outId, inId });
+  if (r.error) { showToast(r.error, 'error'); return; }
+  tournament.players = players;
+  syncEntriesFromPlayers(); // refaz os inscritos; a chave ja tem o nome novo e nao reseta
+  await window.api.saveTournament(tournament);
+  prepareRankingsForSync();window.api.supabaseUpsertTournament(tournament.id,tournament.name,tournament);
+  closeModal('modal-swap-athlete');
+  renderRoster();
+  showToast(`${swapName(outP)} trocado por ${swapName(inP)} em ${e.key}.`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
