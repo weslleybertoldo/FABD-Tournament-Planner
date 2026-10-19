@@ -29,7 +29,7 @@ function renderMatches() {
   }
   const tb=document.getElementById('matches-table-body');
   const matches=tournament.matches||[];
-  const pendingMatches=matches.filter(m=>m.status!=='Finalizada'&&m.status!=='WO'&&m.status!=='Desistencia'&&m.status!=='Desqualificacao');
+  const pendingMatches=matches.filter(m=>!isMatchDone(m));
   renderMatchesProgress();
   if(!pendingMatches.length){tb.innerHTML=`<tr><td colspan="11" style="text-align:center;color:var(--fabd-gray-500);padding:40px">Todas as partidas foram finalizadas.</td></tr>`;return;}
   if(!matches.length){tb.innerHTML=`<tr><td colspan="11" style="text-align:center;color:var(--fabd-gray-500);padding:40px">Sem partidas.</td></tr>`;return;}
@@ -130,7 +130,7 @@ function renderMatches() {
     _lastMatchDraw = m.drawName || '';
     _lastMatchDay = getMatchDay(m)?.date || '';
 
-    const stMap={'Finalizada':'tag-green','WO':'tag-red','Desqualificacao':'tag-red','Desistencia':'tag-yellow','Em Quadra':'tag-blue','A definir':'tag-gray','Pendente':'tag-gray'};
+    const stMap={'Finalizada':'tag-green','WO':'tag-red','Desqualificacao':'tag-red','Desistencia':'tag-yellow','SemJogo':'tag-gray','Em Quadra':'tag-blue','A definir':'tag-gray','Pendente':'tag-gray'};
     const st=stMap[m.status]||'tag-gray';
     const isDef=m.status==='A definir';
     const isEQ=m.status==='Em Quadra';
@@ -182,7 +182,10 @@ function renderMatches() {
     const w2=n=>highlightPlayer(n,m.player2);
 
     let pHtml;
-    if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
+    if(isSpecialResult(m)){
+      // W.O., desistencia, desqualificacao, Sem jogo: o texto com a marca (match-result.js)
+      pHtml=`<td><strong style="${m.winner===1?'color:#10B981':''}">${w1(p1)}</strong></td><td style="text-align:center;font-weight:700;font-size:12px;white-space:nowrap;color:${resultColor(m.status)}">${esc(resultText(m))}</td><td><strong style="${m.winner===2?'color:#10B981':''}">${w2(p2)}</strong></td>`;
+    } else if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
       pHtml=`<td><strong style="${m.winner===1?'color:#10B981':''}">${w1(p1)}</strong></td><td style="text-align:center;font-weight:700;font-size:13px;white-space:nowrap;color:var(--fabd-gray-700)">${esc(formatScoreByGames(m.score))}</td><td><strong style="${m.winner===2?'color:#10B981':''}">${w2(p2)}</strong></td>`;
     } else if(m.score==='W.O.'||m.score==='DSQ'||m.score==='RET'){
       pHtml=`<td><strong>${w1(p1)}</strong></td><td style="text-align:center;font-weight:700;color:var(--fabd-red)">${esc(m.score)}</td><td><strong>${w2(p2)}</strong></td>`;
@@ -190,14 +193,14 @@ function renderMatches() {
       pHtml=`<td><strong>${w1(p1)}</strong></td><td style="text-align:center;color:var(--fabd-gray-400)">x</td><td><strong>${w2(p2)}</strong></td>`;
     }
 
-    const isFinished=m.status==='Finalizada'||m.status==='WO'||m.status==='Desistencia'||m.status==='Desqualificacao';
+    const isFinished=isMatchDone(m);
     const resetBtn=isFinished?`<button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA;margin-left:4px;padding:2px 6px;font-size:11px" data-action="resetMatch" data-arg-1="${i}" title="Desfazer resultado">&#8635;</button>`:'';
     const matchDay=getMatchDay(m);
     const dayLabel=matchDay?((d)=>{const o=new Date(d+'T00:00:00');return`${String(o.getDate()).padStart(2,'0')}/${String(o.getMonth()+1).padStart(2,'0')}`;})(matchDay.date):'-';
     const _hideRow=_dayVal&&(matchDay?.date||'')!==_dayVal?'display:none;':''; // dia do JOGO
     // Texto da busca: so o conteudo da linha (sem as opcoes das listas de quadra/arbitro)
     const _search=normSearch([dayLabel,m.time,m.drawName,m.roundName||'R'+m.round,m.num,m.player1,m.player2,d1,d2,m.court,m.umpire,m.status].join(' '));
-    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" data-day="${esc(matchDay?.date||'')}" data-search="${esc(_search)}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${isEQ?(esc(m.time)||'-'):`<select class="form-control" style="width:auto;padding:2px 4px;font-size:11px" title="Mudar o horário" data-action="setMatchTime" data-event="change" data-arg-1="${i}" data-arg-2="$value">${getTimeOptions(m,_choicesOf(m))}</select>`}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" data-action="assignCourt" data-event="change" data-arg-1="${i}" data-arg-2="$value"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" data-action="updateMatchField" data-event="change" data-arg-1="${i}" data-arg-2="umpire" data-arg-3="$value"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" data-action="showScoreModal" data-arg-1="${i}">Placar</button>${resetBtn}`}</td></tr>`;
+    h+=`<tr data-status="${m.status}" data-draw="${esc(m.drawName||'')}" data-day="${esc(matchDay?.date||'')}" data-search="${esc(_search)}" style="${_hideRow}${rs}"><td style="font-size:12px">${dayLabel}</td><td>${isEQ?(esc(m.time)||'-'):`<select class="form-control" style="width:auto;padding:2px 4px;font-size:11px" title="Mudar o horário" data-action="setMatchTime" data-event="change" data-arg-1="${i}" data-arg-2="$value">${getTimeOptions(m,_choicesOf(m))}</select>`}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td>${m.num}</td>${pHtml}<td>${isDef?'-':`<select class="form-control" style="width:100px;padding:2px 4px;font-size:11px" data-action="assignCourt" data-event="change" data-arg-1="${i}" data-arg-2="$value"><option value="">-</option>${getCourtOptions(m.court)}</select>`}</td><td>${isDef?'-':`<select class="form-control" style="width:120px;padding:2px 4px;font-size:11px" data-action="updateMatchField" data-event="change" data-arg-1="${i}" data-arg-2="umpire" data-arg-3="$value"><option value="">-</option>${getUmpireOptions(m.umpire)}</select>`}</td><td><span class="tag ${st}">${esc(resultStatusLabel(m.status))}</span></td><td>${isDef?'':`<button class="btn btn-sm btn-primary" data-action="showScoreModal" data-arg-1="${i}">Placar</button>${resetBtn}`}</td></tr>`;
   });
   // Quadras livres do ultimo horario
   if (_lastMatchTime && _matchesAtTime < _nc) {
@@ -330,13 +333,13 @@ function setMatchesTab(tab){
 function renderFinishedMatches(){
   const tb=document.getElementById('finished-table-body');
   if(!tournament?.matches?.length){tb.innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--fabd-gray-500);padding:40px">Sem partidas finalizadas.</td></tr>';return;}
-  const finished=tournament.matches.filter(m=>m.status==='Finalizada'||m.status==='WO'||m.status==='Desistencia'||m.status==='Desqualificacao')
+  const finished=tournament.matches.filter(m=>isMatchDone(m))
     .slice().sort((a,b)=>(new Date(b.finishedAt||0).getTime())-(new Date(a.finishedAt||0).getTime()));
   if(!finished.length){tb.innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--fabd-gray-500);padding:40px">Sem partidas finalizadas.</td></tr>';return;}
   let h='';
   finished.forEach(m=>{
     const i=tournament.matches.indexOf(m);
-    const stMap={'Finalizada':'tag-green','WO':'tag-red','Desqualificacao':'tag-red','Desistencia':'tag-yellow'};
+    const stMap={'Finalizada':'tag-green','WO':'tag-red','Desqualificacao':'tag-red','Desistencia':'tag-yellow','SemJogo':'tag-gray'};
     const st=stMap[m.status]||'tag-gray';
     const p1Style=m.winner===1?'color:#10B981;font-weight:700':'';
     const p2Style=m.winner===2?'color:#10B981;font-weight:700':'';
@@ -353,14 +356,16 @@ function renderFinishedMatches(){
     }
     // Placar formatado
     let scoreHtml;
-    if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
+    if(isSpecialResult(m)){
+      scoreHtml=`<span style="color:${resultColor(m.status)};font-weight:700;white-space:nowrap">${esc(resultText(m))}</span>`;
+    } else if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
       scoreHtml=`<span style="color:var(--fabd-gray-700);white-space:nowrap">${esc(formatScoreByGames(m.score))}</span>`;
     } else {
       scoreHtml=`<span style="color:var(--fabd-red);font-weight:700">${esc(m.score||'-')}</span>`;
     }
     const editBtn=`<button class="btn btn-sm" style="background:#DBEAFE;color:#1E3A8A;border:1px solid #BFDBFE;padding:2px 6px;font-size:11px;margin-right:4px" data-action="showEditFinishedModal" data-arg-1="${i}" title="Editar placar, arbitro e quadra">&#9998;</button>`;
     const resetBtn=`<button class="btn btn-sm" style="background:#FEE2E2;color:#DC2626;border:1px solid #FECACA;padding:2px 6px;font-size:11px" data-action="resetMatch" data-arg-1="${i}" title="Desfazer resultado">&#8635;</button>`;
-    h+=`<tr><td>${m.num}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td style="${p1Style}">${esc(m.player1||'')}</td><td style="text-align:center;font-weight:700;font-size:13px;white-space:nowrap">${scoreHtml}</td><td style="${p2Style}">${esc(m.player2||'')}</td><td>${esc(m.court||'-')}</td><td>${esc(m.umpire||'-')}</td><td>${startTime}</td><td>${endTime}</td><td>${duration}</td><td><span class="tag ${st}">${esc(m.status)}</span></td><td style="white-space:nowrap">${editBtn}${resetBtn}</td></tr>`;
+    h+=`<tr><td>${m.num}</td><td style="font-size:12px">${esc(m.drawName)}</td><td>${esc(m.roundName||'R'+m.round)}</td><td style="${p1Style}">${esc(m.player1||'')}</td><td style="text-align:center;font-weight:700;font-size:13px;white-space:nowrap">${scoreHtml}</td><td style="${p2Style}">${esc(m.player2||'')}</td><td>${esc(m.court||'-')}</td><td>${esc(m.umpire||'-')}</td><td>${startTime}</td><td>${endTime}</td><td>${duration}</td><td><span class="tag ${st}">${esc(resultStatusLabel(m.status))}</span></td><td style="white-space:nowrap">${editBtn}${resetBtn}</td></tr>`;
   });
   tb.innerHTML=h;
 }

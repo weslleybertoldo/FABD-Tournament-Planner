@@ -182,7 +182,7 @@ function scheduleClock(min) {
 
 // Jogo que ja acabou: nao segura quadra, atleta nem a fase seguinte da chave
 function scheduleIsDone(m) {
-  return ['Finalizada', 'WO', 'Desistencia', 'Desqualificacao'].includes(m.status);
+  return ['Finalizada', 'WO', 'Desistencia', 'Desqualificacao', 'SemJogo'].includes(m.status);
 }
 
 // Avisos de pôr o jogo `m` as `t` (min) a mao: o que fura as regras da agenda

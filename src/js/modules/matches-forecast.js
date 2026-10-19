@@ -17,7 +17,7 @@
 // Cobertura: tests/unit/matches-forecast.test.js
 // =====================================================================
 
-const FORECAST_DONE_STATUS = ['Finalizada', 'WO', 'Desistencia', 'Desqualificacao'];
+const FORECAST_DONE_STATUS = ['Finalizada', 'WO', 'Desistencia', 'Desqualificacao', 'SemJogo'];
 
 function forecastIsDone(m) {
   return FORECAST_DONE_STATUS.includes(m.status);

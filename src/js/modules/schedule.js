@@ -23,7 +23,7 @@ function renderSchedule() {
     if(cur+dur>bs&&cur<bs){cur=be;continue;}
     slots.push(cur);cur+=slot;
   }
-  if(infoEl){const done=matches.filter(m=>m.status==='Finalizada'||m.status==='WO').length;infoEl.textContent=`${matches.length} jogos | ${done} finalizados`;}
+  if(infoEl){const done=matches.filter(m=>isMatchDone(m)).length;infoEl.textContent=`${matches.length} jogos | ${done} finalizados`;}
 
   // Garantir que daySchedule tem draws preenchidos
   ensureDayScheduleDraws();
@@ -122,7 +122,7 @@ function renderSchedule() {
 }
 
 function renderScheduleMatch(m){
-  const done=m.status==='Finalizada'||m.status==='WO',eq=m.status==='Em Quadra',adef=m.status==='A definir';
+  const done=isMatchDone(m),eq=m.status==='Em Quadra',adef=m.status==='A definir';
   let bg='#fff';if(eq)bg='#FFF3E0';if(done)bg='#D1FAE5';if(adef)bg='#F9FAFB';
   const border=done?'#10B981':eq?'#F59E0B':adef?'var(--fabd-gray-300)':'var(--fabd-blue)';
   // Provisorio da eliminatoria: grupo que ja acabou mostra o nome do classificado
@@ -132,7 +132,9 @@ function renderScheduleMatch(m){
   const p1Style=m.winner===1?'color:#10B981;font-weight:700':'font-weight:600';
   const p2Style=m.winner===2?'color:#10B981;font-weight:700':'font-weight:600';
   let scoreHtml='';
-  if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
+  if(isSpecialResult(m)){
+    scoreHtml=`<span style="color:${resultColor(m.status)};font-weight:700;white-space:nowrap">${esc(resultText(m))}</span>`;
+  } else if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
     scoreHtml=`<span style="color:var(--fabd-gray-700);font-weight:700;white-space:nowrap">${esc(formatScoreByGames(m.score))}</span>`;
   } else if(m.score==='W.O.'||m.score==='DSQ'||m.score==='RET'){
     scoreHtml=`<span style="color:var(--fabd-red);font-weight:700">${esc(m.score)}</span>`;
