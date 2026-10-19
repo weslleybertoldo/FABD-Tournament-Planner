@@ -4,6 +4,9 @@ import { loadModule } from './_loader.js';
 // Regras de encaixe (grade, descanso, atletas possiveis) vem do schedule-slots.js
 const slotsMod = loadModule('src/js/modules/schedule-slots.js');
 const SLOTS = Object.fromEntries(Object.entries(slotsMod).filter(([k, v]) => k.startsWith('schedule') && typeof v === 'function'));
+// Numero do jogo (proximo livre) vem do match-helpers.js
+const helpersMod = loadModule('src/js/modules/match-helpers.js');
+const NUMS = { matchNextNumber: helpersMod.matchNextNumber, matchNumberNew: helpersMod.matchNumberNew };
 
 function loadRegen(tournament, mocks = {}) {
   const toastCalls = [];
@@ -11,6 +14,7 @@ function loadRegen(tournament, mocks = {}) {
   const saveCalls = [];
   const ctx = {
     ...SLOTS,
+    ...NUMS,
     tournament,
     showToast: (msg, kind) => { toastCalls.push({ msg, kind }); },
     confirm: mocks.confirm || (() => true),
@@ -112,7 +116,7 @@ describe('regenerateDrawSchedule — eliminatoria simples', () => {
     expect(novos.every(m => !!m.time)).toBe(true);
   });
 
-  it('renumera tournament.matches do 1 ao N', async () => {
+  it('da numero do 1 ao N quando ninguem tinha numero', async () => {
     const t = mkElim();
     const { regenerateDrawSchedule } = loadRegen(t);
     await regenerateDrawSchedule(0, true);
@@ -307,5 +311,56 @@ describe('regenerateDrawSchedule — Todos contra Todos', () => {
     await regenerateDrawSchedule(0, true);
     const names = t.matches.filter(m => m.drawName === 'SF Principal').map(m => `${m.round}:${m.roundName}`).sort();
     expect(names).toEqual(['1:R1', '1:R1', '2:R2', '2:R2', '3:R3', '3:R3']);
+  });
+});
+
+// Numero do jogo fixo (19/10/2026): o Regenerar de UMA chave nao muda o numero
+// das outras chaves nem o dos jogos desta chave que ja existiam; jogo novo
+// ganha o proximo livre. So o Regenerar Horarios (todas) renumera.
+describe('regenerateDrawSchedule — numero do jogo fixo', () => {
+  function mk(lista) {
+    return {
+      id: 't1', courts: 2, matchDuration: 30, restMinBetweenGames: 20,
+      startTime: '08:00', endTime: '12:00', breakStart: '11:00', breakEnd: '11:30',
+      draws: [{
+        id: 'd1', name: 'SM Sub11', type: 'Eliminatoria', event: 'SM',
+        matches: [
+          { round: 1, player1: 'A', player2: 'B' },
+          { round: 1, player1: 'C', player2: 'D' },
+          { round: 2, player1: '', player2: '' },
+        ],
+      }],
+      matches: lista,
+    };
+  }
+  const jogo = (t, draw, p1, p2) => t.matches.find(m => m.drawName === draw && m.player1 === p1 && m.player2 === p2);
+
+  it('outras chaves e os jogos desta que ja existiam mantem o numero; o novo ganha o proximo livre', async () => {
+    const t = mk([
+      { id: '1', num: 1, drawName: 'OUTRA', player1: 'X', player2: 'Y', time: '08:00', status: 'Pendente' },
+      { id: '3', num: 3, drawName: 'SM Sub11', drawMatchIdx: 0, round: 1, player1: 'A', player2: 'B', time: '08:30', status: 'Pendente' },
+      { id: '2', num: 2, drawName: 'SM Sub11', drawMatchIdx: 1, round: 1, player1: 'C', player2: 'D', time: '09:00', status: 'Pendente' },
+      { id: '4', num: 4, drawName: 'OUTRA', player1: 'Z', player2: 'W', time: '09:30', status: 'Pendente' },
+    ]);
+    const { regenerateDrawSchedule } = loadRegen(t);
+    await regenerateDrawSchedule(0, true);
+    expect(jogo(t, 'OUTRA', 'X', 'Y').num).toBe(1);
+    expect(jogo(t, 'OUTRA', 'Z', 'W').num).toBe(4);
+    expect(jogo(t, 'SM Sub11', 'A', 'B').num).toBe(3);
+    expect(jogo(t, 'SM Sub11', 'C', 'D').num).toBe(2);
+    expect(t.matches.find(m => m.drawName === 'SM Sub11' && m.round === 2).num).toBe(5);
+    expect(t.matches.every(m => m.id === String(m.num))).toBe(true);
+  });
+
+  it('dois jogos da chave nunca ficam com o mesmo numero (jogo antigo achado pela posicao e pelo par)', async () => {
+    const t = mk([
+      { id: '3', num: 3, drawName: 'SM Sub11', drawMatchIdx: 1, round: 1, player1: 'A', player2: 'B', time: '08:30', status: 'Pendente' },
+    ]);
+    const { regenerateDrawSchedule } = loadRegen(t);
+    await regenerateDrawSchedule(0, true);
+    const nums = t.matches.map(m => m.num);
+    expect(new Set(nums).size).toBe(nums.length);
+    expect(jogo(t, 'SM Sub11', 'A', 'B').num).toBe(3);
+    expect(nums.every(n => n > 0)).toBe(true);
   });
 });

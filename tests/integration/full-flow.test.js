@@ -14,6 +14,11 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { loadModulesShared } from './_loader-multi.js';
+import { loadModule } from '../unit/_loader.js';
+
+// Numero do jogo (proximo livre) vem do match-helpers.js: so os 2 helpers, pra
+// nao trocar o stub do findTournamentMatch pelo de verdade
+const helpersMod = loadModule('src/js/modules/match-helpers.js');
 
 function buildCtx(tournament) {
   // Stubs de UI/IPC que app.js fornece em runtime
@@ -33,6 +38,8 @@ function buildCtx(tournament) {
     renderDraws: () => { renders.draws++; },
     assignAutoTimes: () => {},
     findTournamentMatch: (drawName, idx) => tournament.matches.find(m => m.drawName === drawName && m.drawMatchIdx === idx) || null,
+    matchNextNumber: helpersMod.matchNextNumber,
+    matchNumberNew: helpersMod.matchNumberNew,
     window: {
       api: {
         saveTournament: (t) => { saves.push(JSON.parse(JSON.stringify(t))); return Promise.resolve(); },

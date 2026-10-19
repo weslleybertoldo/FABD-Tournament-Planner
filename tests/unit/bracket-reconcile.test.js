@@ -328,3 +328,36 @@ describe('Eliminatoria — rotulo da vaga com o numero do jogo na lista', () => 
     expect([f.player1Display, f.player2Display]).toEqual(['Venc. jogo 10', 'Venc. jogo 20']);
   });
 });
+
+// Numero do jogo fixo (19/10/2026): tirar o "A definir" que virou BYE deixa o
+// numero dele vago e NAO renumera os outros (a lista pode estar fora da ordem
+// dos numeros depois de um horario mudado a mao).
+describe('repropagateAllResults — numero do jogo fixo', () => {
+  function mkByeImplicito() {
+    return {
+      id: 't1',
+      draws: [{
+        id: 'd1', name: 'SM Sub11', type: 'Eliminatoria',
+        matches: [
+          { round: 1, slotIdx: 0, player1: 'A', player2: 'B', score1: '', score2: '' },
+          { round: 1, slotIdx: 1, player1: 'C', player2: '', advancer: 'C', winner: 1, score1: '', score2: '' },
+          { round: 2, slotIdx: 0, player1: '', player2: '', score1: '', score2: '' },
+        ],
+      }],
+      matches: [
+        { id: '7', num: 7, drawName: 'SM Sub11', drawMatchIdx: 0, round: 1, player1: 'A', player2: 'B', status: 'Pendente', time: '09:00' },
+        { id: '3', num: 3, drawName: 'SM Sub11', drawMatchIdx: 1, round: 1, player1: 'C', player2: '', status: 'A definir' },
+        { id: '5', num: 5, drawName: 'SM Sub11', drawMatchIdx: 2, round: 2, player1: '', player2: '', status: 'A definir' },
+      ],
+    };
+  }
+
+  it('tira o BYE implicito sem mudar o numero dos outros jogos', () => {
+    const t = mkByeImplicito();
+    const { repropagateAllResults } = loadReconcile(t);
+    repropagateAllResults();
+    expect(t.matches.map(m => m.drawMatchIdx)).toEqual([0, 2]);
+    expect(t.matches.map(m => m.num)).toEqual([7, 5]);
+    expect(t.matches.map(m => m.id)).toEqual(['7', '5']);
+  });
+});

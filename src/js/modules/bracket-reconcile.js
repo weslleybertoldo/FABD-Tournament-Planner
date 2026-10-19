@@ -174,11 +174,9 @@ function repropagateAllResults(){
     if(dm.advancer&&((dm.player1&&!dm.player2)||(dm.player2&&!dm.player1)))return false;
     return true;
   });
-  if(tournament.matches.length!==beforeLen){
-    // Renumerar
-    tournament.matches.forEach((m,i)=>{m.id=(i+1).toString();m.num=i+1;});
-    changed=true;
-  }
+  // O numero do BYE tirado fica vago: os outros jogos nao mudam de numero
+  // (numero do jogo fixo, 19/10/2026 — matchNumberNew em match-helpers.js)
+  if(tournament.matches.length!==beforeLen)changed=true;
 
   (tournament.draws||[]).forEach(d=>{
     if(!d.matches?.length)return;
