@@ -8,7 +8,7 @@
 // Issue #14 sub-tarefa 14.C — auditoria 2026-05-09.
 // =====================================================================
 
-// === GAME PROFILES + BTP HELPERS ===
+// === GAME PROFILES + HELPERS ===
 async function loadGameProfiles(){
   try{
     const settings=await window.api.getSettings();
@@ -74,7 +74,7 @@ function addRange(){const r=collectRanges();const l=r.length?r[r.length-1].max+1
 function removeRange(i){const r=collectRanges();if(r.length<=1)return;r.splice(i,1);setRanges(r);}
 function collectRanges(){
   // Perfis definem apenas faixa (min, max) e tipo de disputa.
-  // numGroups e classificados/grupo saem do calculo BTP (calcIdealGroupCount)
+  // numGroups e classificados/grupo saem do calculo ideal (calcIdealGroupCount)
   // e podem ser editados manualmente por chave no detalhe.
   const r = [];
   document.querySelectorAll('#gp-ranges-container .form-row').forEach(row => {
@@ -89,7 +89,7 @@ function collectRanges(){
 function saveGameProfile(){const name=gv('gp-name');if(!name){alert('Nome');return;}const mode=document.getElementById('gp-mode').value;const p={id:editingProfileId||Date.now().toString(),name,mode,fixedType:document.getElementById('gp-fixed-type').value,ranges:mode==='custom'?collectRanges():[]};if(editingProfileId){const i=gameProfiles.findIndex(x=>x.id===editingProfileId);if(i>=0)gameProfiles[i]=p;}else gameProfiles.push(p);saveGameProfiles();cancelProfileEditor();renderGameProfiles();showToast('Perfil salvo!');}
 function getDrawTypeForCount(t,count){if(!t.gameProfileId)return null;const p=gameProfiles.find(x=>x.id===t.gameProfileId);if(!p)return null;if(p.mode==='fixed')return p.fixedType;for(const r of(p.ranges||[]))if(count>=r.min&&count<=r.max)return r.type;if(p.ranges?.length)return p.ranges[p.ranges.length-1].type;return null;}
 
-// Calculo BTP/BWF ideal de numero de grupos por contagem de atletas.
+// Calculo BWF ideal de numero de grupos por contagem de atletas.
 // Alvo: grupos de 3-4 atletas.
 // 1-5: 1 grupo (round-robin puro)
 // 6-8: 2 | 9-12: 3 | 13-16: 4 | 17-24: 6 | 25+: 8

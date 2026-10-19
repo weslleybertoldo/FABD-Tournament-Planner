@@ -13,6 +13,7 @@ function renderSchedule() {
   if(!tournament){document.getElementById('schedule-no-tournament').style.display='block';document.getElementById('schedule-content').style.display='none';return;}
   document.getElementById('schedule-no-tournament').style.display='none';document.getElementById('schedule-content').style.display='block';
   const container=document.getElementById('schedule-grid-container'),infoEl=document.getElementById('schedule-info');
+  _svMarks=scheduleValidationRun().byMatch; // ⚠ nos cartoes (Validar programacao)
   const nc=tournament.courts||4,cn=tournament.courtNames||[],matches=tournament.matches||[];
   if(!matches.length){container.innerHTML='<div class="empty-state"><div class="icon">&#128197;</div><h3>Sem partidas agendadas</h3></div>';return;}
   const startT=tournament.startTime||'08:00',endT=tournament.endTime||'18:00',dur=tournament.matchDuration||30,rest=tournament.restMinBetweenGames||20;
@@ -145,7 +146,7 @@ function renderScheduleMatch(m){
   r+=`<div style="background:${bg};border-left:4px solid ${border};border-radius:8px;padding:12px 16px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">`;
   r+=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">`;
   r+=`<div style="display:flex;align-items:center;gap:12px">`;
-  r+=`<span style="font-weight:700;color:var(--fabd-blue);font-size:14px">Jogo ${m.num}</span>`;
+  r+=`<span style="font-weight:700;color:var(--fabd-blue);font-size:14px">Jogo ${m.num}${scheduleValidationIcon(_svMarks,m)}</span>`;
   r+=`<span style="font-size:12px;color:var(--fabd-gray-500)">${esc(m.time||'-')}</span>`;
   r+=`<span style="font-size:12px;color:var(--fabd-gray-500)">${esc(m.drawName)}</span>`;
   r+=`<span style="font-size:11px;color:var(--fabd-gray-500)">${esc(m.roundName||'R'+m.round)}</span>`;
@@ -224,7 +225,7 @@ function renderDaySchedule(){
   });
 }
 
-// Rodadas por dia, igual ao BTP (Weslley, 18/10/2026): 1 linha por chave
+// Rodadas por dia (Weslley, 18/10/2026): 1 linha por chave
 // sorteada, 1 seletor por rodada ("Automatico" = o dia da modalidade, igual
 // antes). Grava tournament.roundDays[chave][fase] = data (scheduleDayOf).
 function renderRoundDaysTable(dates){
@@ -238,7 +239,7 @@ function renderRoundDaysTable(dates){
   const box='background:var(--fabd-gray-100);border-radius:8px;padding:16px;margin-bottom:12px';
   const names=Object.keys(byDraw);
   if(!names.length)return `<div style="${box};font-size:13px;color:var(--fabd-gray-500)">Rodadas por dia: sorteie as chaves pra escolher o dia de cada rodada.</div>`;
-  let h=`<div style="${box}"><h4 style="margin-bottom:4px;color:var(--fabd-blue)">Rodadas por dia</h4><div style="font-size:12px;color:var(--fabd-gray-500);margin-bottom:12px">Escolha em que dia vai cada rodada (igual ao BTP). "Automático" = o dia da modalidade ou, se uma rodada anterior foi escolhida, o dia dela.</div>`;
+  let h=`<div style="${box}"><h4 style="margin-bottom:4px;color:var(--fabd-blue)">Rodadas por dia</h4><div style="font-size:12px;color:var(--fabd-gray-500);margin-bottom:12px">Escolha em que dia vai cada rodada. "Automático" = o dia da modalidade ou, se uma rodada anterior foi escolhida, o dia dela.</div>`;
   names.forEach(n=>{
     h+=`<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #e5e7eb"><strong style="min-width:140px;font-size:13px">${esc(n)}</strong>`;
     Object.keys(byDraw[n]).map(Number).sort((a,b)=>a-b).forEach(st=>{
@@ -304,3 +305,161 @@ function getMatchDay(match){
   return i>=0?tournament.daySchedule[i]:null;
 }
 
+// ---------------------------------------------------------------------
+// Validar programacao — janela da Agenda (Weslley, 19/10/2026; nucleo puro em
+// schedule-validation.js): Dia, lista agrupada por checagem, aba Configuracoes
+// (tournament.scheduleValidation; nao vai pro Supabase), Ver jogo / Ver chave /
+// Imprimir. So sob demanda e nao bloqueia nada. O ⚠ das regras da agenda
+// aparece em Partidas e na Agenda.
+// ---------------------------------------------------------------------
+let _svRows = [], _svSel = -1, _svMarks = null;
+
+function scheduleValidationSettingsNow() {
+  return scheduleValidationSettings(tournament.scheduleValidation, tournament.restMinBetweenGames || 20);
+}
+
+// Problemas da programacao do torneio ativo: { rows, byMatch }
+function scheduleValidationRun() {
+  ensureDayScheduleDraws();
+  const days = tournament.daySchedule || [];
+  return scheduleValidate(tournament.matches || [], {
+    days, roundDays: tournament.roundDays,
+    gridOf: i => dayGridCfg(i >= 0 ? days[i] : null),
+    drawOf: m => (tournament.draws || []).find(d => d.name === m.drawName) || null,
+    settings: scheduleValidationSettingsNow(),
+  });
+}
+
+// ⚠ do jogo com problema na programacao (Partidas e Agenda); o title lista os problemas
+function scheduleValidationIcon(marks, m) {
+  const t = marks && marks.get(m);
+  if (!t || !t.length) return '';
+  return `<span class="sv-warn" title="${esc('Programação:\n' + t.map(x => '⚠ ' + x).join('\n'))}" style="color:#DC2626;font-weight:700;cursor:help;margin-left:4px">&#9888;</span>`;
+}
+
+function _svDayLabel(i) {
+  const days = tournament.daySchedule || [];
+  if (i < 0) return days.length ? 'Sem dia definido' : 'Todos os jogos';
+  return `Dia ${i + 1} - ${fmtDate(days[i].date)}`;
+}
+
+function showScheduleValidation() {
+  if (!tournament) { showToast('Nenhum torneio ativo', 'warning'); return; }
+  setScheduleValidationTab('list');
+  openModal('modal-schedule-validation');
+}
+
+// Abas Lista / Configuracoes (voltar pra Lista recalcula)
+function setScheduleValidationTab(tab) {
+  const list = tab !== 'settings';
+  document.getElementById('sv-list').style.display = list ? '' : 'none';
+  document.getElementById('sv-settings').style.display = list ? 'none' : '';
+  document.getElementById('sv-tab-list').className = 'btn btn-sm ' + (list ? 'btn-primary' : 'btn-secondary');
+  document.getElementById('sv-tab-settings').className = 'btn btn-sm ' + (list ? 'btn-secondary' : 'btn-primary');
+  if (list) renderScheduleValidation(); else renderScheduleValidationSettings();
+}
+
+function _svButtons() {
+  const r = _svRows[_svSel];
+  document.getElementById('sv-show-match').disabled = !(r && r.m);
+  document.getElementById('sv-show-draw').disabled = !(r && r.drawName);
+}
+
+function renderScheduleValidation() {
+  _svRows = scheduleValidationRun().rows;
+  const days = tournament.daySchedule || [];
+  const sel = document.getElementById('sv-day');
+  const opts = days.map((_, i) => i);
+  if (!days.length || _svRows.some(r => r.day < 0)) opts.push(-1);
+  const prev = sel.value;
+  sel.innerHTML = opts.map(i => `<option value="${i}">${esc(_svDayLabel(i))} (${_svRows.filter(r => r.day === i).length})</option>`).join('');
+  sel.value = opts.map(String).includes(prev) ? prev : String(opts[0]);
+  const day = Number(sel.value);
+  _svSel = -1; _svButtons();
+  const list = _svRows.map((r, idx) => ({ r, idx })).filter(o => o.r.day === day);
+  const box = document.getElementById('sv-list');
+  if (!list.length) { box.innerHTML = '<p class="sv-empty">&#9989; Nenhum problema neste dia.</p>'; return; }
+  let h = '<div class="sv-scroll"><table class="sv-table"><thead><tr><th>Nome</th><th>Chave</th><th>Rodada</th><th>Jogo</th><th>Hora</th><th>Coment&aacute;rio</th></tr></thead><tbody>';
+  scheduleValidationGroups().forEach(g => {
+    const rows = list.filter(o => o.r.grupo === g.id);
+    if (!rows.length) return;
+    h += `<tr class="sv-group ${g.regra ? 'sv-regra' : 'sv-extra'}"><td colspan="6">${g.regra ? '&#9888;' : '&#9432;'} ${esc(g.titulo)} (${rows.length})</td></tr>`;
+    rows.forEach(({ r, idx }) => {
+      h += `<tr class="sv-row" data-sv-idx="${idx}" data-action="selectScheduleValidationRow" data-event="click dblclick" data-arg-1="${idx}" data-arg-2="$event"><td>${esc(r.nome)}</td><td>${esc(r.drawName || '-')}</td><td>${esc(r.roundName || '-')}</td><td>${r.num != null ? '#' + r.num : '-'}</td><td>${esc(r.time || '-')}</td><td>${esc(r.texto)}</td></tr>`;
+    });
+  });
+  box.innerHTML = h + '</tbody></table></div>';
+}
+
+// Clique seleciona a linha; duplo clique = Ver jogo
+function selectScheduleValidationRow(idx, ev) {
+  _svSel = Number(idx);
+  document.querySelectorAll('#sv-list .sv-row').forEach(tr => tr.classList.toggle('selected', Number(tr.dataset.svIdx) === _svSel));
+  _svButtons();
+  if (ev && ev.type === 'dblclick') scheduleValidationShowMatch();
+}
+
+// Ver jogo: Partidas no dia do jogo, com a linha dele acesa
+function scheduleValidationShowMatch() {
+  const r = _svRows[_svSel]; if (!r || !r.m) return;
+  const m = r.m;
+  closeModal('modal-schedule-validation');
+  navigateTo('matches');
+  const df = document.getElementById('match-day-filter'); if (df) df.value = getMatchDay(m)?.date || '';
+  const sf = document.getElementById('match-status-filter'); if (sf) sf.value = '';
+  const sm = document.getElementById('search-matches'); if (sm) sm.value = '';
+  filterMatches();
+  const tr = document.querySelector(`#matches-table-body tr[data-match-id="${CSS.escape(String(m.id || ''))}"]`);
+  if (tr) { tr.scrollIntoView({ block: 'center' }); tr.classList.add('sv-flash'); setTimeout(() => tr.classList.remove('sv-flash'), 2600); }
+}
+
+// Ver chave: abre a chave na aba Chaves
+function scheduleValidationShowDraw() {
+  const r = _svRows[_svSel]; if (!r || !r.drawName) return;
+  const idx = (tournament.draws || []).findIndex(d => d.name === r.drawName);
+  if (idx < 0) return;
+  closeModal('modal-schedule-validation');
+  navigateTo('draws');
+  selectDraw(idx);
+}
+
+function renderScheduleValidationSettings() {
+  const st = scheduleValidationSettingsNow();
+  const ev = 'data-action="onScheduleValidationSetting" data-event="change"';
+  const chk = id => `<input type="checkbox" data-sv="${id}" ${st[id] ? 'checked' : ''} ${ev}>`;
+  const num = (id, min, max, step) => `<input type="number" class="form-control sv-num" data-sv="${id}" value="${st[id]}" min="${min}" max="${max}" step="${step || 1}" ${ev}>`;
+  const hora = id => `<input type="time" class="form-control sv-time" data-sv="${id}" value="${st[id]}" ${ev}>`;
+  const linha = inner => `<label class="sv-opt">${inner}</label>`;
+  document.getElementById('sv-settings').innerHTML =
+    '<p class="sv-hint">Regras da agenda: marcam &#9888; no jogo em Partidas e na Agenda.</p>' +
+    linha(`${chk('semHorario')} Jogo sem hor&aacute;rio`) +
+    linha(`${chk('conflito')} Atleta em 2 jogos ao mesmo tempo`) +
+    linha(`${chk('descanso')} Descanso m&iacute;nimo entre o fim de um jogo e o in&iacute;cio do outro: ${num('descansoMin', 0, 1440, 5)} min <span class="sv-hint">(no torneio: ${tournament.restMinBetweenGames || 20} min)</span>`) +
+    linha(`${chk('quadras')} Mais jogos que quadras no mesmo hor&aacute;rio`) +
+    linha(`${chk('ordem')} Fase da chave antes de acabar a anterior`) +
+    linha(`${chk('horarioDoDia')} Fora do hor&aacute;rio do dia ou na pausa`) +
+    '<p class="sv-hint" style="margin-top:14px">Outras checagens: s&oacute; aparecem nesta lista.</p>' +
+    linha(`${chk('tardeCedo')} Termina tarde e come&ccedil;a cedo: jogo a partir das ${hora('tardeDepois')} e, no dia seguinte, at&eacute; as ${hora('cedoAntes')}`) +
+    linha(`${chk('simplesDepoisDuplas')} Simples depois de duplas no mesmo dia`) +
+    linha(`${chk('maxDia')} M&aacute;ximo de partidas por dia: ${num('maxDiaN', 1, 99)}`) +
+    linha(`${chk('maxSimplesDia')} M&aacute;ximo de simples por dia: ${num('maxSimplesDiaN', 1, 99)}`) +
+    linha(`${chk('maxChaveDia')} M&aacute;ximo de partidas por chave por dia: ${num('maxChaveDiaN', 1, 99)}`) +
+    '<div style="margin-top:12px"><button class="btn btn-sm btn-secondary" data-action="resetScheduleValidationSettings">Voltar ao padr&atilde;o</button></div>';
+}
+
+async function _svSaveSettings(value) {
+  if (value) tournament.scheduleValidation = value; else delete tournament.scheduleValidation;
+  await window.api.saveTournament(tournament);
+  renderScheduleValidationSettings();
+  renderSchedule(); // ⚠ dos cartoes com as regras ligadas agora
+}
+
+function onScheduleValidationSetting() {
+  const s = {};
+  document.querySelectorAll('#sv-settings [data-sv]').forEach(el => { s[el.dataset.sv] = el.type === 'checkbox' ? el.checked : el.value; });
+  return _svSaveSettings(scheduleValidationSettings(s, tournament.restMinBetweenGames || 20));
+}
+
+function resetScheduleValidationSettings() { return _svSaveSettings(null); }
+
+function printScheduleValidation() { printReport('scheduleValidation'); }

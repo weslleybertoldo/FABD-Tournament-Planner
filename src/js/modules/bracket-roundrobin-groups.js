@@ -112,7 +112,7 @@ function generateGroupsPhase(playerList, numGroups, seeds) {
     groups.push({ name: 'Grupo ' + groupLabels[i], players: [], matches: [] });
   }
 
-  // BWF/BTP: seeds distribuidas em SNAKE draft (nao round-robin simples)
+  // BWF: seeds distribuidas em SNAKE draft (nao round-robin simples)
   // Com 8 seeds e 4 grupos: A(1,8), B(2,7), C(3,6), D(4,5) — balanceamento de forca
   let si = 0, sdir = 1;
   seeds.forEach(s => {
@@ -122,7 +122,7 @@ function generateGroupsPhase(playerList, numGroups, seeds) {
     else if (si < 0) { si = 0; sdir = 1; }
   });
 
-  // BWF/BTP: non-seeds EMBARALHADOS (shuffle) antes da distribuicao pra aleatoriedade real
+  // BWF: non-seeds EMBARALHADOS (shuffle) antes da distribuicao pra aleatoriedade real
   // + protecao de clube (atletas do mesmo clube evitam o mesmo grupo quando possivel)
   const remaining = _shuffleArray(playerList.filter(p => !seeds.includes(p)));
   remaining.forEach(p => _placePlayerWithClubProtection(groups, p));

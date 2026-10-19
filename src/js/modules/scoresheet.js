@@ -1,13 +1,12 @@
 // =====================================================================
-// Sumulas de jogo (score sheets) — igual ao BTP (Report > Scoresheets):
+// Sumulas de jogo (score sheets):
 // A4 paisagem, 1 por folha, padrao BWF/CBBd. Funcoes puras, sem globals.
 //
-// Sumula EM BRANCO pro arbitro (o padrao do BTP): o cabecalho do jogo sai
+// Sumula EM BRANCO pro arbitro: o cabecalho do jogo sai
 // preenchido (torneio, chave, rodada, n do jogo, data, horario, quadra,
 // atletas e clubes; o arbitro, se ja escalado) e o resto e a mao. Filtro
 // de dia, quadra e horario, pulando jogo com atleta "A definir" e as ja
-// impressas (FRMPRINTSCORESHEETS do BTP: "Skip if not all players are
-// known" / "Skip if already printed"). Modelo validado pelo Weslley em
+// impressas. Modelo validado pelo Weslley em
 // 18/10/2026 ("1-1-2"; layout em Plano de Retorno/.../sumula-modelo/).
 //
 // Sumula PREENCHIDA (jogos finalizados): mesma folha com o resultado do app

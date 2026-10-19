@@ -331,7 +331,7 @@ describe('scheduleSortByDay', () => {
   });
 });
 
-describe('scheduleDayOf — rodadas por dia, igual ao BTP (Weslley, 18/10/2026)', () => {
+describe('scheduleDayOf — rodadas por dia (Weslley, 18/10/2026)', () => {
   const dias = [{ date: '2026-11-07', draws: ['SM A', 'SF A'] }, { date: '2026-11-08', draws: ['DX A'] }];
   const ms = [
     { drawName: 'SM A', round: 1 }, { drawName: 'SM A', round: 2 }, { drawName: 'SM A', round: 3 },

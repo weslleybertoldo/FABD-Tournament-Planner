@@ -3,15 +3,15 @@
 // _stableMatchId(tournamentId, m): id deterministico de tournamentId + drawName
 //   sanitizado + player1/2 sanitizados (NAO inclui match num — mantido
 //   estavel mesmo com renumeracao).
-// sortMatchesByBTPOrder(matches): ordena pelo padrao BTP (round → categoria →
+// sortMatchesByRoundOrder(matches): ordena por rodada (round → categoria →
 //   modalidade → drawMatchIdx). Depende de globals `getCatIdx` e
-//   `EVENT_ORDER_BTP` definidos em app.js.
+//   `EVENT_ORDER` definidos em app.js.
 // distributeMatches(matches): reordena matches via escolha gulosa por descanso
 //   (lastPlayed/minGap entre jogos dos mesmos jogadores) + catGap entre mesma
 //   categoria/drawName. NAO faz alocacao em quadras — caller distribui depois.
 // findTournamentMatch(drawName, drawMatchIdx, dm): lookup em
 //   `tournament.matches` (global) por drawName + drawMatchIdx.
-// Acoplamento explicito a globals: tournament, getCatIdx, EVENT_ORDER_BTP.
+// Acoplamento explicito a globals: tournament, getCatIdx, EVENT_ORDER.
 // Issue #14 sub-tarefa 14.I — auditoria 2026-05-09.
 // =====================================================================
 
@@ -31,7 +31,7 @@ function _stableMatchId(tournamentId, m) {
   return `${tournamentId}_${draw}_${p1}_${p2}`;
 }
 
-function sortMatchesByBTPOrder(matches) {
+function sortMatchesByRoundOrder(matches) {
   return [...matches].sort((a, b) => {
     // 1. Round (R1 antes de R2)
     const ra = a.round || 1, rb = b.round || 1;
@@ -43,8 +43,8 @@ function sortMatchesByBTPOrder(matches) {
     // 3. Modalidade/sexo (M → F → X, simples antes duplas)
     const eA = a.event || (a.drawName || '').split(' ')[0] || '';
     const eB = b.event || (b.drawName || '').split(' ')[0] || '';
-    const eIdxA = EVENT_ORDER_BTP.indexOf(eA);
-    const eIdxB = EVENT_ORDER_BTP.indexOf(eB);
+    const eIdxA = EVENT_ORDER.indexOf(eA);
+    const eIdxB = EVENT_ORDER.indexOf(eB);
     const ea = eIdxA >= 0 ? eIdxA : 99;
     const eb = eIdxB >= 0 ? eIdxB : 99;
     if (ea !== eb) return ea - eb;
