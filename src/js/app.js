@@ -4145,94 +4145,52 @@ window.clickLogoFileInput = function() {
 };
 
 // =====================================================================
-// AUTO-UPDATER UI (issue #13)
-// Mostra modal "nova atualizacao disponivel" quando main process detecta.
-// Sim -> baixa em background + reinicia automaticamente em quitAndInstall.
-// Nao -> popup fecha; volta no proximo open (main re-checa a cada startup).
+// AUTO-UPDATER UI (issue #13; instalacao silenciosa em 19/10/2026)
+// O main baixa a versao nova sozinho, em segundo plano, sem perguntar
+// (pedido do Weslley: "baixa sozinho e pergunta 'Reiniciar agora?'"). Quando
+// termina, aparece um aviso no canto que nao trava a tela (igual ao
+// fabd-fluxos): Reiniciar agora -> salva o torneio, o app fecha, instala sem
+// as telas do instalador e abre de novo; Depois -> instala ao fechar o app.
 // =====================================================================
 let _updateInfo = null;
 function setupAutoUpdaterUI() {
-  if (!window.api?.onUpdateAvailable) return;
-  window.api.onUpdateAvailable((info) => {
-    _updateInfo = info;
-    _showUpdateModal('available');
-  });
-  window.api.onUpdateProgress((p) => {
-    const bar = document.getElementById('update-progress-bar');
-    const pct = document.getElementById('update-progress-pct');
-    if (bar) bar.style.width = p.percent + '%';
-    if (pct) pct.textContent = p.percent + '%';
-  });
-  window.api.onUpdateDownloaded((info) => {
-    _updateInfo = info;
-    _showUpdateModal('ready');
-  });
-  window.api.onUpdateError((err) => {
-    console.warn('[updater] erro:', err?.message);
-    showToast('Falha no auto-update: ' + (err?.message || 'erro desconhecido'), 'error');
-    _hideUpdateModal();
-  });
+  if (!window.api?.onUpdateDownloaded) return;
+  window.api.onUpdateAvailable?.((info) => { _updateInfo = info; console.info('[updater] baixando v' + (info?.version || '?')); });
+  window.api.onUpdateDownloaded((info) => { _updateInfo = info; _showUpdateToast(); });
+  // Erro no download em segundo plano (ex.: sem internet) nao incomoda: tenta de novo na proxima abertura
+  window.api.onUpdateError?.((err) => { console.warn('[updater] erro:', err?.message); });
 }
-function _showUpdateModal(state) {
-  let modal = document.getElementById('update-modal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'update-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.7);z-index:99998;display:flex;align-items:center;justify-content:center';
-    document.body.appendChild(modal);
+function _showUpdateToast() {
+  let el = document.getElementById('update-modal');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'update-modal';
+    el.setAttribute('role', 'status');
+    el.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99998;max-width:380px;width:92%;background:#fff;border:1px solid #BFDBFE;border-radius:14px;padding:16px;box-shadow:0 12px 40px rgba(15,23,42,.25)';
+    document.body.appendChild(el);
   }
-  modal.style.display = 'flex';
   const v = _updateInfo?.version || '?';
-  if (state === 'available') {
-    modal.innerHTML = `
-      <div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-        <h3 style="margin:0 0 12px;color:#1E3A8A">Nova atualizacao disponivel</h3>
-        <p style="margin:0 0 8px;color:#475569;font-size:14px">Versao <strong>v${esc(String(v))}</strong> pronta pra baixar.</p>
-        <p style="margin:0 0 20px;color:#94A3B8;font-size:12px">Atualizar agora baixa em background e reinicia o app automaticamente.</p>
-        <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-secondary" data-action="updaterDecline">Mais tarde</button>
-          <button class="btn btn-primary" data-action="updaterAccept">Atualizar agora</button>
-        </div>
-      </div>`;
-  } else if (state === 'downloading') {
-    modal.innerHTML = `
-      <div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-        <h3 style="margin:0 0 12px;color:#1E3A8A">Baixando v${esc(String(v))}...</h3>
-        <div style="background:#E2E8F0;border-radius:6px;height:8px;overflow:hidden;margin-bottom:8px">
-          <div id="update-progress-bar" style="background:#3B82F6;height:100%;width:0%;transition:width .2s"></div>
-        </div>
-        <p style="margin:0;color:#64748B;font-size:13px;text-align:center"><span id="update-progress-pct">0%</span></p>
-      </div>`;
-  } else if (state === 'ready') {
-    modal.innerHTML = `
-      <div style="background:#fff;border-radius:12px;padding:24px;max-width:420px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-        <h3 style="margin:0 0 12px;color:#065F46">Atualizacao baixada!</h3>
-        <p style="margin:0 0 20px;color:#475569;font-size:14px">v${esc(String(v))} pronta. App vai reiniciar pra aplicar.</p>
-        <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-secondary" data-action="updaterDeclineInstall">Reiniciar depois</button>
-          <button class="btn btn-primary" data-action="updaterInstallNow">Reiniciar agora</button>
-        </div>
-      </div>`;
-  }
+  el.innerHTML = `
+    <p style="margin:0 0 4px;color:#065F46;font-weight:700">Atualiza&ccedil;&atilde;o v${esc(String(v))} baixada</p>
+    <p style="margin:0 0 12px;color:#475569;font-size:13px">Reiniciar agora? O app fecha, instala sozinho e abre de novo. Se preferir, ela entra quando voc&ecirc; fechar o app.</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" data-action="updaterDeclineInstall">Depois</button>
+      <button class="btn btn-primary" data-action="updaterInstallNow">Reiniciar agora</button>
+    </div>`;
+  el.style.display = 'block';
 }
-function _hideUpdateModal() {
-  const modal = document.getElementById('update-modal');
-  if (modal) modal.style.display = 'none';
+function _hideUpdateToast() {
+  const el = document.getElementById('update-modal');
+  if (el) el.style.display = 'none';
 }
-window.updaterAccept = async function() {
-  _showUpdateModal('downloading');
+window.updaterInstallNow = async function() {
+  // Salva o torneio antes: o instalador fecha o app na hora. Sem salvar, nao reinicia.
   try {
-    const res = await window.api.updaterDownload();
-    if (res && res.ok === false) {
-      // Falha sincrona — UI fica presa em 'downloading' sem este fallback
-      showToast('Falha ao baixar atualizacao: ' + (res.error || 'erro desconhecido'), 'error');
-      _showUpdateModal('available');
-    }
+    if (tournament) await window.api.saveTournament(tournament);
   } catch (e) {
-    showToast('Falha ao baixar atualizacao: ' + (e?.message || String(e)), 'error');
-    _showUpdateModal('available');
+    showToast('Não deu pra salvar o torneio: a atualização entra quando você fechar o app.', 'error');
+    return;
   }
+  window.api.updaterInstall();
 };
-window.updaterDecline = function() { _hideUpdateModal(); };
-window.updaterInstallNow = function() { window.api.updaterInstall(); };
-window.updaterDeclineInstall = function() { _hideUpdateModal(); };
+window.updaterDeclineInstall = function() { _hideUpdateToast(); };
