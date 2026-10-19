@@ -201,19 +201,14 @@ function renderDaySchedule(){
     // Mostrar quais categorias ficam neste dia
     const modeDraws=mode==='simples'?simples:mode==='duplas'?duplas:drawNames;
     if(modeDraws.length)h+=`<div style="margin-top:8px;font-size:12px;color:var(--fabd-gray-500)">Categorias: ${modeDraws.map(esc).join(', ')}</div>`;
-    // Fases por dia (Weslley, 18/10/2026): opcional; "Todas as fases" = igual antes.
-    // Ex.: sabado "Ate as quartas" e domingo "Semis e finais" (scheduleDayOf)
-    const phases=saved.phases||'todas';
-    const phaseBtn=(v,txt)=>`<label style="font-size:14px;display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;background:${phases===v?'#2563EB':'#fff'};color:${phases===v?'#fff':'#333'};border-radius:8px;border:2px solid ${phases===v?'#2563EB':'#cbd5e1'}"><input type="radio" name="ds-phases-${idx}" class="ds-phases" value="${v}" ${phases===v?'checked':''} style="display:none"> ${txt}</label>`;
-    h+=`<label style="font-weight:600;font-size:13px;margin:12px 0 8px;display:block">Fases neste dia:</label>`;
-    h+=`<div style="display:flex;gap:12px;flex-wrap:wrap">${phaseBtn('todas','Todas as fases')}${phaseBtn('ate-quartas','Até as quartas')}${phaseBtn('semis-finais','Semis e finais')}</div>`;
     h+=`</div></div>`;
   });
-  container.innerHTML=h;
+  container.innerHTML=h+renderRoundDaysTable(days);
   // Listener: ao trocar radio, salvar estado atual e re-renderizar
-  container.querySelectorAll('.ds-mode, .ds-phases').forEach(r=>{
+  container.querySelectorAll('.ds-mode').forEach(r=>{
     r.addEventListener('change',()=>{
       tournament.daySchedule=collectDaySchedule();
+      tournament.roundDays=collectRoundDays();
       renderDaySchedule();
     });
   });
@@ -221,9 +216,44 @@ function renderDaySchedule(){
   container.querySelectorAll('.ds-no-break').forEach(c=>{
     c.addEventListener('change',()=>{
       tournament.daySchedule=collectDaySchedule();
+      tournament.roundDays=collectRoundDays();
       renderDaySchedule();
     });
   });
+}
+
+// Rodadas por dia, igual ao BTP (Weslley, 18/10/2026): 1 linha por chave
+// sorteada, 1 seletor por rodada ("Automatico" = o dia da modalidade, igual
+// antes). Grava tournament.roundDays[chave][fase] = data (scheduleDayOf).
+function renderRoundDaysTable(dates){
+  if(dates.length<2)return '';
+  const rd=tournament.roundDays||{};
+  const byDraw={};
+  (tournament.matches||[]).forEach(m=>{
+    const st=scheduleStageOf(m), r=(byDraw[m.drawName]=byDraw[m.drawName]||{});
+    if(!(st in r))r[st]=st===0?'Grupos':(m.roundName||`Rodada ${st}`);
+  });
+  const box='background:var(--fabd-gray-100);border-radius:8px;padding:16px;margin-bottom:12px';
+  const names=Object.keys(byDraw);
+  if(!names.length)return `<div style="${box};font-size:13px;color:var(--fabd-gray-500)">Rodadas por dia: sorteie as chaves pra escolher o dia de cada rodada.</div>`;
+  let h=`<div style="${box}"><h4 style="margin-bottom:4px;color:var(--fabd-blue)">Rodadas por dia</h4><div style="font-size:12px;color:var(--fabd-gray-500);margin-bottom:12px">Escolha em que dia vai cada rodada (igual ao BTP). "Automático" = o dia da modalidade.</div>`;
+  names.forEach(n=>{
+    h+=`<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #e5e7eb"><strong style="min-width:140px;font-size:13px">${esc(n)}</strong>`;
+    Object.keys(byDraw[n]).map(Number).sort((a,b)=>a-b).forEach(st=>{
+      const cur=(rd[n]||{})[st]||'';
+      h+=`<label style="font-size:12px;display:flex;align-items:center;gap:4px">${esc(byDraw[n][st])}<select class="form-control rd-select" data-draw="${esc(n)}" data-stage="${st}" style="width:auto;padding:2px 4px;font-size:12px"><option value="">Automático</option>${dates.map((d,i)=>`<option value="${d}"${cur===d?' selected':''}>Dia ${i+1}</option>`).join('')}</select></label>`;
+    });
+    h+=`</div>`;
+  });
+  return h+`</div>`;
+}
+
+function collectRoundDays(){
+  const out={};
+  document.querySelectorAll('#tc-day-schedule-container .rd-select').forEach(s=>{
+    if(s.value)(out[s.dataset.draw]=out[s.dataset.draw]||{})[s.dataset.stage]=s.value;
+  });
+  return out;
 }
 
 function collectDaySchedule(){
@@ -243,9 +273,8 @@ function collectDaySchedule(){
     const breakEnd=noBreak?'00:00':(panel.querySelector('.ds-break-end')?.value||'13:30');
     const modeEl=panel.querySelector('.ds-mode:checked');
     const mode=modeEl?.value||'todas';
-    const phases=panel.querySelector('.ds-phases:checked')?.value||'todas';
     const draws=mode==='simples'?simples:mode==='duplas'?duplas:drawNames;
-    schedule.push({date,startTime,endTime,breakStart,breakEnd,noBreak,mode,phases,draws});
+    schedule.push({date,startTime,endTime,breakStart,breakEnd,noBreak,mode,draws});
   });
   return schedule;
 }

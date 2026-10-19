@@ -3320,6 +3320,7 @@ async function saveTournamentConfig(){
     tournament.courtNames=Array.from(document.querySelectorAll('.tc-court-name')).map((inp,i)=>inp.value.trim()||`Quadra ${i+1}`);
     // Salvar programacao por dia
     tournament.daySchedule=collectDaySchedule();
+    tournament.roundDays=collectRoundDays();
     // Ranking selecionado pra este torneio
     const rkSel=document.getElementById('tc-ranking-select');
     if(rkSel)tournament.scoringTableId=rkSel.value||'default-bwf';
