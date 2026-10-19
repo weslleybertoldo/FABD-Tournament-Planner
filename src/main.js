@@ -292,15 +292,17 @@ process.on('unhandledRejection', (e) => { log('ERROR', 'Unhandled:', String(e));
 
 // =====================================================================
 // AUTO-UPDATER (electron-updater + GitHub Releases)
-// Fluxo: check on startup -> se ha update, manda evento pro renderer
-// que mostra popup "Atualizar agora?". Sim -> downloadUpdate + quitAndInstall.
-// Nao -> adia; popup volta no proximo open do app.
+// Instalacao silenciosa (pedido do Weslley, 19/10/2026: "baixa sozinho e
+// pergunta 'Reiniciar agora?'"): ao abrir, se ha versao nova, baixa sozinho em
+// segundo plano; quando termina, o renderer pergunta "Reiniciar agora?".
+// Sim -> instala sem as telas do instalador e abre de novo. Depois -> instala
+// sem telas quando o app for fechado.
 // =====================================================================
 function setupAutoUpdater() {
   try {
     const { autoUpdater } = require('electron-updater');
-    autoUpdater.autoDownload = false; // user confirma antes
-    autoUpdater.autoInstallOnAppQuit = false;
+    autoUpdater.autoDownload = true; // baixa sozinho, sem perguntar
+    autoUpdater.autoInstallOnAppQuit = true; // "Depois": instala ao fechar o app
     autoUpdater.logger = { info: (m) => log('INFO', '[updater]', m), warn: (m) => log('WARN', '[updater]', m), error: (m) => log('ERROR', '[updater]', m), debug: () => {} };
 
     autoUpdater.on('update-available', (info) => {
@@ -328,22 +330,10 @@ function setupAutoUpdater() {
       }
     });
 
-    ipcMain.handle('updater:download', async () => {
-      try { await autoUpdater.downloadUpdate(); return { ok: true }; }
-      catch (err) {
-        const msg = err?.message || String(err);
-        log('ERROR', '[updater] downloadUpdate falhou:', msg);
-        // Emitir tambem o evento pro renderer: garante que UI veja o erro
-        // mesmo se a chamada IPC nao for awaited (defesa em camadas).
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('updater:error', { message: msg });
-        }
-        return { ok: false, error: msg };
-      }
-    });
     ipcMain.handle('updater:install', () => {
       log('INFO', '[updater] quitAndInstall');
-      setImmediate(() => autoUpdater.quitAndInstall(false, true));
+      // isSilent: sem as telas do instalador; isForceRunAfter: abre o app de novo
+      setImmediate(() => autoUpdater.quitAndInstall(true, true));
       return { ok: true };
     });
 
