@@ -108,3 +108,38 @@ jobs:
             echo "Push falhou (tentativa $i/5), aguardando..."
             sleep $((RANDOM % 5 + 2))
           done
+
+  # AppImage do Linux (notebook Xubuntu) na MESMA release, com o latest-linux.yml:
+  # o app no Linux se atualiza sozinho igual ao Windows (pedido do Weslley em
+  # 19/10/2026). Roda depois do Windows (a release ja existe) e no MESMO commit
+  # (o bump vem num commit depois, entao a versao bate com a do .exe).
+  build-linux:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Get current version
+        id: version
+        run: |
+          FULL=$(node -p "require('./package.json').version")
+          echo "current=$(echo "$FULL" | sed 's/\.0$//')" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build AppImage
+        run: npx electron-builder --linux AppImage --x64 --publish never
+
+      - name: Upload AppImage to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "v${{ steps.version.outputs.current }}" dist/*.AppImage dist/latest-linux.yml --clobber
