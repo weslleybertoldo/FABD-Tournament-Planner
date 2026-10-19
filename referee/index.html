@@ -556,7 +556,7 @@
     let clubMap=new Map(); // mapeia nome completo -> clube do jogador
     // Sides: quem esta em qual lado da tela
     let leftPlayer=1,rightPlayer=2; // 1=player1, 2=player2
-    let state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
+    let state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[],rallies:[]};
     // Scoring dinamico - vem do Supabase (configurado no Planner)
     let PTS=21,MAX=30,BEST=3;
     let intervalAt=11; // ponto de descanso/troca de lado (auto: floor(points/2)+1)
@@ -1204,7 +1204,7 @@
           applyScoring(tData.scoring);
         }catch(e){clubMap=new Map();}
         leftPlayer=1;rightPlayer=2;
-        state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[]};
+        state={set:1,p1:0,p2:0,setsP1:[],setsP2:[],setsWonP1:0,setsWonP2:0,server:1,history:[],rallies:[]};
         intervalAsked=false;
         // Todo jogo comeca com "Trocar saque" liberado — antes so a dupla zerava
         // isso, e um simples aberto depois de uma dupla ja comecada ficava sem o
@@ -1236,6 +1236,7 @@
         // Carregar score existente
         const{data:sc}=await sb.from('live_scores').select('*').eq('match_id',matchId).single();
         if(sc){state.set=sc.current_set||1;state.p1=sc.score_p1||0;state.p2=sc.score_p2||0;state.setsP1=sc.sets_p1||[];state.setsP2=sc.sets_p2||[];state.setsWonP1=sc.sets_won_p1||0;state.setsWonP2=sc.sets_won_p2||0;
+          state.rallies=Array.isArray(sc.rallies)?sc.rallies:[];
           if(isDoubles&&(state.p1>0||state.p2>0))canSwapInner=false;
         }
 
@@ -1342,6 +1343,20 @@
       updateDisplay();
     }
 
+    // Ponto a ponto da sumula (padrao BWF, 19/10/2026): 1 item por game
+    // {srv, rcv, pts:[[lado que ganhou o rali, linha de quem saca o proximo]]}.
+    // Linhas da grade: 0 = 1o nome do lado 1, 1 = parceiro, 2 = 1o nome do lado 2, 3 = parceiro.
+    const _RALLY_ROW={p1a:0,p1b:1,p2a:2,p2b:3};
+    function _rallyServerRow(){return isDoubles?(_RALLY_ROW[doublesServer]??0):(state.server===1?0:2);}
+    // Recebedor = jogador do outro lado na quadra da mesma paridade do placar de quem saca
+    // (diagonal). Mesma convencao de posicao do addPoint: esquerda par=baixo, direita par=cima.
+    function _rallyReceiverRow(){
+      if(!isDoubles)return state.server===1?2:0;
+      const srvTeam=String(doublesServer).startsWith('p1')?1:2,recTeam=3-srvTeam;
+      const even=(srvTeam===1?state.p1:state.p2)%2===0;
+      const id=leftPlayer===recTeam?(even?leftBottomPlayer:leftTopPlayer):(even?rightTopPlayer:rightBottomPlayer);
+      return _RALLY_ROW[id]??(recTeam===1?0:2);
+    }
     function addPoint(side){
       if(isReadOnly)return;
       const player=side==='left'?leftPlayer:rightPlayer;
@@ -1356,6 +1371,9 @@
         canSwapInner
       });
       if(state.history.length>500)state.history.shift();
+      const g=state.set-1;
+      if(!Array.isArray(state.rallies))state.rallies=[];
+      if(!state.rallies[g])state.rallies[g]={srv:_rallyServerRow(),rcv:_rallyReceiverRow(),pts:[]};
       if(player===1)state.p1++;else state.p2++;
       state.server=player;
 
@@ -1398,6 +1416,7 @@
         }
       }
 
+      state.rallies[g].pts.push([player,_rallyServerRow()]);
       checkSetEnd();
       updateDisplay();
       syncScore();
@@ -1409,6 +1428,8 @@
       state.set=prev.set;state.p1=prev.p1;state.p2=prev.p2;state.server=prev.server;
       state.setsP1=prev.setsP1;state.setsP2=prev.setsP2;
       state.setsWonP1=prev.setsWonP1;state.setsWonP2=prev.setsWonP2;
+      const gr=state.rallies?.[prev.set-1];
+      if(gr){gr.pts.pop();if(!gr.pts.length)state.rallies.length=prev.set-1;}
       leftPlayer=prev.leftPlayer;rightPlayer=prev.rightPlayer;
       intervalAsked=prev.intervalAsked||false;
       if(isDoubles){
@@ -1726,7 +1747,7 @@
           federation_id:currentMatch.federation_id,
           current_set:state.set,score_p1:state.p1,score_p2:state.p2,
           sets_p1:state.setsP1,sets_p2:state.setsP2,
-          sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,
+          sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,rallies:state.rallies||[],
           umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()
         },{onConflict:'match_id'}).select('match_id');
         if(error){throw error;}
@@ -1757,7 +1778,7 @@
         // Verificar se o jogo ainda esta Em Quadra antes de finalizar
         const {data:matchCheck}=await sb.from('live_matches').select('status').eq('id',currentMatch.id).single();
         if(!matchCheck||matchCheck.status!=='Em Quadra'){alert('Este jogo nao esta mais em quadra. Saindo do placar.');closeModal();doExitScorer();return;}
-        const r1=await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,federation_id:currentMatch.federation_id,current_set:state.set,score_p1:state.p1,score_p2:state.p2,sets_p1:state.setsP1,sets_p2:state.setsP2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,winner,final_score:finalScore,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'});
+        const r1=await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,federation_id:currentMatch.federation_id,current_set:state.set,score_p1:state.p1,score_p2:state.p2,sets_p1:state.setsP1,sets_p2:state.setsP2,sets_won_p1:state.setsWonP1,sets_won_p2:state.setsWonP2,rallies:state.rallies||[],winner,final_score:finalScore,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'});
         const r2=await sb.from('live_matches').update({status:'Finalizada',umpire:currentUser?.name||''}).eq('id',currentMatch.id);
         if(r1.error||r2.error){alert('Erro ao finalizar: '+(r1.error?.message||r2.error?.message));return;}
         closeModal();alert('Placar registrado!');doExitScorer();
@@ -1909,7 +1930,7 @@
         const {data:matchCheck}=await sb.from('live_matches').select('status').eq('id',currentMatch.id).single();
         if(!matchCheck||matchCheck.status!=='Em Quadra'){alert('Este jogo nao esta mais em quadra. Saindo do placar.');closeEndModal();doExitScorer();return;}
         // .select: sem linha de volta = RLS barrou em silêncio (igual ao syncScore)
-        const r1=await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,federation_id:currentMatch.federation_id,current_set:r.current_set,score_p1:r.score_p1,score_p2:r.score_p2,sets_p1:r.sets_p1,sets_p2:r.sets_p2,sets_won_p1:r.sets_won_p1,sets_won_p2:r.sets_won_p2,winner:r.winner,final_score:r.final_score,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'}).select('match_id');
+        const r1=await sb.from('live_scores').upsert({match_id:currentMatch.id,tournament_id:currentMatch.tournament_id,federation_id:currentMatch.federation_id,current_set:r.current_set,score_p1:r.score_p1,score_p2:r.score_p2,sets_p1:r.sets_p1,sets_p2:r.sets_p2,sets_won_p1:r.sets_won_p1,sets_won_p2:r.sets_won_p2,rallies:state.rallies||[],winner:r.winner,final_score:r.final_score,umpire_name:currentUser?.name||'',updated_at:new Date().toISOString()},{onConflict:'match_id'}).select('match_id');
         if(r1.error){alert('Erro ao finalizar: '+r1.error.message);return;}
         if(!r1.data?.length){alert('Erro ao finalizar: o resultado não foi salvo. Verifique se seu cadastro de árbitro está autorizado.');return;}
         const r2=await sb.from('live_matches').update({status:'Finalizada',umpire:currentUser?.name||''}).eq('id',currentMatch.id);
