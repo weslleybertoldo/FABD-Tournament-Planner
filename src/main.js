@@ -869,6 +869,11 @@ ipcMain.handle('supabase:upsertTournament', async (_, tournamentId, name, tourna
         courtNames: tournamentData.courtNames || [],
         startDate: tournamentData.startDate,
         endDate: tournamentData.endDate,
+        // Dia de cada jogo no site ao vivo (Programacao por dia): a mesma regra do
+        // Planner (scheduleDayOf) precisa da data e das chaves de cada dia e das
+        // rodadas por dia — so isso, sem os horarios da configuracao
+        daySchedule: (tournamentData.daySchedule || []).map(d => ({ date: d.date, draws: d.draws || [] })),
+        roundDays: tournamentData.roundDays || {},
         location: tournamentData.location,
         city: tournamentData.city,
         // Apenas nome + clube — sem PII (telefone/dob/email) para nao vazar publicamente
