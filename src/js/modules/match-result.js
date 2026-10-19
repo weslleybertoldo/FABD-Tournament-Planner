@@ -15,6 +15,8 @@
 // live_scores.final_score — e por ele que o arbitro manda a situacao
 // (parseFinalScore e o inverso). Regras escolhidas pelo Weslley em
 // 18/10/2026 (CBBd primeiro, BWF onde a CBBd nao fala).
+// Placar automatico (winnerPointsFor): pontos de quem ganhou o game a partir
+// dos de quem perdeu.
 // Cobertura: tests/unit/match-result.test.js
 // =====================================================================
 
@@ -122,4 +124,16 @@ function validatePartialSets(sets, points, maxPoints) {
     }
   }
   return { valid: true };
+}
+
+// Placar automatico (Weslley, 18/10/2026): o organizador digita so os pontos
+// de quem PERDEU o game e o app completa os de quem ganhou pela regra do
+// torneio — ate 19 → 21; na prorrogacao 2 a mais (20 → 22, 25 → 27) ate o
+// maximo (29 → 30). null = o numero nao pode ser de quem perdeu.
+function winnerPointsFor(loserPoints, points, maxPoints) {
+  const s = String(loserPoints ?? '').trim();
+  if (!/^\d+$/.test(s)) return null;
+  const lo = Number(s);
+  if (lo >= maxPoints) return null;
+  return Math.min(maxPoints, Math.max(points, lo + 2));
 }
