@@ -39,7 +39,7 @@ function fillMissingTimesByDay() {
   const drawOf = m => (tournament.draws || []).find(d => d.name === m.drawName);
   const athletesOf = m => scheduleIsToDefine(m) ? schedulePossibleAthletes(m, drawOf(m)) : scheduleAthletes(m.player1, m.player2);
   let changed = false;
-  const dayCtx = scheduleDayContext(all, tournament.draws);
+  const dayCtx = tournament.roundDays;
   days.forEach((day, di) => {
     const inDay = m => !day || scheduleDayOf(m, days, dayCtx) === di; // dia do JOGO (fases por dia)
     const slots = scheduleDaySlots({

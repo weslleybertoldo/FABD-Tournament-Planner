@@ -4,7 +4,7 @@ import { loadModule } from './_loader.js';
 const {
   scheduleStageOf, scheduleDaySlots, scheduleAthletes, schedulePossibleAthletes,
   scheduleBook, schedulePlaceDefined, schedulePlaceToDefine, scheduleRole,
-  scheduleConflicts, scheduleSortByDay, scheduleDayContext, scheduleDayOf,
+  scheduleConflicts, scheduleSortByDay, scheduleDayOf,
 } = loadModule('src/js/modules/schedule-slots.js');
 
 const H = hhmm => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
@@ -331,55 +331,34 @@ describe('scheduleSortByDay', () => {
   });
 });
 
-describe('scheduleDayOf — fases por dia (Weslley, 18/10/2026)', () => {
-  // Sabado "Ate as quartas" e domingo "Semis e finais", os 2 com todas as modalidades
-  const draws = [
-    { name: 'SM A', type: 'Eliminatoria' },
-    { name: 'DX A', type: 'Grupos + Eliminatoria' },
-    { name: 'SF A', type: 'Todos contra Todos' },
-    { name: 'DM 4', type: 'Eliminatoria' },
-  ];
+describe('scheduleDayOf — rodadas por dia, igual ao BTP (Weslley, 18/10/2026)', () => {
+  const dias = [{ date: '2026-11-07', draws: ['SM A', 'SF A'] }, { date: '2026-11-08', draws: ['DX A'] }];
   const ms = [
-    { drawName: 'SM A', round: 1, roundName: 'Quartas' }, { drawName: 'SM A', round: 2, roundName: 'Semifinal' }, { drawName: 'SM A', round: 3, roundName: 'Final' },
-    { drawName: 'DX A', phase: 'group', round: 2 }, { drawName: 'DX A', phase: 'elimination', round: 1 }, { drawName: 'DX A', phase: 'elimination', round: 2 },
-    { drawName: 'SF A', round: 3 },
-    { drawName: 'DM 4', round: 1 }, { drawName: 'DM 4', round: 2 },
+    { drawName: 'SM A', round: 1 }, { drawName: 'SM A', round: 2 }, { drawName: 'SM A', round: 3 },
+    { drawName: 'DX A', phase: 'group', round: 2 }, { drawName: 'DX A', phase: 'elimination', round: 1 },
   ];
-  const ctx = scheduleDayContext(ms, draws);
-  const todas = ['SM A', 'DX A', 'SF A', 'DM 4'];
-  const dias = [{ draws: todas, phases: 'ate-quartas' }, { draws: todas, phases: 'semis-finais' }];
-  const dia = m => scheduleDayOf(m, dias, ctx);
+  const dia = (m, rd) => scheduleDayOf(m, dias, rd);
 
-  it('semis e finais vao pro dia "Semis e finais"; o resto fica no "Ate as quartas"', () => {
-    expect(ms.slice(0, 3).map(dia)).toEqual([0, 1, 1]);
-    expect(ms.slice(3, 6).map(dia)).toEqual([0, 1, 1]);
+  it('Automatico (sem escolha): o 1o dia que tem a chave, igual antes', () => {
+    expect(ms.map(m => dia(m))).toEqual([0, 0, 0, 1, 1]);
+    expect(dia({ drawName: 'XX' })).toBe(-1);
   });
 
-  it('Todos contra Todos nao tem semi nem final: fica inteiro no 1o dia', () => {
-    expect(dia(ms[6])).toBe(0);
+  it('rodada com dia escolhido vai pra ele, mesmo que o dia seja de outra modalidade', () => {
+    const rd = { 'SM A': { 2: '2026-11-08', 3: '2026-11-08' }, 'DX A': { 0: '2026-11-07' } };
+    expect(ms.map(m => dia(m, rd))).toEqual([0, 1, 1, 0, 1]);
   });
 
-  it('chave de 4 ja comeca na semi: vai inteira pro dia das semis e finais', () => {
-    expect([dia(ms[7]), dia(ms[8])]).toEqual([1, 1]);
+  it('dia escolhido que nao existe mais: volta pro Automatico', () => {
+    expect(dia(ms[2], { 'SM A': { 3: '2026-12-25' } })).toBe(0);
   });
 
-  it('sem fases (padrao "Todas"): o 1o dia que tem a chave, igual antes', () => {
-    const d2 = [{ draws: ['SF A'] }, { draws: ['SM A', 'DX A'] }];
-    expect([scheduleDayOf(ms[0], d2, ctx), scheduleDayOf(ms[2], d2, ctx), scheduleDayOf(ms[6], d2, ctx)]).toEqual([1, 1, 0]);
-    expect(scheduleDayOf({ drawName: 'XX' }, d2, ctx)).toBe(-1);
-  });
-
-  it('nenhum dia aceita a fase: fica no 1o dia que tem a chave (cada dia com uma modalidade)', () => {
-    const sep = [{ draws: ['SM A'], phases: 'ate-quartas' }, { draws: ['DX A'], phases: 'semis-finais' }];
-    expect([scheduleDayOf(ms[2], sep, ctx), scheduleDayOf(ms[3], sep, ctx)]).toEqual([0, 1]);
-  });
-
-  it('scheduleSortByDay usa o dia do jogo: final de sabado-domingo vai pro fim', () => {
+  it('scheduleSortByDay usa o dia de cada jogo: a final escolhida pro dia 2 vai pro fim', () => {
     const lista = [
-      { num: 1, drawName: 'SM A', round: 3, time: '09:00' },
+      { num: 1, drawName: 'SM A', round: 3, time: '08:00' },
       { num: 2, drawName: 'SM A', round: 1, time: '09:00' },
-      { num: 3, drawName: 'SM A', round: 2, time: '08:00' },
+      { num: 3, drawName: 'DX A', round: 1, phase: 'elimination', time: '08:30' },
     ];
-    expect(scheduleSortByDay(lista, dias, scheduleDayContext(lista, draws)).map(m => m.num)).toEqual([2, 3, 1]);
+    expect(scheduleSortByDay(lista, dias, { 'SM A': { 3: '2026-11-08' } }).map(m => m.num)).toEqual([2, 1, 3]);
   });
 });

@@ -233,45 +233,22 @@ function scheduleConflicts(m, t, others, cfg, drawOf) {
   return out;
 }
 
-// Fases por dia (Weslley, 18/10/2026): cada dia pode receber so parte das
-// fases (daySchedule[].phases): 'todas' (padrao, igual antes), 'ate-quartas'
-// (tudo menos semis e finais) ou 'semis-finais'. ctx = tipo de cada chave +
-// maior fase do mata-mata na lista (uma conta por lista de jogos).
-function scheduleDayContext(matches, draws) {
-  const type = new Map((draws || []).map(d => [d.name, d.type]));
-  const top = new Map();
-  (matches || []).forEach(m => {
-    if (m.phase === 'group') return;
-    const s = scheduleStageOf(m);
-    if (!(top.get(m.drawName) >= s)) top.set(m.drawName, s);
-  });
-  return { type, top };
-}
-
-// Semi ou final = as 2 ultimas fases do mata-mata (nao o texto do roundName,
-// que muda conforme o caminho que montou a lista). Grupo e Todos contra Todos: nao.
-function scheduleIsLatePhase(m, ctx) {
-  const t = ctx.type.get(m.drawName);
-  if ((t !== 'Eliminatoria' && t !== 'Grupos + Eliminatoria') || m.phase === 'group') return false;
-  return scheduleStageOf(m) >= ctx.top.get(m.drawName) - 1;
-}
-
-// Dia (indice em days) de UM jogo: o 1o dia que tem a chave e aceita a fase;
-// nenhum aceita -> o 1o dia que tem a chave; nenhum tem -> -1.
-function scheduleDayOf(m, days, ctx) {
+// Dia (indice em days) de UM jogo. Rodadas por dia, igual ao BTP (Weslley,
+// 18/10/2026): roundDays[chave][fase] = data do dia escolhido na Programacao
+// (fase = scheduleStageOf: 0 grupos, 1.. rodadas). Sem escolha ("Automatico")
+// ou dia que nao existe mais -> o 1o dia que tem a chave, igual antes. -1 = nenhum.
+function scheduleDayOf(m, days, roundDays) {
   const list = days || [];
-  const has = d => (d.draws || []).includes(m.drawName);
-  const late = scheduleIsLatePhase(m, ctx);
-  const i = list.findIndex(d => has(d) && (!d.phases || d.phases === 'todas' || (d.phases === 'semis-finais') === late));
-  return i >= 0 ? i : list.findIndex(has);
+  const chosen = roundDays && roundDays[m.drawName] && roundDays[m.drawName][scheduleStageOf(m)];
+  if (chosen) { const i = list.findIndex(d => d.date === chosen); if (i >= 0) return i; }
+  return list.findIndex(d => (d.draws || []).includes(m.drawName));
 }
 
 // Lista na ordem de Partidas/Agenda: dia do jogo (scheduleDayOf), horario (sem
 // horario no fim) e numero do jogo. Devolve uma copia; nao renumera.
-function scheduleSortByDay(matches, days, ctx) {
-  const c = ctx || scheduleDayContext(matches, []);
+function scheduleSortByDay(matches, days, roundDays) {
   const n = (days || []).length;
-  const dayOf = m => { const i = scheduleDayOf(m, days, c); return i < 0 ? n : i; };
+  const dayOf = m => { const i = scheduleDayOf(m, days, roundDays); return i < 0 ? n : i; };
   const at = m => (m.time ? scheduleMinutes(m.time) : 9999);
   return [...matches].sort((a, b) => dayOf(a) - dayOf(b) || at(a) - at(b) || (a.num || 0) - (b.num || 0));
 }
