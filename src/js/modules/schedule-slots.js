@@ -236,12 +236,18 @@ function scheduleConflicts(m, t, others, cfg, drawOf) {
 // Dia (indice em days) de UM jogo. Rodadas por dia, igual ao BTP (Weslley,
 // 18/10/2026): roundDays[chave][fase] = data do dia escolhido na Programacao
 // (fase = scheduleStageOf: 0 grupos, 1.. rodadas). Sem escolha ("Automatico")
-// ou dia que nao existe mais -> o 1o dia que tem a chave, igual antes. -1 = nenhum.
+// ou dia que nao existe mais -> o 1o dia que tem a chave, igual antes. A rodada
+// nunca fica antes de uma rodada anterior escolhida: so a semi no dia 2 leva a
+// final junto (senao a final ficava no dia 1, antes da semi). -1 = nenhum.
 function scheduleDayOf(m, days, roundDays) {
   const list = days || [];
-  const chosen = roundDays && roundDays[m.drawName] && roundDays[m.drawName][scheduleStageOf(m)];
-  if (chosen) { const i = list.findIndex(d => d.date === chosen); if (i >= 0) return i; }
-  return list.findIndex(d => (d.draws || []).includes(m.drawName));
+  const stage = scheduleStageOf(m);
+  const chosen = (roundDays && roundDays[m.drawName]) || {};
+  const idxOf = date => (date ? list.findIndex(d => d.date === date) : -1);
+  let prev = -1;
+  Object.keys(chosen).forEach(k => { if (Number(k) < stage) prev = Math.max(prev, idxOf(chosen[k])); });
+  const own = idxOf(chosen[stage]);
+  return Math.max(own >= 0 ? own : list.findIndex(d => (d.draws || []).includes(m.drawName)), prev);
 }
 
 // Lista na ordem de Partidas/Agenda: dia do jogo (scheduleDayOf), horario (sem
