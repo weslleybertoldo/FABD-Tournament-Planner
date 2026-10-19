@@ -11,7 +11,11 @@
 // generateGroupsPhase(playerList, numGroups, seeds): snake draft + RR
 //   por grupo. Retorna { groups, eliminationMatches: [] }.
 // computeGroupStandings(groupPlayers, matches): tabela com BWF tiebreaker
-//   (mini-league entre empatados).
+//   (mini-league entre empatados). Quem nao completou o grupo (deu W.O.,
+//   desistiu, foi desqualificado, Sem jogo) vem por ultimo com withdrawn:true
+//   e os jogos dele nao contam pra ninguem (BWF 16.2.5).
+// drawMatchStatus(m) / groupWithdrawnPlayers(matches): situacao do jogo da
+//   chave (dados antigos so tem 'W.O.' no placar) e quem nao completou.
 // areGroupsFinished(d): true se todos matches dos grupos tem winner.
 //
 // Issue #14 sub-tarefa 14.K — auditoria 2026-05-09.
@@ -133,13 +137,42 @@ function generateGroupsPhase(playerList, numGroups, seeds) {
   return { groups, eliminationMatches: [] };
 }
 
+// Situacao do jogo da chave: o status que o Planner grava junto do placar
+// ou, em dados antigos, o 'W.O.'/'DSQ'/'RET' que ia no placar
+function drawMatchStatus(m) {
+  if (!m) return '';
+  if (m.status) return m.status;
+  const sc = [m.score1, m.score2];
+  if (sc.includes('W.O.')) return 'WO';
+  if (sc.includes('DSQ')) return 'Desqualificacao';
+  if (sc.includes('RET')) return 'Desistencia';
+  return (m.winner === 1 || m.winner === 2) ? 'Finalizada' : '';
+}
+
+// Quem nao completou o grupo (BWF 16.2.5): deu W.O., desistiu, foi
+// desqualificado ou faltou junto com o adversario (Sem jogo)
+function groupWithdrawnPlayers(matches) {
+  const out = new Set();
+  (matches || []).forEach(m => {
+    const st = drawMatchStatus(m);
+    if (!st || st === 'Finalizada') return;
+    if (st === 'SemJogo') { if (m.player1) out.add(m.player1); if (m.player2) out.add(m.player2); return; }
+    const loser = m.winner === 1 ? m.player2 : m.winner === 2 ? m.player1 : null;
+    if (loser) out.add(loser);
+  });
+  return out;
+}
+
 function computeGroupStandings(groupPlayers, matches) {
   const stats = {};
+  const withdrawn = groupWithdrawnPlayers(matches);
   groupPlayers.forEach(p => { stats[p] = { name: p, wins: 0, losses: 0, ptsFor: 0, ptsAgainst: 0, headToHead: {} }; });
   matches.forEach(m => {
     if (m.winner === undefined) return;
     const p1 = m.player1, p2 = m.player2;
     if (!stats[p1] || !stats[p2]) return;
+    // Resultado de quem nao completou o grupo nao conta pra ninguem
+    if (withdrawn.has(p1) || withdrawn.has(p2)) return;
     let p1Pts = 0, p2Pts = 0;
     if (m.score1 && m.score2 && m.score1 !== 'W.O.' && m.score2 !== 'W.O.') {
       String(m.score1).split(' ').map(Number).filter(n => !isNaN(n)).forEach(v => p1Pts += v);
@@ -193,7 +226,10 @@ function computeGroupStandings(groupPlayers, matches) {
     for (let k = start; k < end; k++) arr[k] = block[k - start];
   });
 
-  return arr;
+  // Quem nao completou vai por ultimo e nunca se classifica
+  if (!withdrawn.size) return arr;
+  arr.forEach(s => { if (withdrawn.has(s.name)) s.withdrawn = true; });
+  return [...arr.filter(s => !s.withdrawn), ...arr.filter(s => s.withdrawn)];
 }
 
 // Nome do classificado quando o grupo dele ja acabou, a partir do rotulo da
@@ -209,7 +245,7 @@ function resolveGroupQualifierLabel(d, label) {
   const real = (g.matches || []).filter(x => x.player1 && x.player2 && x.player1 !== 'BYE' && x.player2 !== 'BYE');
   if (!real.length || !real.every(x => x.winner !== undefined && x.winner !== null)) return label;
   const s = computeGroupStandings(g.players || [], g.matches || [])[Number(m[1]) - 1];
-  return s ? s.name : label;
+  return s ? (s.withdrawn ? 'BYE' : s.name) : label;
 }
 
 function areGroupsFinished(d) {
