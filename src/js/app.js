@@ -1932,9 +1932,10 @@ function renderGroupsElimination(d) {
     // Classificacao
     h += '<div class="table-container"><table><thead><tr><th style="text-align:center;width:40px">Pos</th><th>Jogador</th><th style="text-align:center">V</th><th style="text-align:center">D</th><th style="text-align:center">Pts+</th><th style="text-align:center">Pts-</th><th style="text-align:center">Diff</th></tr></thead><tbody>';
     standings.forEach((s, i) => {
-      const isQ = i < qualifiers || bestThirdNames.has(s.name);
+      // quem nao completou o grupo (W.O., desistencia...) nunca se classifica (BWF 16.2.5)
+      const isQ = !s.withdrawn && (i < qualifiers || bestThirdNames.has(s.name));
       const badge = i < qualifiers ? 'Classif.' : 'Classif. (melhor 3o)';
-      h += `<tr style="background:${isQ ? '#D1FAE5' : i % 2 === 0 ? '#fff' : '#f8f9fa'}"><td style="text-align:center;font-weight:${isQ ? '700' : '400'};color:${isQ ? '#065F46' : '#1a1a1a'}">${i + 1}o</td><td style="font-weight:${isQ ? '700' : '400'}">${esc(s.name)}${isQ ? ` <span style="background:#10B981;color:white;font-size:10px;padding:1px 6px;border-radius:10px">${badge}</span>` : ''}</td><td style="text-align:center">${s.wins}</td><td style="text-align:center">${s.losses}</td><td style="text-align:center">${s.ptsFor}</td><td style="text-align:center">${s.ptsAgainst}</td><td style="text-align:center;font-weight:700;color:${s.ptsDiff > 0 ? '#059669' : s.ptsDiff < 0 ? '#DC2626' : '#666'}">${s.ptsDiff > 0 ? '+' : ''}${s.ptsDiff}</td></tr>`;
+      h += `<tr style="background:${isQ ? '#D1FAE5' : i % 2 === 0 ? '#fff' : '#f8f9fa'}"><td style="text-align:center;font-weight:${isQ ? '700' : '400'};color:${isQ ? '#065F46' : '#1a1a1a'}">${i + 1}o</td><td style="font-weight:${isQ ? '700' : '400'}">${s.withdrawn ? `<span style="color:#94A3B8;text-decoration:line-through">${esc(s.name)}</span> <span style="background:#64748B;color:white;font-size:10px;padding:1px 6px;border-radius:10px">não completou</span>` : esc(s.name)}${isQ ? ` <span style="background:#10B981;color:white;font-size:10px;padding:1px 6px;border-radius:10px">${badge}</span>` : ''}</td><td style="text-align:center">${s.wins}</td><td style="text-align:center">${s.losses}</td><td style="text-align:center">${s.ptsFor}</td><td style="text-align:center">${s.ptsAgainst}</td><td style="text-align:center;font-weight:700;color:${s.ptsDiff > 0 ? '#059669' : s.ptsDiff < 0 ? '#DC2626' : '#666'}">${s.ptsDiff > 0 ? '+' : ''}${s.ptsDiff}</td></tr>`;
     });
     h += '</tbody></table></div>';
     // Confrontos
