@@ -11,6 +11,8 @@
 //   categoria/drawName. NAO faz alocacao em quadras — caller distribui depois.
 // findTournamentMatch(drawName, drawMatchIdx, dm): lookup em
 //   `tournament.matches` (global) por drawName + drawMatchIdx.
+// matchNextNumber(matches) / matchNumberNew(matches): numero do jogo fixo —
+//   proximo numero livre e numero so pra jogo novo (sem renumerar a lista).
 // Acoplamento explicito a globals: tournament, getCatIdx, EVENT_ORDER.
 // Issue #14 sub-tarefa 14.I — auditoria 2026-05-09.
 // =====================================================================
@@ -135,3 +137,21 @@ function findTournamentMatch(drawName,drawMatchIdx,dm){
   return tm||null;
 }
 
+// Numero do jogo fixo (decisao do Weslley, 19/10/2026: "1"): depois de dado, o
+// numero de um jogo nao muda — abrir Partidas, tirar BYE, sincronizar atletas
+// ou excluir/regenerar uma chave deixavam a lista ser renumerada pela posicao,
+// e depois de um horario mudado a mao os numeros trocavam (#43 virava #48).
+// So o Regenerar Horarios (todas as chaves) e a montagem da lista no sorteio
+// renumeram. Jogo novo ganha o proximo livre; jogo apagado deixa o numero vago.
+function matchNextNumber(matches) {
+  let max = 0;
+  (matches || []).forEach(m => { const n = Number(m && m.num) || 0; if (n > max) max = n; });
+  return max + 1;
+}
+
+// Da numero (e id) so a quem ainda nao tem, a partir do proximo livre, na ordem da lista
+function matchNumberNew(matches) {
+  let n = matchNextNumber(matches);
+  (matches || []).forEach(m => { if (!(Number(m.num) > 0)) { m.num = n; m.id = String(n); n++; } });
+  return matches;
+}

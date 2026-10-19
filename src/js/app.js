@@ -942,8 +942,7 @@ function syncDrawsPlayers(){
           toReset.push(d.name);
           // Limpar partidas desta chave
           if(tournament.matches){
-            tournament.matches=tournament.matches.filter(m=>m.drawName!==d.name);
-            tournament.matches.forEach((m,i)=>{m.id=(i+1).toString();m.num=i+1;});
+            tournament.matches=tournament.matches.filter(m=>m.drawName!==d.name); // as outras ficam com o numero
           }
         }
       }
@@ -1580,8 +1579,8 @@ async function syncDrawsWithPlayers() {
     assignAutoTimes(allNewMatches.filter(m => m.isDefinida));
 
     // Juntar: existentes + novos
-    tournament.matches = [...(tournament.matches || []), ...allNewMatches]
-      .map((m, i) => ({ ...m, id: (i + 1).toString(), num: i + 1 }));
+    // So os novos ganham numero (o proximo livre); os existentes ficam com o deles
+    tournament.matches = matchNumberNew([...(tournament.matches || []), ...allNewMatches]);
   }
 
   await window.api.saveTournament(tournament);
@@ -2077,7 +2076,7 @@ async function deleteDraw(i) {
   if(!confirm('Excluir chave e partidas?'))return;
   const d=tournament.draws[i];
   tournament.draws.splice(i,1);
-  if(tournament.matches) tournament.matches=tournament.matches.filter(m=>m.drawId!==d?.id&&m.drawName!==d?.name).map((m,i)=>({...m,id:(i+1).toString(),num:i+1}));
+  if(tournament.matches) tournament.matches=tournament.matches.filter(m=>m.drawId!==d?.id&&m.drawName!==d?.name); // as outras ficam com o numero
   if(!tournament.draws.length)tournament.matches=[];
   cleanOrphanMatches(); selectedDrawIdx=-1;
   await window.api.saveTournament(tournament);
@@ -2365,8 +2364,9 @@ function cleanOrphanMatches() {
     seen.add(key);
     return true;
   });
-  // Renumerar
-  tournament.matches.forEach((m,i)=>{m.id=(i+1).toString();m.num=i+1;});
+  // Sem renumerar: roda a cada abertura de Partidas e, com a lista fora da
+  // ordem dos numeros (horario mudado a mao), trocava o numero dos jogos
+  // (#43 virava #48). Jogo tirado deixa o numero vago (19/10/2026).
 }
 
 function autoFillTimes() {
@@ -2491,8 +2491,8 @@ async function syncMatchesWithDraws() {
     added++;
   });
 
-  // Renumerar e gerar horarios para os novos
-  tournament.matches.forEach((m, i) => { m.id = (i + 1).toString(); m.num = i + 1; });
+  // Numero so pros novos (o proximo livre) e horarios para eles
+  matchNumberNew(tournament.matches);
 
   // Gerar horarios para partidas sem horario
   const semHorario = tournament.matches.filter(m => !m.time && m.isDefinida !== false && m.status !== 'A definir');
