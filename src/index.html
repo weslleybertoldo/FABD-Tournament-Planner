@@ -264,51 +264,50 @@
 
         <!-- PARTIDAS -->
         <div class="page" id="page-matches">
-          <div class="empty-state" id="matches-no-tournament"><div class="icon">&#127992;</div><h3>Nenhum torneio selecionado</h3><p>Selecione um torneio para ver as partidas</p><button class="btn btn-primary" data-action="navigateTo" data-arg-1="tournaments">Ir para Torneios</button></div>
+          <div class="empty-state" id="matches-no-tournament"><i data-icon="peteca" data-icon-class="i es-ic"></i><h3>Nenhum torneio selecionado</h3><p>Selecione um torneio para ver as partidas</p><button class="btn btn-primary" data-action="navigateTo" data-arg-1="tournaments">Ir para Torneios</button></div>
           <div id="matches-content" style="display:none">
             <div class="toolbar">
-              <div class="search-box"><span class="search-icon">&#128269;</span><input type="text" placeholder="Buscar partidas..." id="search-matches" data-action="filterMatches" data-event="input"></div>
-              <select class="form-control" style="width:150px" id="match-day-filter" data-action="filterMatches" data-event="change">
+              <div class="search-box"><span class="search-icon"><i data-icon="search"></i></span><input type="text" placeholder="Buscar atleta, chave, nº do jogo..." id="search-matches" data-action="filterMatches" data-event="input"></div>
+              <label class="mt-day-sel" title="Dia"><i data-icon="calendar-days"></i><select class="sel-filter" id="match-day-filter" data-action="filterMatches" data-event="change">
                 <option value="">Todos os dias</option>
-              </select>
-              <select class="form-control" style="width:150px" id="match-status-filter" data-action="filterMatches" data-event="change">
-                <option value="">Todas</option><option value="Pendente">Pendentes</option><option value="Em Quadra">Em Quadra</option><option value="Finalizada">Finalizadas</option><option value="A definir">A definir</option>
-              </select>
+              </select></label>
+              <!-- situação escolhida nos botões abaixo (mesmos valores da lista de antes) -->
+              <input type="hidden" id="match-status-filter" value="">
+              <div class="mt-chips" id="match-status-chips"></div>
+              <div class="mt-actions"><button class="btn btn-secondary" data-action="showScoresheetModal"><i data-icon="printer"></i>Súmulas</button></div>
             </div>
 
-            <!-- PROGRESSO DO DIA (acompanha o filtro de dia) -->
-            <div id="matches-progress" class="matches-progress"></div>
-
-            <!-- PAINEIS DE QUADRAS -->
+            <!-- QUADRAS: o jogo em quadra de cada uma -->
             <div id="courts-panel" class="courts-panel"></div>
 
-            <!-- TABELA DE PARTIDAS -->
-            <div class="card" style="margin-top:16px">
-              <div class="card-header" style="flex-direction:column;align-items:stretch;gap:8px">
-                <div style="display:flex;align-items:center;justify-content:space-between">
-                  <div class="tabs" id="matches-tabs" style="margin:0;border:0">
-                    <div class="tab active" data-action="setMatchesTab" data-arg-1="all">Todas as Partidas</div>
-                    <div class="tab" data-action="setMatchesTab" data-arg-1="finished">Finalizadas</div>
-                    <div class="tab" data-action="setMatchesTab" data-arg-1="umpires">Arbitros</div>
-                  </div>
+            <!-- LISTA DE JOGOS -->
+            <div class="cd mt-card">
+              <div class="ch mt-head">
+                <span class="bar3"></span>
+                <div class="mt-tabs" id="matches-tabs">
+                  <div class="tab active" data-action="setMatchesTab" data-arg-1="all">Todas as partidas</div>
+                  <div class="tab" data-action="setMatchesTab" data-arg-1="finished">Finalizadas</div>
+                  <div class="tab" data-action="setMatchesTab" data-arg-1="umpires">Árbitros</div>
                 </div>
+                <!-- PROGRESSO DO DIA (acompanha o filtro de dia) -->
+                <div id="matches-progress" class="mt-fc"></div>
               </div>
               <div id="matches-tab-all">
                 <div class="table-container">
-                  <table><thead><tr><th>Data</th><th>Hora</th><th>Chave</th><th>Rod.</th><th>Nº</th><th>Jogador 1</th><th>Placar</th><th>Jogador 2</th><th>Quadra</th><th>Arbitro</th><th>Status</th><th>Acoes</th></tr></thead>
+                  <table class="mt-tbl" id="matches-table"><thead><tr><th>Nº</th><th>Hora</th><th>Chave</th><th>Jogador / dupla 1</th><th>Placar</th><th>Jogador / dupla 2</th><th>Quadra</th><th>Árbitro</th><th>Situação</th><th></th></tr></thead>
                   <tbody id="matches-table-body"></tbody></table>
                 </div>
               </div>
               <div id="matches-tab-finished" style="display:none">
-                <div style="padding:12px 16px"><div class="search-box" style="max-width:350px"><span class="search-icon">&#128269;</span><input type="text" placeholder="Buscar por atleta, arbitro, categoria..." id="search-finished" data-action="filterFinished" data-event="input"></div></div>
+                <div class="toolbar mt-sub"><div class="search-box"><span class="search-icon"><i data-icon="search"></i></span><input type="text" placeholder="Buscar por atleta, árbitro, categoria..." id="search-finished" data-action="filterFinished" data-event="input"></div></div>
                 <div class="table-container">
-                  <table><thead><tr><th>Nº</th><th>Chave</th><th>Rod.</th><th>Jogador 1</th><th>Placar</th><th>Jogador 2</th><th>Quadra</th><th>Arbitro</th><th>Inicio</th><th>Fim</th><th>Duracao</th><th>Status</th><th>Acoes</th></tr></thead>
+                  <table class="mt-tbl"><thead><tr><th>Nº</th><th>Chave</th><th>Jogador / dupla 1</th><th>Placar</th><th>Jogador / dupla 2</th><th>Quadra</th><th>Árbitro</th><th>Início</th><th>Fim</th><th>Duração</th><th>Situação</th><th></th></tr></thead>
                   <tbody id="finished-table-body"></tbody></table>
                 </div>
               </div>
               <div id="matches-tab-umpires" style="display:none">
                 <div class="table-container">
-                  <table><thead><tr><th>Arbitro</th><th>Jogos Arbitrados</th><th>Jogos</th></tr></thead>
+                  <table class="mt-tbl"><thead><tr><th>Árbitro</th><th>Jogos arbitrados</th><th>Jogos</th></tr></thead>
                   <tbody id="umpires-stats-body"></tbody></table>
                 </div>
               </div>
