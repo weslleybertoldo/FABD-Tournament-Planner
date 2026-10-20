@@ -186,27 +186,28 @@
 
         <!-- INSCRITOS -->
         <div class="page" id="page-roster">
-          <div class="empty-state" id="roster-no-tournament"><div class="icon">&#128203;</div><h3>Nenhum torneio selecionado</h3><p>Selecione um torneio na aba "Torneios" para gerenciar inscritos</p><button class="btn btn-primary" data-action="navigateTo" data-arg-1="tournaments">Ir para Torneios</button></div>
+          <div class="empty-state" id="roster-no-tournament"><i data-icon="clipboard-list" data-icon-class="i es-ic"></i><h3>Nenhum torneio selecionado</h3><p>Selecione um torneio na aba "Torneios" para gerenciar inscritos</p><button class="btn btn-primary" data-action="navigateTo" data-arg-1="tournaments">Ir para Torneios</button></div>
           <div id="roster-content" style="display:none">
             <div class="toolbar">
-              <div class="search-box"><span class="search-icon">&#128269;</span><input type="text" placeholder="Buscar inscritos..." id="search-roster" data-action="filterRoster" data-event="input"></div>
-            </div>
-            <div class="tabs" id="roster-tabs">
-              <div class="tab active" data-mod="" data-action="setRosterTab" data-arg-1="$el" data-arg-2="">Todos</div>
-              <div class="tab" data-mod="SM" data-action="setRosterTab" data-arg-1="$el" data-arg-2="SM">SM</div>
-              <div class="tab" data-mod="SF" data-action="setRosterTab" data-arg-1="$el" data-arg-2="SF">SF</div>
-              <div class="tab" data-mod="DM" data-action="setRosterTab" data-arg-1="$el" data-arg-2="DM">DM</div>
-              <div class="tab" data-mod="DF" data-action="setRosterTab" data-arg-1="$el" data-arg-2="DF">DF</div>
-              <div class="tab" data-mod="DX" data-action="setRosterTab" data-arg-1="$el" data-arg-2="DX">DX</div>
-              <select class="form-control" id="roster-cat-filter" style="width:150px;margin-left:8px" data-action="renderRoster" data-event="change">
-                <option value="">Todas categorias</option>
+              <div class="search-box"><span class="search-icon"><i data-icon="search"></i></span><input type="text" placeholder="Buscar inscrito, clube..." id="search-roster" data-action="filterRoster" data-event="input"></div>
+              <div class="seg" id="roster-tabs">
+                <div class="tab active" data-mod="" data-action="setRosterTab" data-arg-1="$el" data-arg-2="">Todos<em data-n=""></em></div>
+                <div class="tab" data-mod="SM" data-action="setRosterTab" data-arg-1="$el" data-arg-2="SM">SM<em data-n="SM"></em></div>
+                <div class="tab" data-mod="SF" data-action="setRosterTab" data-arg-1="$el" data-arg-2="SF">SF<em data-n="SF"></em></div>
+                <div class="tab" data-mod="DM" data-action="setRosterTab" data-arg-1="$el" data-arg-2="DM">DM<em data-n="DM"></em></div>
+                <div class="tab" data-mod="DF" data-action="setRosterTab" data-arg-1="$el" data-arg-2="DF">DF<em data-n="DF"></em></div>
+                <div class="tab" data-mod="DX" data-action="setRosterTab" data-arg-1="$el" data-arg-2="DX">DX<em data-n="DX"></em></div>
+              </div>
+              <select class="sel-filter" id="roster-cat-filter" data-action="renderRoster" data-event="change">
+                <option value="">Categoria: todas</option>
                 <option>Sub 11</option><option>Sub 13</option><option>Sub 15</option><option>Sub 17</option><option>Sub 19</option><option>Sub 23</option>
                 <option>Principal</option><option>Senior</option><option>Master I</option><option>Master II</option>
               </select>
+              <div class="ro-sum" id="roster-summary"></div>
             </div>
-            <div class="card">
+            <div class="cd">
               <div class="table-container">
-                <table><thead><tr><th>#</th><th>Jogador</th><th>Clube</th><th>Eventos</th><th>Status</th><th>Check-in</th><th>Acoes</th></tr></thead>
+                <table><thead><tr><th>#</th><th>Atleta</th><th>Clube</th><th>Evento</th><th>Situação</th><th>Check-in</th><th></th></tr></thead>
                 <tbody id="roster-table-body"></tbody></table>
               </div>
             </div>

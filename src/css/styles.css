@@ -645,6 +645,32 @@ td.acts .btn-soft { margin-left: 4px; }
 .btn-secondary.is-danger { color: #C81E1E; }
 .btn-secondary.is-danger:hover:not(:disabled) { background: #FDECEC; border-color: #F5C2C2; }
 
+/* Botões juntos (Todos · SM · SF ...) e filtro em lista, peças comuns a partir da parte 5 */
+.seg { display: inline-flex; border: 1px solid var(--ln); border-radius: 9px; background: #fff; overflow: hidden; height: 36px; flex: none; }
+.seg .tab { display: flex; align-items: center; gap: 6px; padding: 0 13px; font-size: 12.5px; font-weight: 600; color: #334155; border: 0; border-right: 1px solid var(--ln); border-radius: 0; margin: 0; cursor: pointer; white-space: nowrap; transition: var(--transition); }
+.seg .tab:last-child { border-right: 0; }
+.seg .tab:hover { background: var(--sb); color: var(--nv); }
+.seg .tab.active { background: var(--nv); color: #fff; border-bottom-color: var(--ln); }
+.seg .tab em { font-style: normal; font-size: 11px; font-weight: 500; opacity: 0.7; }
+.sel-filter { height: 36px; border: 1px solid var(--ln); border-radius: 9px; background: #fff; padding: 0 12px; font: inherit; font-size: 12.5px; font-weight: 600; color: #334155; cursor: pointer; }
+.sel-filter:focus { outline: none; border-color: var(--bl); box-shadow: 0 0 0 3px rgba(32,80,152,0.12); }
+.sel-mini { height: 30px; border: 1px solid var(--ln); border-radius: 7px; background: #fff; padding: 0 8px; font: inherit; font-size: 12.5px; font-weight: 600; color: #334155; cursor: pointer; }
+.sel-mini:focus { outline: none; border-color: var(--bl); box-shadow: 0 0 0 3px rgba(32,80,152,0.12); }
+.pill.is-confirmado { background: #E8F6EE; color: #0B7A43; }
+.pill.is-presente { background: #EAF0FA; color: var(--bl); }
+.pill.is-ausente { background: #FDECEC; color: #C81E1E; }
+
+/* === INSCRITOS (W20 parte 5) === */
+#page-roster .cd { overflow: hidden; }
+#page-roster .toolbar .search-box { flex: 0 1 320px; min-width: 220px; }
+.ro-sum { margin-left: auto; font-size: 12.5px; color: var(--mu); white-space: nowrap; }
+td.ro-n { color: var(--mu); font-weight: 600; width: 44px; }
+.pl-name small.ro-sub { color: var(--mu); }
+.ro-ev { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: #475569; background: #EAF0FA; border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
+.ro-ev b { font-weight: 650; color: var(--bl); }
+.ro-st s { display: block; }
+td.ro-empty { text-align: center; color: var(--mu); padding: 40px 20px; }
+
 /* === QUICK ACTIONS === */
 .quick-actions {
   display: grid;
