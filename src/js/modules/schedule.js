@@ -9,158 +9,190 @@
 // Issue #14 sub-tarefa 14.H — auditoria 2026-05-09.
 // =====================================================================
 
+// Layout novo (W20 parte 7): botões "Todos os jogos" (1º) e um por dia. Todos =
+// a lista de sempre com o cartão novo; dia = grade horário × quadra com os
+// mesmos jogos. Só a apresentação muda; os dados e as ações são os de sempre.
+let _agendaView = 'all';
+
+function setAgendaView(v) {
+  _agendaView = v === 'all' ? 'all' : Number(v);
+  renderSchedule();
+}
+
+const _AG_DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+function agendaDayLabel(iso) {
+  if (!iso) return { curto: '-', longo: '-' };
+  const d = new Date(iso + 'T00:00:00');
+  const dd = String(d.getDate()).padStart(2, '0'), mm = String(d.getMonth() + 1).padStart(2, '0');
+  const nome = _AG_DIAS[d.getDay()];
+  return { curto: `${nome.slice(0, 3)} ${dd}/${mm}`, longo: `${nome}, ${dd}/${mm}/${d.getFullYear()}` };
+}
+
+// Linhas da grade do dia: jogo com quadra na coluna dela, sem quadra na 1ª
+// coluna livre; mais jogos que quadras no mesmo horário = outra linha do mesmo
+// horário (nenhum some). Jogo sem horário fica fora (vai embaixo da grade).
+function agendaGridRows(dayMatches, nc, courtNames) {
+  const cn = courtNames || [];
+  const col = c => {
+    if (!c) return -1;
+    const i = cn.indexOf(c);
+    if (i >= 0) return i;
+    const k = /(\d+)\s*$/.exec(c);
+    return k ? Number(k[1]) - 1 : -1;
+  };
+  const comHora = dayMatches.filter(m => m.time).sort((a, b) => timeToMin(a.time) - timeToMin(b.time) || (a.num || 0) - (b.num || 0));
+  const linhas = [];
+  [...new Set(comHora.map(m => m.time))].forEach(t => {
+    const doHorario = comHora.filter(m => m.time === t);
+    const rows = [];
+    const novaLinha = () => { const r = { time: t, cells: new Array(nc).fill(null) }; rows.push(r); return r; };
+    novaLinha();
+    const resto = [];
+    doHorario.forEach(m => {
+      const q = col(m.court);
+      if (q >= 0 && q < nc && !rows[0].cells[q]) rows[0].cells[q] = m; else resto.push(m);
+    });
+    resto.forEach(m => {
+      let r = rows.find(x => x.cells.includes(null));
+      if (!r) r = novaLinha();
+      r.cells[r.cells.indexOf(null)] = m;
+    });
+    linhas.push(...rows);
+  });
+  return linhas;
+}
+
+function _agStatus(m) {
+  if (isMatchDone(m)) return ['is-done', 'Finalizada'];
+  if (m.status === 'Em Quadra') return ['is-live', 'Em quadra'];
+  if (m.status === 'A definir') return ['is-tbd', 'A definir'];
+  return ['is-pend', 'Pendente'];
+}
+
+function _agSides(m) {
+  // Provisorio da eliminatoria: grupo que ja acabou mostra o nome do classificado
+  const _d = !m.player1 || !m.player2 ? (tournament.draws || []).find(x => x.name === m.drawName) : null;
+  const _disp = (raw, disp) => raw ? (disp || raw) : resolveGroupQualifierLabel(_d, disp || 'A definir');
+  return [esc(_disp(m.player1, m.player1Display)), esc(_disp(m.player2, m.player2Display))];
+}
+
 function renderSchedule() {
   if(!tournament){document.getElementById('schedule-no-tournament').style.display='block';document.getElementById('schedule-content').style.display='none';return;}
   document.getElementById('schedule-no-tournament').style.display='none';document.getElementById('schedule-content').style.display='block';
   const container=document.getElementById('schedule-grid-container'),infoEl=document.getElementById('schedule-info');
   _svMarks=scheduleValidationRun().byMatch; // ⚠ nos cartoes (Validar programacao)
   const nc=tournament.courts||4,cn=tournament.courtNames||[],matches=tournament.matches||[];
-  if(!matches.length){container.innerHTML='<div class="empty-state"><div class="icon">&#128197;</div><h3>Sem partidas agendadas</h3></div>';return;}
-  const startT=tournament.startTime||'08:00',endT=tournament.endTime||'18:00',dur=tournament.matchDuration||30,rest=tournament.restMinBetweenGames||20;
-  const bS=tournament.breakStart||'12:00',bE=tournament.breakEnd||'13:30',slot=dur+rest;
-  const slots=[];let cur=timeToMin(startT);const end=timeToMin(endT),bs=timeToMin(bS),be=timeToMin(bE);
-  while(cur<end){
-    if(cur>=bs&&cur<be){cur=be;continue;}
-    if(cur+dur>bs&&cur<bs){cur=be;continue;}
-    slots.push(cur);cur+=slot;
-  }
-  if(infoEl){const done=matches.filter(m=>isMatchDone(m)).length;infoEl.textContent=`${matches.length} jogos | ${done} finalizados`;}
-
   // Garantir que daySchedule tem draws preenchidos
   ensureDayScheduleDraws();
-  // Agrupar por dia se daySchedule existe
-  const hasDaySchedule=tournament.daySchedule?.length>0;
+  const days=tournament.daySchedule||[];
+  if(_agendaView!=='all'&&!days[_agendaView])_agendaView='all';
+  const viewsEl=document.getElementById('schedule-views');
+  if(viewsEl){
+    let vh=`<div class="tab${_agendaView==='all'?' active':''}" data-view="all" data-action="setAgendaView" data-arg-1="all">${icon('list')}Todos os jogos<em>${matches.length}</em></div>`;
+    days.forEach((day,i)=>{
+      const n=matches.filter(m=>getMatchDay(m)===day).length;
+      vh+=`<div class="tab${_agendaView===i?' active':''}" data-view="${i}" data-action="setAgendaView" data-arg-1="${i}">${esc(agendaDayLabel(day.date).curto)}<em>${n} jogos</em></div>`;
+    });
+    viewsEl.innerHTML=vh;
+  }
+  if(!matches.length){container.innerHTML=`<div class="empty-state">${icon('calendar-days','i es-ic')}<h3>Sem partidas agendadas</h3></div>`;if(infoEl)infoEl.textContent='';return;}
+  const startT=tournament.startTime||'08:00',endT=tournament.endTime||'18:00',dur=tournament.matchDuration||30;
+  const bS=tournament.breakStart||'12:00',bE=tournament.breakEnd||'13:30';
+  const end=timeToMin(endT),bs=timeToMin(bS);
+  if(_agendaView!=='all'){
+    const day=days[_agendaView];
+    if(infoEl)infoEl.textContent=`${day.startTime||startT} às ${day.endTime||endT} · ${nc} quadras · jogo a cada ${dur} min`;
+    container.innerHTML=renderAgendaGrid(day,_agendaView,nc,cn,matches);
+    return;
+  }
+  if(infoEl){const done=matches.filter(m=>isMatchDone(m)).length;infoEl.textContent=`${matches.length} jogos · ${done} finalizados`;}
+  const pausa=(a,b)=>`<div class="sch-pause">Pausa · ${esc(a)} às ${esc(b)}</div>`;
+  const livre=(t,q)=>`<div class="sch-free"><span class="sch-time">${esc(t)}</span>${esc(cn[q]||`Quadra ${q+1}`)} · livre</div>`;
+  const porHora=(a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;};
+  // Lista de um bloco de jogos (dia ou sem dia), com a pausa e as quadras livres de cada horario
+  const lista=(sorted,brk,brkA,brkB)=>{
+    let r='',pausaRendered=false,lastTime='',matchesAtTime=0;
+    sorted.forEach((m,si)=>{
+      const mTime=m.time?timeToMin(m.time):0;
+      if(brk!==null&&!pausaRendered&&m.time&&mTime>=brk){pausaRendered=true;r+=pausa(brkA,brkB);}
+      if(m.time&&m.time!==lastTime){
+        if(lastTime&&matchesAtTime<nc)for(let q=matchesAtTime;q<nc;q++)r+=livre(lastTime,q);
+        lastTime=m.time;matchesAtTime=0;
+      }
+      matchesAtTime++;
+      r+=renderScheduleMatch(m);
+      if(si===sorted.length-1&&m.time&&matchesAtTime<nc)for(let q=matchesAtTime;q<nc;q++)r+=livre(m.time,q);
+    });
+    if(brk!==null&&!pausaRendered&&sorted.length&&brk<end)r+=pausa(brkA,brkB);
+    return r;
+  };
   let h='';
-
-  if(hasDaySchedule){
+  if(days.length){
     // Agrupar matches pelo dia de CADA jogo (rodadas por dia; antes pela
     // chave: 2 dias "Todas" repetiam todos os jogos nos 2 dias)
-    tournament.daySchedule.forEach((day,dayIdx)=>{
+    days.forEach((day,dayIdx)=>{
       const dayMatches=matches.filter(m=>getMatchDay(m)===day);
       if(!dayMatches.length)return;
-      const dObj=new Date(day.date+'T00:00:00');
-      const dayLabel=`Dia ${dayIdx+1} - ${String(dObj.getDate()).padStart(2,'0')}/${String(dObj.getMonth()+1).padStart(2,'0')}/${dObj.getFullYear()}`;
-      h+=`<div style="background:#1E3A8A;color:white;padding:12px 16px;border-radius:8px;margin-bottom:8px;font-weight:700;font-size:16px">${dayLabel} <span style="font-size:12px;font-weight:400;opacity:0.8">${day.startTime||'08:00'} - ${day.endTime||'18:00'}</span></div>`;
-      const dayBs=timeToMin(day.breakStart||bS);const dayBe=timeToMin(day.breakEnd||bE);
-      const sorted=[...dayMatches].sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;});
-      let pausaRendered=false;
-      // Agrupar por horario para detectar quadras livres
-      let lastTime='';
-      let matchesAtTime=0;
-      sorted.forEach((m,si)=>{
-        const mTime=m.time?timeToMin(m.time):0;
-        // v4.2: dia com noBreak NAO renderiza o badge PAUSA
-        if(!pausaRendered&&m.time&&mTime>=dayBs&&!day.noBreak){
-          pausaRendered=true;
-          h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${day.breakStart||bS} - ${day.breakEnd||bE})</div>`;
-        }
-        // Contar jogos por horario e mostrar quadras livres quando muda o horario
-        if(m.time&&m.time!==lastTime){
-          // Antes de mudar de horario, verificar quadras livres do horario anterior
-          if(lastTime&&matchesAtTime<nc){
-            const livres=nc-matchesAtTime;
-            for(let q=0;q<livres;q++){
-              const courtName=cn[matchesAtTime+q]||`Quadra ${matchesAtTime+q+1}`;
-              h+=`<div style="background:#F1F5F9;padding:8px 16px;border-radius:8px;margin-bottom:4px;display:flex;align-items:center;gap:8px;border:1px dashed #CBD5E1"><span style="font-size:12px;color:#94A3B8;min-width:50px">${lastTime}</span><span style="color:#94A3B8;font-size:12px;font-style:italic">${esc(courtName)} - livre</span></div>`;
-            }
-          }
-          lastTime=m.time;
-          matchesAtTime=0;
-        }
-        matchesAtTime++;
-        h+=renderScheduleMatch(m);
-        // Ultimo jogo do dia: verificar quadras livres
-        if(si===sorted.length-1&&m.time&&matchesAtTime<nc){
-          const livres=nc-matchesAtTime;
-          for(let q=0;q<livres;q++){
-            const courtName=cn[matchesAtTime+q]||`Quadra ${matchesAtTime+q+1}`;
-            h+=`<div style="background:#F1F5F9;padding:8px 16px;border-radius:8px;margin-bottom:4px;display:flex;align-items:center;gap:8px;border:1px dashed #CBD5E1"><span style="font-size:12px;color:#94A3B8;min-width:50px">${m.time}</span><span style="color:#94A3B8;font-size:12px;font-style:italic">${esc(courtName)} - livre</span></div>`;
-          }
-        }
-      });
-      if(!pausaRendered&&dayBs<end&&!day.noBreak)h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${day.breakStart||bS} - ${day.breakEnd||bE})</div>`;
+      h+=`<div class="sch-day"><b>Dia ${dayIdx+1} · ${esc(agendaDayLabel(day.date).longo)}</b><span>${esc(day.startTime||'08:00')} às ${esc(day.endTime||'18:00')} · ${dayMatches.length} jogos</span></div>`;
+      // v4.2: dia com noBreak NAO renderiza o badge PAUSA
+      h+=lista([...dayMatches].sort(porHora),day.noBreak?null:timeToMin(day.breakStart||bS),day.breakStart||bS,day.breakEnd||bE);
     });
     // Matches sem dia atribuido
     const unassigned=matches.filter(m=>!getMatchDay(m));
     if(unassigned.length){
-      h+=`<div style="background:#334155;color:white;padding:12px 16px;border-radius:8px;margin:16px 0 8px;font-weight:700">Sem dia definido</div>`;
-      unassigned.sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;}).forEach(m=>{h+=renderScheduleMatch(m);});
+      h+=`<div class="sch-day is-none"><b>Sem dia definido</b><span>${unassigned.length} jogos</span></div>`;
+      unassigned.sort(porHora).forEach(m=>{h+=renderScheduleMatch(m);});
     }
   } else {
     // Sem daySchedule: layout original
-    const sorted=[...matches].sort((a,b)=>{const ta=a.time?timeToMin(a.time):9999;const tb2=b.time?timeToMin(b.time):9999;return ta-tb2||a.num-b.num;});
-    let pausaRendered=false;
-    let lastTimeSingle='';let matchesAtTimeSingle=0;
-    sorted.forEach((m,si)=>{
-      const mTime=m.time?timeToMin(m.time):0;
-      if(!pausaRendered&&m.time&&mTime>=bs){
-        pausaRendered=true;
-        h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${bS} - ${bE})</div>`;
-      }
-      if(m.time&&m.time!==lastTimeSingle){
-        if(lastTimeSingle&&matchesAtTimeSingle<nc){
-          const livres=nc-matchesAtTimeSingle;
-          for(let q=0;q<livres;q++){
-            const courtName=cn[matchesAtTimeSingle+q]||`Quadra ${matchesAtTimeSingle+q+1}`;
-            h+=`<div style="background:#F1F5F9;padding:8px 16px;border-radius:8px;margin-bottom:4px;display:flex;align-items:center;gap:8px;border:1px dashed #CBD5E1"><span style="font-size:12px;color:#94A3B8;min-width:50px">${lastTimeSingle}</span><span style="color:#94A3B8;font-size:12px;font-style:italic">${esc(courtName)} - livre</span></div>`;
-          }
-        }
-        lastTimeSingle=m.time;matchesAtTimeSingle=0;
-      }
-      matchesAtTimeSingle++;
-      h+=renderScheduleMatch(m);
-      if(si===sorted.length-1&&m.time&&matchesAtTimeSingle<nc){
-        const livres=nc-matchesAtTimeSingle;
-        for(let q=0;q<livres;q++){
-          const courtName=cn[matchesAtTimeSingle+q]||`Quadra ${matchesAtTimeSingle+q+1}`;
-          h+=`<div style="background:#F1F5F9;padding:8px 16px;border-radius:8px;margin-bottom:4px;display:flex;align-items:center;gap:8px;border:1px dashed #CBD5E1"><span style="font-size:12px;color:#94A3B8;min-width:50px">${m.time}</span><span style="color:#94A3B8;font-size:12px;font-style:italic">${esc(courtName)} - livre</span></div>`;
-        }
-      }
-    });
-    if(!pausaRendered&&sorted.length&&bs<end)h+=`<div style="background:#FEE2E2;padding:12px 16px;border-radius:8px;text-align:center;font-weight:700;color:#991B1B;margin-bottom:8px">PAUSA (${bS} - ${bE})</div>`;
+    h+=lista([...matches].sort(porHora),bs,bS,bE);
   }
   container.innerHTML=h;
 }
 
 function renderScheduleMatch(m){
-  const done=isMatchDone(m),eq=m.status==='Em Quadra',adef=m.status==='A definir';
-  let bg='#fff';if(eq)bg='#FFF3E0';if(done)bg='#D1FAE5';if(adef)bg='#F9FAFB';
-  const border=done?'#10B981':eq?'#F59E0B':adef?'var(--fabd-gray-300)':'var(--fabd-blue)';
-  // Provisorio da eliminatoria: grupo que ja acabou mostra o nome do classificado
-  const _d=!m.player1||!m.player2?(tournament.draws||[]).find(x=>x.name===m.drawName):null;
-  const _disp=(raw,disp)=>raw?(disp||raw):resolveGroupQualifierLabel(_d,disp||'A definir');
-  const p1=esc(_disp(m.player1,m.player1Display)),p2=esc(_disp(m.player2,m.player2Display));
-  const p1Style=m.winner===1?'color:#10B981;font-weight:700':'font-weight:600';
-  const p2Style=m.winner===2?'color:#10B981;font-weight:700':'font-weight:600';
+  const [st,rot]=_agStatus(m);
+  const [p1,p2]=_agSides(m);
   let scoreHtml='';
   if(isSpecialResult(m)){
-    scoreHtml=`<span style="color:${resultColor(m.status)};font-weight:700;white-space:nowrap">${esc(resultText(m))}</span>`;
+    scoreHtml=`<span class="sch-score" style="color:${resultColor(m.status)}">${esc(resultText(m))}</span>`;
   } else if(m.score&&m.score!=='-'&&m.score!=='W.O.'&&m.score!=='DSQ'&&m.score!=='RET'){
-    scoreHtml=`<span style="color:var(--fabd-gray-700);font-weight:700;white-space:nowrap">${esc(formatScoreByGames(m.score))}</span>`;
+    scoreHtml=`<span class="sch-score">${esc(formatScoreByGames(m.score))}</span>`;
   } else if(m.score==='W.O.'||m.score==='DSQ'||m.score==='RET'){
-    scoreHtml=`<span style="color:var(--fabd-red);font-weight:700">${esc(m.score)}</span>`;
+    scoreHtml=`<span class="sch-score is-red">${esc(m.score)}</span>`;
   } else {
-    scoreHtml='<span style="color:var(--fabd-gray-400);font-weight:700">x</span>';
+    scoreHtml='<span class="sch-x">×</span>';
   }
-  let r='';
-  r+=`<div style="background:${bg};border-left:4px solid ${border};border-radius:8px;padding:12px 16px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08)">`;
-  r+=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">`;
-  r+=`<div style="display:flex;align-items:center;gap:12px">`;
-  r+=`<span style="font-weight:700;color:var(--fabd-blue);font-size:14px">Jogo ${m.num}${scheduleValidationIcon(_svMarks,m)}</span>`;
-  r+=`<span style="font-size:12px;color:var(--fabd-gray-500)">${esc(m.time||'-')}</span>`;
-  r+=`<span style="font-size:12px;color:var(--fabd-gray-500)">${esc(m.drawName)}</span>`;
-  r+=`<span style="font-size:11px;color:var(--fabd-gray-500)">${esc(m.roundName||'R'+m.round)}</span>`;
-  r+=`</div>`;
-  r+=`<div style="display:flex;align-items:center;gap:8px">`;
-  if(m.court)r+=`<span style="font-size:11px;background:var(--fabd-blue);color:white;padding:2px 8px;border-radius:4px">${esc(m.court)}</span>`;
-  if(m.umpire)r+=`<span style="font-size:11px;background:var(--fabd-gray-200);color:var(--fabd-gray-700);padding:2px 8px;border-radius:4px">${esc(m.umpire)}</span>`;
-  r+=`</div></div>`;
-  r+=`<div style="display:flex;align-items:center;justify-content:center;gap:16px;font-size:15px">`;
-  r+=`<span style="${p1Style}">${p1}</span>`;
-  r+=`<span style="font-size:14px">${scoreHtml}</span>`;
-  r+=`<span style="${p2Style}">${p2}</span>`;
-  r+=`</div></div>`;
-  return r;
+  const quadra=m.court?`<span class="sch-court">${esc(m.court)}</span>`:(st==='is-pend'?'<span class="sch-court is-tbd">quadra a definir</span>':'');
+  return `<div class="sch-card ${st}">
+    <div class="sch-top"><div class="sch-meta"><span class="sch-num">Jogo ${m.num}${scheduleValidationIcon(_svMarks,m)}</span><span class="sch-time">${esc(m.time||'-')}</span><span class="sch-draw">${esc(m.drawName)}</span><span class="sch-rd">${esc(m.roundName||'R'+m.round)}</span></div>
+    <div class="sch-tags">${quadra}${m.umpire?`<span class="sch-ump">${esc(m.umpire)}</span>`:''}<span class="pill sch-st ${st}"><s></s>${rot}</span></div></div>
+    <div class="sch-mid"><span class="sch-p${m.winner===1?' is-win':''}">${p1}</span>${scoreHtml}<span class="sch-p${m.winner===2?' is-win':''}">${p2}</span></div>
+  </div>`;
+}
+
+function _agCell(m){
+  const [st]=_agStatus(m);
+  const [p1,p2]=_agSides(m);
+  const sc=isSpecialResult(m)?esc(resultText(m)):(m.score&&m.score!=='-')?esc(m.score==='W.O.'||m.score==='DSQ'||m.score==='RET'?m.score:formatScoreByGames(m.score)):'';
+  return `<div class="ag-cell ${st}"><div class="ag-c1"><span class="sch-num">Jogo ${m.num}${scheduleValidationIcon(_svMarks,m)}</span><span class="ag-d">${esc(m.drawName)} · ${esc(m.roundName||'R'+m.round)}</span>${sc?`<span class="ag-sc">${sc}</span>`:''}</div>
+    <div class="ag-p${m.winner===1?' is-win':''}">${p1}</div><div class="ag-p${m.winner===2?' is-win':''}"><i>×</i> ${p2}</div>${!m.court&&st==='is-pend'?'<span class="ag-q">quadra a definir</span>':''}</div>`;
+}
+
+function renderAgendaGrid(day,dayIdx,nc,cn,matches){
+  const dm=matches.filter(m=>getMatchDay(m)===day);
+  const bS=day.breakStart||tournament.breakStart||'12:00',bE=day.breakEnd||tournament.breakEnd||'13:30',bs=timeToMin(bS);
+  let h=`<div class="cd ag-grid" style="--nc:${nc}"><div class="ag-row ag-head"><span></span>${Array.from({length:nc},(_,q)=>`<b>${esc(cn[q]||`Quadra ${q+1}`)}</b>`).join('')}</div>`;
+  let pausa=day.noBreak;
+  agendaGridRows(dm,nc,cn).forEach((l,i,arr)=>{
+    if(!pausa&&timeToMin(l.time)>=bs){pausa=true;h+=`<div class="ag-pause">Pausa · ${esc(bS)} às ${esc(bE)}</div>`;}
+    const rep=i>0&&arr[i-1].time===l.time;
+    h+=`<div class="ag-row"><span class="ag-t">${rep?'':esc(l.time)}</span>${l.cells.map(m=>m?_agCell(m):'<div class="ag-free">livre</div>').join('')}</div>`;
+  });
+  const semHora=dm.filter(m=>!m.time);
+  if(semHora.length)h+=`<div class="ag-row ag-nohour"><span class="ag-t">Sem horário</span><div class="ag-list">${semHora.map(_agCell).join('')}</div></div>`;
+  if(!dm.length)h+=`<div class="empty-state">${icon('calendar-days','i es-ic')}<h3>Nenhum jogo neste dia</h3></div>`;
+  return h+'</div>';
 }
 
 // === DRAW WIZARD ===
@@ -334,7 +366,7 @@ function scheduleValidationRun() {
 function scheduleValidationIcon(marks, m) {
   const t = marks && marks.get(m);
   if (!t || !t.length) return '';
-  return `<span class="sv-warn" title="${esc('Programação:\n' + t.map(x => '⚠ ' + x).join('\n'))}" style="color:#DC2626;font-weight:700;cursor:help;margin-left:4px">&#9888;</span>`;
+  return `<span class="sv-warn" title="${esc('Programação:\n' + t.map(x => '⚠ ' + x).join('\n'))}">${icon('triangle-alert')}</span>`;
 }
 
 function _svDayLabel(i) {
@@ -378,12 +410,12 @@ function renderScheduleValidation() {
   _svSel = -1; _svButtons();
   const list = _svRows.map((r, idx) => ({ r, idx })).filter(o => o.r.day === day);
   const box = document.getElementById('sv-list');
-  if (!list.length) { box.innerHTML = '<p class="sv-empty">&#9989; Nenhum problema neste dia.</p>'; return; }
+  if (!list.length) { box.innerHTML = `<p class="sv-empty">${icon('circle-check')} Nenhum problema neste dia.</p>`; return; }
   let h = '<div class="sv-scroll"><table class="sv-table"><thead><tr><th>Nome</th><th>Chave</th><th>Rodada</th><th>Jogo</th><th>Hora</th><th>Coment&aacute;rio</th></tr></thead><tbody>';
   scheduleValidationGroups().forEach(g => {
     const rows = list.filter(o => o.r.grupo === g.id);
     if (!rows.length) return;
-    h += `<tr class="sv-group ${g.regra ? 'sv-regra' : 'sv-extra'}"><td colspan="6">${g.regra ? '&#9888;' : '&#9432;'} ${esc(g.titulo)} (${rows.length})</td></tr>`;
+    h += `<tr class="sv-group ${g.regra ? 'sv-regra' : 'sv-extra'}"><td colspan="6"><span class="sv-gi">${icon(g.regra ? 'triangle-alert' : 'info')}</span>${esc(g.titulo)} (${rows.length})</td></tr>`;
     rows.forEach(({ r, idx }) => {
       h += `<tr class="sv-row" data-sv-idx="${idx}" data-action="selectScheduleValidationRow" data-event="click dblclick" data-arg-1="${idx}" data-arg-2="$event"><td>${esc(r.nome)}</td><td>${esc(r.drawName || '-')}</td><td>${esc(r.roundName || '-')}</td><td>${r.num != null ? '#' + r.num : '-'}</td><td>${esc(r.time || '-')}</td><td>${esc(r.texto)}</td></tr>`;
     });
@@ -431,7 +463,7 @@ function renderScheduleValidationSettings() {
   const hora = id => `<input type="time" class="form-control sv-time" data-sv="${id}" value="${st[id]}" ${ev}>`;
   const linha = inner => `<label class="sv-opt">${inner}</label>`;
   document.getElementById('sv-settings').innerHTML =
-    '<p class="sv-hint">Regras da agenda: marcam &#9888; no jogo em Partidas e na Agenda.</p>' +
+    `<p class="sv-hint">Regras da agenda: marcam ${icon('triangle-alert')} no jogo em Partidas e na Agenda.</p>` +
     linha(`${chk('semHorario')} Jogo sem hor&aacute;rio`) +
     linha(`${chk('conflito')} Atleta em 2 jogos ao mesmo tempo`) +
     linha(`${chk('descanso')} Descanso m&iacute;nimo entre o fim de um jogo e o in&iacute;cio do outro: ${num('descansoMin', 0, 1440, 5)} min <span class="sv-hint">(no torneio: ${tournament.restMinBetweenGames || 20} min)</span>`) +

@@ -29,6 +29,9 @@ const MODALITIES = [
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     console.log('[INIT] Starting app...');
+    // Casca (menu do topo + faixa do torneio): ícones e faixa já atrás do login
+    hydrateIcons();
+    renderShell();
     // Gate de autenticacao: bloqueia o app ate o organizador estar logado
     const authOk = await ensureAuthenticated();
     console.log('[INIT] Auth result:', authOk);
@@ -42,7 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateOverview();
     console.log('[INIT] Overview updated');
     const verEl=document.getElementById('current-version');
-    if(verEl)verEl.textContent=`Versao atual: v${APP_VERSION}`;
+    if(verEl)verEl.textContent=`Versão atual: v${APP_VERSION}`;
     setupAutoUpdaterUI();
     console.log('[INIT] Done!');
   } catch(e) {
@@ -164,12 +167,12 @@ async function authSendCode() {
   const msgEl = document.getElementById('auth-email-msg');
   const btnEl = document.getElementById('auth-send-btn');
   const email = (emailEl.value || '').trim().toLowerCase();
-  if (!email || !email.includes('@')) { msgEl.textContent = 'Informe um email valido'; return; }
+  if (!email || !email.includes('@')) { msgEl.textContent = 'Informe um e-mail válido'; return; }
   msgEl.style.color = '#94A3B8'; msgEl.textContent = 'Enviando...';
   btnEl.disabled = true;
   try {
     const res = await window.api.authSendOtp(email);
-    if (!res.ok) { msgEl.style.color = '#EF4444'; msgEl.textContent = res.error || 'Falhou ao enviar codigo'; btnEl.disabled = false; return; }
+    if (!res.ok) { msgEl.style.color = '#EF4444'; msgEl.textContent = res.error || 'Falhou ao enviar o código'; btnEl.disabled = false; return; }
     _authState.email = email;
     document.getElementById('auth-email-shown').textContent = email;
     document.getElementById('auth-step-email').style.display = 'none';
@@ -184,12 +187,12 @@ async function authVerifyCode() {
   const msgEl = document.getElementById('auth-code-msg');
   const btnEl = document.getElementById('auth-verify-btn');
   const token = (codeEl.value || '').trim();
-  if (!/^\d{6}$/.test(token)) { msgEl.style.color = '#EF4444'; msgEl.textContent = 'Codigo deve ter 6 digitos'; return; }
+  if (!/^\d{6}$/.test(token)) { msgEl.style.color = '#EF4444'; msgEl.textContent = 'O código tem 6 dígitos'; return; }
   msgEl.style.color = '#94A3B8'; msgEl.textContent = 'Verificando...';
   btnEl.disabled = true;
   try {
     const res = await window.api.authVerifyOtp(_authState.email, token);
-    if (!res.ok) { msgEl.style.color = '#EF4444'; msgEl.textContent = res.error || 'Codigo invalido'; btnEl.disabled = false; return; }
+    if (!res.ok) { msgEl.style.color = '#EF4444'; msgEl.textContent = res.error || 'Código inválido'; btnEl.disabled = false; return; }
     msgEl.style.color = '#10B981'; msgEl.textContent = 'Sucesso! Carregando...';
     hideAuthOverlay();
     showOrganizerBadge(await window.api.authStatus());
@@ -237,21 +240,21 @@ async function loadAccessOrganizers() {
   cnt.innerHTML = '<p style="color:#94A3B8">Carregando...</p>';
   const r = await window.api.organizersList(_accessCurrentFedId);
   if (!r.ok) { cnt.innerHTML = `<p style="color:#EF4444">Erro: ${esc(r.error)}</p>`; return; }
-  if (!r.organizers.length) { cnt.innerHTML = '<p style="color:#94A3B8">Nenhum organizador nesta federacao ainda.</p>'; return; }
+  if (!r.organizers.length) { cnt.innerHTML = '<p class="mut">Nenhum organizador nesta federação ainda.</p>'; return; }
   const me = (await window.api.authStatus())?.organizer?.email?.toLowerCase();
-  let h = '<table class="data-table" style="width:100%;font-size:13px"><thead><tr><th>Status</th><th>Nome</th><th>Email</th><th>Role</th><th>Ultimo login</th><th></th></tr></thead><tbody>';
+  let h = '<table class="mt-tbl st-acc"><thead><tr><th>Situação</th><th>Nome</th><th>E-mail</th><th>Papel</th><th>Último login</th><th></th></tr></thead><tbody>';
   r.organizers.forEach(o => {
     const fmt = o.last_login_at ? new Date(o.last_login_at).toLocaleString('pt-BR') : 'Nunca';
     const isMe = o.email?.toLowerCase() === me;
-    const dot = o.active ? '<span style="display:inline-block;width:8px;height:8px;background:#10B981;border-radius:50%"></span>' : '<span style="display:inline-block;width:8px;height:8px;background:#EF4444;border-radius:50%"></span>';
+    const dot = o.active ? '<span class="pill is-on"><s></s>Ativo</span>' : '<span class="pill is-off"><s></s>Inativo</span>';
     // O1: remover emojis, usar texto simples (institucional).
-    const roleBadge = o.role === 'super_admin' ? '<span style="background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Super admin</span>'
-      : o.role === 'admin' ? '<span style="background:#DBEAFE;color:#1E40AF;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Admin</span>'
-      : '<span style="background:#F3F4F6;color:#6B7280;padding:2px 8px;border-radius:10px;font-size:11px">Organizer</span>';
-    const actions = isMe ? '<span style="color:#94A3B8;font-size:11px">(voce)</span>' :
-      `<button class="btn btn-sm" style="background:#F3F4F6;color:#374151;margin-right:4px" data-action="toggleAccessOrganizer" data-arg-1="${esc(o.email)}" data-arg-2="${!o.active}">${o.active?'Desativar':'Ativar'}</button>
-       <button class="btn btn-sm btn-danger" data-action="removeAccessOrganizer" data-arg-1="${esc(o.email)}">Remover</button>`;
-    h += `<tr><td>${dot}</td><td><strong>${esc(o.name)}</strong></td><td>${esc(o.email)}</td><td>${roleBadge}</td><td style="font-size:11px;color:#64748B">${fmt}</td><td>${actions}</td></tr>`;
+    const roleBadge = o.role === 'super_admin' ? '<span class="pill is-super">Super admin</span>'
+      : o.role === 'admin' ? '<span class="pill is-sched">Admin</span>'
+      : '<span class="pill">Organizer</span>';
+    const actions = isMe ? '<span class="mut">(você)</span>' :
+      `<button class="btn-soft is-gray" data-action="toggleAccessOrganizer" data-arg-1="${esc(o.email)}" data-arg-2="${!o.active}">${o.active?'Desativar':'Ativar'}</button>
+       <button class="btn-soft is-danger" data-action="removeAccessOrganizer" data-arg-1="${esc(o.email)}">Remover</button>`;
+    h += `<tr><td>${dot}</td><td><strong>${esc(o.name)}</strong></td><td>${esc(o.email)}</td><td>${roleBadge}</td><td class="mut">${fmt}</td><td class="acts">${actions}</td></tr>`;
   });
   h += '</tbody></table>';
   cnt.innerHTML = h;
@@ -380,24 +383,28 @@ async function removeFederationLogo() {
 function showOrganizerBadge(st) {
   if (!st) return;
   applyAccessVisibility(st);
+  // Organizador no canto do menu do topo (clique = sair, igual antes)
   let el = document.getElementById('organizer-badge');
   if (!el) {
-    el = document.createElement('div');
+    el = document.createElement('button');
     el.id = 'organizer-badge';
-    el.style.cssText = 'position:fixed;bottom:8px;right:12px;background:#1E3A8A;color:#fff;padding:4px 10px;border-radius:12px;font-size:11px;z-index:9000;font-family:Inter,sans-serif;cursor:pointer';
-    el.title = 'Clique para sair';
+    el.className = 'org-chip org-chip-solto';
+    document.body.appendChild(el);
+  }
+  if (!el.dataset.pronto) {
+    el.dataset.pronto = '1';
     el.onclick = async () => {
       if (!confirm('Deseja sair do app?')) return;
       await window.api.authSignOut();
       location.reload();
     };
-    document.body.appendChild(el);
   }
   const name = st.organizer?.name || 'Organizador';
-  const role = st.organizer?.role === 'super_admin' ? '★' : (st.organizer?.role === 'admin' ? '⚡' : '');
+  const role = st.organizer?.role === 'super_admin' ? 'Super admin' : (st.organizer?.role === 'admin' ? 'Admin' : 'Organizador');
   const fed = st.federation?.short_name ? ` · ${st.federation.short_name}` : '';
-  el.textContent = `${role} ${name}${fed}`.trim();
+  el.innerHTML = `<span class="org-av">${esc(shellInitials(name))}</span><span class="org-tx"><b>${esc(name)}</b><small>${esc(role + fed)}</small></span>${icon('log-out', 'i org-out')}`;
   el.title = `${st.organizer?.email || ''} · ${st.federation?.name || ''} · clique para sair`;
+  el.hidden = false;
 }
 
 async function loadData(autoLoad=false) {
@@ -549,10 +556,10 @@ async function checkAutoUpdate(){
       const txt=document.getElementById('update-bar-text');
       const btn=document.getElementById('update-bar-btn');
       if(bar&&txt){
-        txt.textContent='Nova versao disponivel: v'+latestVersion;
+        txt.textContent='Nova versão disponível: v'+latestVersion;
         if(baixar.url&&btn){
           btn.onclick=()=>window.api.openExternal(baixar.url);
-          btn.style.display='inline-block';
+          btn.style.display='';
         } else if(btn){ btn.style.display='none'; }
         bar.style.display='flex';
       }
@@ -661,6 +668,8 @@ function setupNavigation() {
 }
 
 function navigateTo(page) {
+  // Acessos virou aba das Configurações (layout novo, W20 parte 10)
+  if (page === 'access') { navigateTo('settings'); const t = document.getElementById('nav-access'); if (t) setSettingsTab(t, 'settings-access'); return; }
   currentPage = page;
   document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -679,6 +688,7 @@ function navigateTo(page) {
     case 'schedule': showTournamentPages(); renderSchedule(); break;
     case 'access': renderAccessPage(); break;
   }
+  renderShell();
 }
 
 // === VALIDATION ===
@@ -698,43 +708,38 @@ function spinUp(id,max){ const el=document.getElementById(id); const v=parseInt(
 function spinDown(id,min){ const el=document.getElementById(id); const v=parseInt(el.value)||0; if(v>min)el.value=v-1; }
 
 // === OVERVIEW ===
+// Tela no layout novo: overview-ui.js (mesmos dados de antes)
 function updateOverview() {
-  document.getElementById('stat-tournaments').textContent = tournament ? '1' : '0';
-  document.getElementById('stat-players').textContent = players.length;
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   const tm = tournament?.matches?.length || 0;
   const done = (tournament?.matches||[]).filter(m=>isMatchDone(m)).length;
-  document.getElementById('stat-matches').textContent = tm;
+  setTxt('stat-tournaments', tournament ? '1' : '0');
+  setTxt('stat-players', players.length);
+  setTxt('stat-matches', done);
   // Calcular total de inscricoes arrecadadas
-  let totalArrecadado=0;
-  const valorPadrao=tournament?.valorInscricao||30;
-  players.forEach(p=>{
-    const catCount=(p.inscriptions||[]).length;
-    const valor=p.valorCategoria||valorPadrao;
-    const pStatus=p.pagamentoStatus||'pago';
-    if(pStatus==='pago')totalArrecadado+=catCount*valor;
-  });
-  const statActive=document.getElementById('stat-active');
-  if(statActive)statActive.textContent=`R$ ${totalArrecadado.toFixed(2)}`;
+  const fin = ovFinance(players, tournament?.valorInscricao||30);
+  setTxt('stat-active', ovMoney(fin.total));
+  const st = tournament ? shellStatus(tournament, Date.now()) : null;
+  setTxt('stat-tournaments-sub', st ? ({ live:'ao vivo agora', run:'em andamento', sched:'agendado', done:'finalizado', draft:'rascunho' })[st.kind] : 'nenhum ativo');
+  const inscritos = tournament ? shellCounts(tournament, players).entries : 0;
+  setTxt('stat-players-sub', tournament ? `${inscritos} inscrito${inscritos===1?'':'s'} no torneio` : '');
+  setTxt('stat-matches-sub', tournament ? `de ${tm} jogo${tm===1?'':'s'} do torneio` : '');
+  setTxt('stat-active-sub', fin.paid ? `${fin.paid} inscriç${fin.paid===1?'ão paga':'ões pagas'}` : '');
 
-  const c = document.getElementById('recent-tournaments');
-  if (!tournament) {
-    c.innerHTML = '<div class="empty-state"><div class="icon">&#127942;</div><h3>Nenhum torneio ativo</h3><p>Crie um novo torneio ou abra um backup</p></div>';
-    document.getElementById('breadcrumb').textContent = '';
-    return;
-  }
-  document.getElementById('breadcrumb').textContent = tournament.name;
-  c.innerHTML = `<table><tbody>
-    <tr><td><strong>${esc(tournament.name)}</strong></td><td>${fmtDate(tournament.startDate)} - ${fmtDate(tournament.endDate)}</td><td>${esc(tournament.location)||'-'}</td><td>${statusTag(tournament)}</td>
-    <td><button class="btn btn-sm btn-primary" data-action="navigateTo" data-arg-1="players">Gerenciar</button></td></tr>
-  </tbody></table>`;
+  renderOverviewRecent(tournament, players);
+  renderOverviewCourts(tournament);
+  renderOverviewNext(tournament);
+  document.getElementById('breadcrumb').textContent = tournament ? tournament.name : '';
+  renderShell();
 }
 
 // === TOURNAMENT PAGE ===
 function renderTournamentPage() {
   const tb = document.getElementById('tournaments-table-body');
   const em = document.getElementById('tournaments-empty');
+  const ft = document.getElementById('tournaments-foot');
   if (!tournament) {
-    tb.innerHTML = ''; em.style.display = 'block'; return;
+    tb.innerHTML = ''; em.style.display = 'block'; if (ft) ft.textContent = ''; return;
   }
   em.style.display = 'none';
   const ev = [];
@@ -742,15 +747,20 @@ function renderTournamentPage() {
   if(tournament.events?.dm)ev.push('DM'); if(tournament.events?.df)ev.push('DF'); if(tournament.events?.mx)ev.push('MX');
   const profile = gameProfiles.find(p=>p.id===tournament.gameProfileId);
   const sysName = profile ? esc(profile.name) : '-';
+  const st = shellStatus(tournament, Date.now());
+  const rot = { live:'Ao vivo', run:'Em andamento', sched:'Agendado', done:'Finalizado', draft:'Rascunho' }[st.kind];
+  const local = [tournament.location, tournament.city].filter(Boolean).join(' · ');
   tb.innerHTML = `<tr>
-    <td><strong>${esc(tournament.name)}</strong></td><td>${esc(tournament.location)||'-'}</td>
-    <td>${fmtDate(tournament.startDate)}</td><td>${fmtDate(tournament.endDate)}</td>
-    <td>${ev.join(', ')||'-'}</td><td>${sysName}</td><td>${statusTag(tournament)}</td>
-    <td>
-      <button class="btn btn-sm btn-secondary" data-action="showTournamentConfig" title="Configuracao">&#9881;</button>
-      <button class="btn btn-sm btn-secondary" data-action="exportTournamentBackup" title="Backup">&#128230;</button>
-      <button class="btn btn-sm btn-danger" data-action="closeTournament">Fechar Torneio</button>
+    <td><div class="tt-name"><span class="tt-ic">${icon('trophy')}</span><div><b>${esc(tournament.name)}</b><small>${players.length} atletas · ${(tournament.matches||[]).length} jogos</small></div></div></td>
+    <td>${esc(local)||'-'}</td>
+    <td class="num">${esc(shellDateRange(tournament.startDate, tournament.endDate))||'-'}</td>
+    <td>${ev.map(e=>`<span class="chip">${e}</span>`).join('')||'-'}</td><td>${sysName}</td><td><span class="pill is-${st.kind}"><s></s>${rot}</span></td>
+    <td class="acts">
+      <button class="btn-icon" data-action="showTournamentConfig" title="Configuração">${icon('settings')}</button>
+      <button class="btn-icon" data-action="exportTournamentBackup" title="Backup">${icon('download')}</button>
+      <button class="btn-soft is-danger" data-action="closeTournament">Fechar torneio</button>
     </td></tr>`;
+  if (ft) ft.textContent = '1 torneio';
 }
 
 function showNewTournamentModal() {
@@ -770,7 +780,7 @@ function openNewTournamentForm() {
   document.getElementById('t-city').value = 'Maceio - AL';
   document.getElementById('t-courts').value = '4';
   ['t-ev-sm','t-ev-sf','t-ev-dm','t-ev-df','t-ev-mx'].forEach(id=>{ const e=document.getElementById(id); if(e) e.checked=true; });
-  document.getElementById('modal-tournament-title').textContent = 'Novo Torneio';
+  document.getElementById('modal-tournament-title').textContent = 'Novo torneio';
   openModal('modal-tournament');
   requestAnimationFrame(()=>document.getElementById('t-name')?.focus());
 }
@@ -1151,13 +1161,26 @@ function renderRoster() {
   if (!tournament) return;
   const tb = document.getElementById('roster-table-body');
   const entries = tournament.entries || [];
-  if (!entries.length) { tb.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--fabd-gray-500);padding:40px">Nenhum inscrito. Adicione categorias nos jogadores.</td></tr>`; return; }
+  const filterCat = document.getElementById('roster-cat-filter')?.value || '';
+  // Layout novo (W20 parte 5): contagem em cada modalidade (com a categoria escolhida)
+  // e o resumo do lado; a lista e as ações são as de sempre.
+  const naCat = entries.filter(e => !filterCat || e.category === filterCat);
+  document.querySelectorAll('#roster-tabs [data-n]').forEach(n => {
+    n.textContent = n.dataset.n ? naCat.filter(e => e.events.includes(n.dataset.n)).length : naCat.length;
+  });
+  const sum = document.getElementById('roster-summary');
+  if (sum) {
+    const atletas = new Set(entries.map(e => e.playerId || e.playerName)).size;
+    const presentes = entries.filter(e => e.status === 'presente').length;
+    sum.textContent = entries.length ? `${atletas} atletas · ${entries.length} inscrições · ${presentes} com check-in` : '';
+  }
+  if (!entries.length) { tb.innerHTML = `<tr><td colspan="7" class="ro-empty">Nenhum inscrito. Adicione categorias nos jogadores.</td></tr>`; return; }
 
   // Filtro ativo
   const activeTab = document.querySelector('#roster-tabs .tab.active');
   const filterMod = activeTab?.dataset?.mod || '';
-  const filterCat = document.getElementById('roster-cat-filter')?.value || '';
 
+  const rot = { inscrito:'Inscrito', confirmado:'Confirmado', presente:'Presente', ausente:'Ausente' };
   let h = '';
   let count = 0;
   entries.forEach((e, i) => {
@@ -1166,22 +1189,23 @@ function renderRoster() {
     count++;
     const partner = e.partner ? players.find(p=>p.id===e.partner) : null;
     const partnerName = partner ? `${partner.firstName} ${partner.lastName}` : '';
-    const st = { inscrito:'tag-gray', confirmado:'tag-green', presente:'tag-blue', ausente:'tag-red' };
+    const sexo = { M:'Masculino', F:'Feminino' }[players.find(p=>p.id===e.playerId)?.gender] || '';
+    const sub = [esc(e.category), sexo].filter(Boolean).join(' · ');
     h += `<tr>
-      <td>${count}</td>
-      <td><strong>${esc(e.playerName)}</strong>${partnerName ? '<br><small style="color:var(--fabd-gray-500)">Dupla: '+esc(partnerName)+'</small>':''}${e.substituiu ? '<br><small style="color:var(--fabd-gray-500)">no lugar de '+esc(e.substituiu)+'</small>':''}</td>
-      <td>${esc(e.club)||'-'}</td>
-      <td><span class="tag tag-blue">${esc(e.key)}</span></td>
-      <td><span class="tag ${st[e.status]||'tag-gray'}">${esc(e.status)}</span></td>
-      <td><select class="form-control" style="width:110px;padding:2px 4px;font-size:11px" data-action="updateEntryStatus" data-event="change" data-arg-1="${i}" data-arg-2="$value">
+      <td class="num ro-n">${count}</td>
+      <td><div class="pl-name"><span class="pl-av" data-ini="${esc(shellInitials(e.playerName))}"></span><div><b>${esc(e.playerName)}</b><small class="ro-sub">${sub}${e.substituiu ? (sub?' · ':'')+'no lugar de '+esc(e.substituiu) : ''}</small></div></div></td>
+      <td${e.club?'':' class="pl-mut"'}>${esc(e.club)||'Sem clube'}</td>
+      <td><span class="ro-ev"><b>${esc(e.key)}</b>${partnerName ? ' c/ '+esc(partnerName) : ''}</span></td>
+      <td><span class="pill ro-st is-${esc(e.status)}"><s></s>${rot[e.status]||esc(e.status)}</span></td>
+      <td><select class="sel-mini" data-action="updateEntryStatus" data-event="change" data-arg-1="${i}" data-arg-2="$value" title="Check-in">
         <option value="inscrito"${e.status==='inscrito'?' selected':''}>Inscrito</option>
         <option value="confirmado"${e.status==='confirmado'?' selected':''}>Confirmado</option>
         <option value="presente"${e.status==='presente'?' selected':''}>Presente</option>
         <option value="ausente"${e.status==='ausente'?' selected':''}>Ausente</option>
       </select></td>
-      <td><button class="btn btn-sm btn-secondary" data-action="showSwapAthlete" data-arg-1="${i}" title="Trocar o atleta desta inscrição">&#8644; Trocar</button></td></tr>`;
+      <td class="acts"><button class="btn-soft" data-action="showSwapAthlete" data-arg-1="${i}" title="Trocar o atleta desta inscrição">${icon('arrow-left-right')}Trocar</button></td></tr>`;
   });
-  if (!count) h = `<tr><td colspan="7" style="text-align:center;color:var(--fabd-gray-500);padding:20px">Nenhum inscrito nesta categoria</td></tr>`;
+  if (!count) h = `<tr><td colspan="7" class="ro-empty">Nenhum inscrito nesta categoria</td></tr>`;
   tb.innerHTML = h;
 }
 
@@ -1282,11 +1306,11 @@ function showSwapAthlete(idx) {
   if (!e) return;
   _swapEntryIdx = idx;
   const dbl = swapIsDouble(e.key);
-  document.getElementById('swap-title').innerHTML = `&#8644; Trocar atleta — ${esc(e.key)}`;
+  document.getElementById('swap-title').textContent = `Trocar atleta — ${e.key}`;
   const ids = [e.playerId, dbl ? e.partner : ''].filter(Boolean);
   document.getElementById('swap-out').innerHTML = ids.map((id, n) => {
     const p = players.find(x => x.id === id);
-    return `<label style="display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;font-weight:400"><input type="radio" name="swap-out" value="${esc(id)}"${n === 0 ? ' checked' : ''} data-action="onSwapOutChange" data-event="change"> ${esc(swapName(p))}${dbl ? ` <small style="color:var(--fabd-gray-500)">Parceiro ${n + 1}</small>` : ''}</label>`;
+    return `<label class="radio-line"><input type="radio" name="swap-out" value="${esc(id)}"${n === 0 ? ' checked' : ''} data-action="onSwapOutChange" data-event="change"> ${esc(swapName(p))}${dbl ? ` <small>Parceiro ${n + 1}</small>` : ''}</label>`;
   }).join('');
   onSwapOutChange();
   openModal('modal-swap-athlete');
@@ -1307,9 +1331,9 @@ function onSwapOutChange() {
 // Jogos pendentes (Chave, Rodada, Dia, Hora, Situacao) nas 2 listas da janela
 function _swapMatchTable(list) {
   const rows = list.filter(m => !isMatchDone(m));
-  if (!rows.length) return '<p style="font-size:12px;color:var(--fabd-gray-500);margin:4px 0">Nenhum jogo pendente.</p>';
+  if (!rows.length) return '<p class="muted-sm">Nenhum jogo pendente.</p>';
   const day = m => { const d = getMatchDay(m); if (!d?.date) return '-'; const o = new Date(d.date + 'T00:00:00'); return `${String(o.getDate()).padStart(2, '0')}/${String(o.getMonth() + 1).padStart(2, '0')}`; };
-  return `<table style="font-size:12px"><thead><tr><th>Chave</th><th>Rodada</th><th>Dia</th><th>Hora</th><th>Situação</th></tr></thead><tbody>${rows.map(m =>
+  return `<table class="mini-tbl"><thead><tr><th>Chave</th><th>Rodada</th><th>Dia</th><th>Hora</th><th>Situação</th></tr></thead><tbody>${rows.map(m =>
     `<tr><td>${esc(m.drawName)}</td><td>${esc(m.roundName || 'R' + m.round)}</td><td>${day(m)}</td><td>${esc(m.time) || '-'}</td><td>${esc(resultStatusLabel(m.status))}</td></tr>`).join('')}</tbody></table>`;
 }
 
@@ -1324,9 +1348,9 @@ function renderSwapAthlete() {
   document.getElementById('swap-mine-title').textContent = dbl ? 'Jogos da dupla' : `Jogos de ${swapName(outP)}`;
   document.getElementById('swap-mine').innerHTML = _swapMatchTable(swapLineMatches(tournament.matches, e.key, label));
   document.getElementById('swap-his-title').textContent = inP ? `Jogos de ${swapName(inP)}` : 'Jogos de quem entra';
-  document.getElementById('swap-his').innerHTML = inP ? _swapMatchTable(swapAthleteMatches(tournament.matches, swapName(inP))) : '<p style="font-size:12px;color:var(--fabd-gray-500);margin:4px 0">Escolha quem entra.</p>';
+  document.getElementById('swap-his').innerHTML = inP ? _swapMatchTable(swapAthleteMatches(tournament.matches, swapName(inP))) : '<p class="muted-sm">Escolha quem entra.</p>';
   const probs = swapProblems(tournament, players, { key: e.key, outId, inId }, _swapDayOf);
-  document.getElementById('swap-problems').innerHTML = probs.map(t => `<div style="background:#FEF3C7;border:1px solid #F59E0B;color:#92400E;border-radius:6px;padding:8px 10px;font-size:13px;margin-top:8px">&#9888; ${esc(t)}</div>`).join('');
+  document.getElementById('swap-problems').innerHTML = probs.map(t => `<div class="note is-warn" style="margin-top:8px">${icon('triangle-alert')}<span>${esc(t)}</span></div>`).join('');
   document.getElementById('swap-ok').disabled = !inP || probs.length > 0;
 }
 
@@ -1841,15 +1865,15 @@ function renderBracket(d) {
   const svgH = totalH + 50;
   const oY = 35;
 
-  let h = '<div style="overflow-x:auto;padding:10px 0">';
-  h += '<svg width="' + svgW + '" height="' + svgH + '" xmlns="http://www.w3.org/2000/svg" style="font-family:Segoe UI,sans-serif">';
+  let h = '<div class="bk-wrap">';
+  h += '<svg width="' + svgW + '" height="' + svgH + '" xmlns="http://www.w3.org/2000/svg" style="font-family:inherit">';
 
   for (let r = 1; r <= totalRounds; r++) {
     const ms = rounds[r] || [];
     const x = (r - 1) * (matchW + connW);
 
-    h += '<rect x="' + x + '" y="0" width="' + matchW + '" height="26" rx="4" fill="#1E3A8A"/>';
-    h += '<text x="' + (x + matchW/2) + '" y="17" text-anchor="middle" fill="white" font-size="11" font-weight="700" letter-spacing="1">' + rName(r) + '</text>';
+    h += '<rect x="' + x + '" y="0" width="' + matchW + '" height="26" rx="6" fill="#EEF2F7"/>';
+    h += '<text x="' + (x + matchW/2) + '" y="17" text-anchor="middle" fill="#0E2A5E" font-size="10.5" font-weight="700" letter-spacing="1">' + rName(r) + '</text>';
 
     ms.forEach((m, i) => {
       const pos = positions[r + '-' + i];
@@ -1861,26 +1885,26 @@ function renderBracket(d) {
       const p2 = getDisp(r, i, 2);
       const future = (!m.player1 && !m.player2 && r > 1) || m.isPreview;
       const dash = (future || isBye) ? ' stroke-dasharray="5,3"' : '';
-      const sc = isBye ? '#CED4DA' : '#343A40';
-      const f1 = m.winner === 1 ? '#D1FAE5' : '#fff';
-      const f2 = m.winner === 2 ? '#D1FAE5' : '#fff';
+      const sc = isBye ? '#E2E8F0' : '#CBD5E1';
+      const f1 = m.winner === 1 ? '#E8F6EE' : '#fff';
+      const f2 = m.winner === 2 ? '#E8F6EE' : '#fff';
 
-      h += '<rect x="'+x+'" y="'+y+'" width="'+matchW+'" height="'+(matchH/2)+'" fill="'+f1+'" stroke="'+sc+'" stroke-width="2"'+dash+'/>';
-      h += '<rect x="'+x+'" y="'+(y+matchH/2)+'" width="'+matchW+'" height="'+(matchH/2)+'" fill="'+f2+'" stroke="'+sc+'" stroke-width="2"'+dash+'/>';
+      h += '<rect x="'+x+'" y="'+y+'" width="'+matchW+'" height="'+(matchH/2)+'" fill="'+f1+'" stroke="'+sc+'" stroke-width="1.5"'+dash+'/>';
+      h += '<rect x="'+x+'" y="'+(y+matchH/2)+'" width="'+matchW+'" height="'+(matchH/2)+'" fill="'+f2+'" stroke="'+sc+'" stroke-width="1.5"'+dash+'/>';
 
-      if (num && !isBye) h += '<text x="'+(x+8)+'" y="'+(y+13)+'" fill="#C41E2A" font-size="10" font-weight="700">Jogo '+String(num).padStart(2,'0')+'</text>';
-      if (isBye) h += '<text x="'+(x+8)+'" y="'+(y+13)+'" fill="#ADB5BD" font-size="10" font-weight="700">BYE</text>';
+      if (num && !isBye) h += '<text x="'+(x+8)+'" y="'+(y+13)+'" fill="#64748B" font-size="10" font-weight="600">Jogo '+String(num).padStart(2,'0')+'</text>';
+      if (isBye) h += '<text x="'+(x+8)+'" y="'+(y+13)+'" fill="#94A3B8" font-size="10" font-weight="600">BYE</text>';
 
       const clipId='clip-'+r+'-'+i;
       h += '<clipPath id="'+clipId+'"><rect x="'+(x+6)+'" y="'+y+'" width="'+(matchW-50)+'" height="'+matchH+'"/></clipPath>';
-      const c1 = m.winner===1?'#065F46':(isBye?'#ADB5BD':'#1E3A8A');
+      const c1 = m.winner===1?'#0B7A43':(isBye?'#94A3B8':'#0F172A');
       h += '<text clip-path="url(#'+clipId+')" x="'+(x+8)+'" y="'+(y+30)+'" fill="'+c1+'" font-size="12" font-weight="600">'+esc(p1||'-')+'</text>';
 
-      const c2 = m.winner===2?'#065F46':(isBye?'#DEE2E6':'#1E3A8A');
+      const c2 = m.winner===2?'#0B7A43':(isBye?'#CBD5E1':'#0F172A');
       h += '<text clip-path="url(#'+clipId+')" x="'+(x+8)+'" y="'+(y+matchH/2+22)+'" fill="'+c2+'" font-size="12" font-weight="600">'+(isBye?'- - -':esc(p2||'-'))+'</text>';
 
-      if (m.score1) h += '<text x="'+(x+matchW-8)+'" y="'+(y+30)+'" text-anchor="end" fill="#495057" font-size="11" font-weight="700">'+esc(m.score1)+'</text>';
-      if (m.score2) h += '<text x="'+(x+matchW-8)+'" y="'+(y+matchH/2+22)+'" text-anchor="end" fill="#495057" font-size="11" font-weight="700">'+esc(m.score2)+'</text>';
+      if (m.score1) h += '<text x="'+(x+matchW-8)+'" y="'+(y+30)+'" text-anchor="end" fill="#334155" font-size="11" font-weight="700">'+esc(m.score1)+'</text>';
+      if (m.score2) h += '<text x="'+(x+matchW-8)+'" y="'+(y+matchH/2+22)+'" text-anchor="end" fill="#334155" font-size="11" font-weight="700">'+esc(m.score2)+'</text>';
 
       // LINHAS CONECTORAS
       if (r < totalRounds) {
@@ -1889,7 +1913,7 @@ function renderBracket(d) {
         const mx = lx + connW / 2;
 
         // Linha horizontal saindo do jogo
-        h += '<line x1="'+lx+'" y1="'+myMidY+'" x2="'+mx+'" y2="'+myMidY+'" stroke="#343A40" stroke-width="2"/>';
+        h += '<line x1="'+lx+'" y1="'+myMidY+'" x2="'+mx+'" y2="'+myMidY+'" stroke="#CBD5E1" stroke-width="1.5"/>';
 
         // Linha vertical conectando par (so no jogo de cima do par)
         if (i % 2 === 0) {
@@ -1897,13 +1921,13 @@ function renderBracket(d) {
           if (pairPos) {
             const pairMidY = pairPos.y + oY + matchH / 2;
             // Vertical
-            h += '<line x1="'+mx+'" y1="'+myMidY+'" x2="'+mx+'" y2="'+pairMidY+'" stroke="#343A40" stroke-width="2"/>';
+            h += '<line x1="'+mx+'" y1="'+myMidY+'" x2="'+mx+'" y2="'+pairMidY+'" stroke="#CBD5E1" stroke-width="1.5"/>';
             // Horizontal saindo pro proximo jogo
             const nextI = Math.floor(i / 2);
             const nextPos = positions[(r+1) + '-' + nextI];
             if (nextPos) {
               const nextMidY = nextPos.y + oY + matchH / 2;
-              h += '<line x1="'+mx+'" y1="'+nextMidY+'" x2="'+(lx+connW)+'" y2="'+nextMidY+'" stroke="#343A40" stroke-width="2"/>';
+              h += '<line x1="'+mx+'" y1="'+nextMidY+'" x2="'+(lx+connW)+'" y2="'+nextMidY+'" stroke="#CBD5E1" stroke-width="1.5"/>';
             }
           }
         }
@@ -1917,17 +1941,18 @@ function renderBracket(d) {
   if (cp) {
     const cx = totalRounds * (matchW + connW);
     const cy = cp.cy + oY;
-    h += '<line x1="'+((totalRounds-1)*(matchW+connW)+matchW)+'" y1="'+cy+'" x2="'+cx+'" y2="'+cy+'" stroke="#343A40" stroke-width="2"/>';
+    h += '<line x1="'+((totalRounds-1)*(matchW+connW)+matchW)+'" y1="'+cy+'" x2="'+cx+'" y2="'+cy+'" stroke="#CBD5E1" stroke-width="1.5"/>';
     const champW=250;
     const champ = finalM && finalM.winner === 1 ? finalM.player1 : finalM && finalM.winner === 2 ? finalM.player2 : 'A definir';
     // Dupla: um nome abaixo do outro, e a caixa cresce 17px por linha extra
     const champLines = fitChampionLines(champ, champW - 20);
     const champH = 56 + (champLines.length - 1) * 17;
     const champTop = cy - champH / 2;
-    h += '<rect x="'+cx+'" y="'+champTop+'" width="'+champW+'" height="'+champH+'" rx="8" fill="#FEF3C7" stroke="#F59E0B" stroke-width="3"/>';
-    h += '<text x="'+(cx+champW/2)+'" y="'+(champTop+20)+'" text-anchor="middle" fill="#92400E" font-size="10" font-weight="700">CAMPEAO</text>';
+    const temCampeao = champ !== 'A definir';
+    h += '<rect x="'+cx+'" y="'+champTop+'" width="'+champW+'" height="'+champH+'" rx="10" fill="'+(temCampeao?'#FFF8E6':'#fff')+'" stroke="'+(temCampeao?'#E5B54A':'#CBD5E1')+'" stroke-width="1.5"'+(temCampeao?'':' stroke-dasharray="5,3"')+'/>';
+    h += '<text x="'+(cx+champW/2)+'" y="'+(champTop+20)+'" text-anchor="middle" fill="#0E2A5E" font-size="10.5" font-weight="700" letter-spacing="1">CAMPEÃO</text>';
     champLines.forEach((ln, k) => {
-      h += '<text x="'+(cx+champW/2)+'" y="'+(champTop+42+k*17)+'" text-anchor="middle" fill="#92400E" font-size="'+ln.size+'" font-weight="800">'+esc(ln.text)+'</text>';
+      h += '<text x="'+(cx+champW/2)+'" y="'+(champTop+42+k*17)+'" text-anchor="middle" fill="#0F172A" font-size="'+ln.size+'" font-weight="700">'+esc(ln.text)+'</text>';
     });
   }
 
@@ -1937,27 +1962,26 @@ function renderBracket(d) {
 
 function renderRoundRobin(d) {
   if(!d.players?.length) return '';
-  let h='<div class="table-container"><table><thead><tr><th>#</th><th>Jogador</th>';
-  d.players.forEach((_,i)=>h+=`<th>${i+1}</th>`);
-  h+='<th>V</th><th>D</th><th>Pts</th></tr></thead><tbody>';
+  let h='<div class="table-container"><table class="tbl-mini"><thead><tr><th class="c">#</th><th>Jogador</th>';
+  d.players.forEach((_,i)=>h+=`<th class="c">${i+1}</th>`);
+  h+='<th class="c">V</th><th class="c">D</th><th class="c">Pts</th></tr></thead><tbody>';
   d.players.forEach((p,i)=>{
-    h+=`<tr><td>${i+1}</td><td><strong>${esc(p)}</strong></td>`;
+    h+=`<tr><td class="c pos">${i+1}</td><td class="nm"><strong>${esc(p)}</strong></td>`;
     d.players.forEach((q,j)=>{
-      if(i===j){h+='<td style="background:var(--fabd-gray-200)">-</td>';return;}
+      if(i===j){h+='<td class="c x">-</td>';return;}
       // Buscar por nome dos jogadores (mais robusto que p1idx/p2idx)
       const m=(d.matches||[]).find(x=>(x.player1===p&&x.player2===q)||(x.player1===q&&x.player2===p));
-      if(!m||m.winner===undefined){h+='<td>-</td>';return;}
+      if(!m||m.winner===undefined){h+='<td class="c">-</td>';return;}
       const isP1=m.player1===p;
-      // WO
       // W.O., desistencia, desqualificacao, Sem jogo: a marca no lugar do placar
       const _st=typeof drawMatchStatus==='function'?drawMatchStatus(m):((m.score1==='W.O.'||m.score2==='W.O.')?'WO':'');
       if(_st&&_st!=='Finalizada'){
         const iWon=(isP1&&m.winner===1)||(!isP1&&m.winner===2);
         const mark={WO:'W.O.',Desistencia:'Desist.',Desqualificacao:'Desq.',SemJogo:'Sem jogo'}[_st]||_st;
-        h+=`<td style="color:${_st==='SemJogo'?'#64748B':iWon?'#10B981':'#DC2626'};font-weight:700;font-size:11px">${iWon?'V · ':''}${mark}</td>`;
+        h+=`<td class="c mk ${_st==='SemJogo'?'is-muted':iWon?'is-win':'is-loss'}">${iWon?'V · ':''}${mark}</td>`;
         return;
       }
-      h+=`<td>${m.score1!==undefined&&m.score1!==''?(isP1?`${m.score1}-${m.score2}`:`${m.score2}-${m.score1}`):'-'}</td>`;
+      h+=`<td class="c">${m.score1!==undefined&&m.score1!==''?(isP1?`${m.score1}-${m.score2}`:`${m.score2}-${m.score1}`):'-'}</td>`;
     });
     let w=0,l=0;
     (d.matches||[]).forEach(m=>{
@@ -1967,7 +1991,7 @@ function renderRoundRobin(d) {
       if((isP1&&m.winner===1)||(isP2&&m.winner===2))w++;
       if((isP1&&m.winner===2)||(isP2&&m.winner===1))l++;
     });
-    h+=`<td>${w}</td><td>${l}</td><td><strong>${w*2}</strong></td></tr>`;
+    h+=`<td class="c">${w}</td><td class="c">${l}</td><td class="c"><strong>${w*2}</strong></td></tr>`;
   });
   return h+'</tbody></table></div>';
 }
@@ -1987,15 +2011,8 @@ function renderGroupsElimination(d) {
   const groups = d.groupsData.groups;
   const hasElim = groupsFinished && d.groupsData.eliminationMatches?.length;
 
-  // Abas: Grupo A | Grupo B | ... | Eliminatorias (sempre visivel)
-  h += `<div class="tabs" id="ge-tabs" style="margin-bottom:16px">`;
-  groups.forEach((g, i) => {
-    h += `<div class="tab${i === 0 ? ' active' : ''}" data-action="setGeTab" data-arg-1="${i}">${esc(g.name)}</div>`;
-  });
-  h += `<div class="tab" data-action="setGeTab" data-arg-1="${groups.length}">Eliminatorias</div>`;
-  h += `</div>`;
-
-  // Paineis dos grupos
+  // Layout novo (W20 parte 6): os grupos lado a lado e a eliminatoria embaixo, sem
+  // abas — as mesmas tabelas (classificacao e confrontos) e a mesma chave.
   groups.forEach(g => {
     const gLabel = (g.name || 'Grupo').replace('Grupo ', '');
     const groupMatches = d.matches.filter(m => m.group === gLabel && m.phase === 'group');
@@ -2004,47 +2021,49 @@ function renderGroupsElimination(d) {
   const bestThirds = usesBestThirds(groups, qualifiers);
   // Com os grupos encerrados, os 2 melhores 3os tambem aparecem como classificados
   const bestThirdNames = bestThirds && groupsFinished ? new Set(rankGroupThirds(groups).slice(0, 2).map(t => t.name)) : new Set();
+  h += '<div class="ge-grid">';
   groups.forEach((g, gi) => {
     const standings = computeGroupStandings(g.players, g.matches);
 
-    h += `<div class="ge-panel" id="ge-panel-${gi}" style="${gi > 0 ? 'display:none' : ''}">`;
+    h += `<div class="ge-panel" id="ge-panel-${gi}"><div class="ge-title"><b>${esc(g.name)}</b><span>${qualifiers} ${qualifiers > 1 ? 'passam' : 'passa'}</span></div>`;
     // Classificacao
-    h += '<div class="table-container"><table><thead><tr><th style="text-align:center;width:40px">Pos</th><th>Jogador</th><th style="text-align:center">V</th><th style="text-align:center">D</th><th style="text-align:center">Pts+</th><th style="text-align:center">Pts-</th><th style="text-align:center">Diff</th></tr></thead><tbody>';
+    h += '<div class="table-container"><table class="tbl-mini"><thead><tr><th class="c">Pos</th><th>Jogador</th><th class="c">V</th><th class="c">D</th><th class="c">Pts+</th><th class="c">Pts-</th><th class="c">Saldo</th></tr></thead><tbody>';
     standings.forEach((s, i) => {
       // quem nao completou o grupo (W.O., desistencia...) nunca se classifica (BWF 16.2.5)
       const isQ = !s.withdrawn && (i < qualifiers || bestThirdNames.has(s.name));
-      const badge = i < qualifiers ? 'Classif.' : 'Classif. (melhor 3o)';
-      h += `<tr style="background:${isQ ? '#D1FAE5' : i % 2 === 0 ? '#fff' : '#f8f9fa'}"><td style="text-align:center;font-weight:${isQ ? '700' : '400'};color:${isQ ? '#065F46' : '#1a1a1a'}">${i + 1}o</td><td style="font-weight:${isQ ? '700' : '400'}">${s.withdrawn ? `<span style="color:#94A3B8;text-decoration:line-through">${esc(s.name)}</span> <span style="background:#64748B;color:white;font-size:10px;padding:1px 6px;border-radius:10px">não completou</span>` : esc(s.name)}${isQ ? ` <span style="background:#10B981;color:white;font-size:10px;padding:1px 6px;border-radius:10px">${badge}</span>` : ''}</td><td style="text-align:center">${s.wins}</td><td style="text-align:center">${s.losses}</td><td style="text-align:center">${s.ptsFor}</td><td style="text-align:center">${s.ptsAgainst}</td><td style="text-align:center;font-weight:700;color:${s.ptsDiff > 0 ? '#059669' : s.ptsDiff < 0 ? '#DC2626' : '#666'}">${s.ptsDiff > 0 ? '+' : ''}${s.ptsDiff}</td></tr>`;
+      const badge = i < qualifiers ? 'Classif.' : 'Classif. (melhor 3º)';
+      h += `<tr${isQ ? ' class="is-q"' : ''}><td class="c pos">${i + 1}º</td><td class="nm">${s.withdrawn ? `<span class="ge-out">${esc(s.name)}</span> <span class="pill">não completou</span>` : esc(s.name)}${isQ ? ` <span class="pill is-confirmado">${badge}</span>` : ''}</td><td class="c">${s.wins}</td><td class="c">${s.losses}</td><td class="c">${s.ptsFor}</td><td class="c">${s.ptsAgainst}</td><td class="c diff${s.ptsDiff > 0 ? ' is-pos' : s.ptsDiff < 0 ? ' is-neg' : ''}">${s.ptsDiff > 0 ? '+' : ''}${s.ptsDiff}</td></tr>`;
     });
     h += '</tbody></table></div>';
     // Confrontos
-    h += '<div class="table-container" style="margin-top:8px"><table><thead><tr><th>#</th><th>Jogador</th>';
-    g.players.forEach((_, i) => h += `<th style="text-align:center">${i + 1}</th>`);
+    h += '<div class="table-container ge-vs"><table class="tbl-mini"><thead><tr><th class="c">#</th><th>Jogador</th>';
+    g.players.forEach((_, i) => h += `<th class="c">${i + 1}</th>`);
     h += '</tr></thead><tbody>';
     g.players.forEach((p, i) => {
-      h += `<tr><td>${i + 1}</td><td><strong>${esc(p)}</strong></td>`;
+      h += `<tr><td class="c pos">${i + 1}</td><td class="nm"><strong>${esc(p)}</strong></td>`;
       g.players.forEach((q, j) => {
-        if (i === j) { h += '<td style="background:var(--fabd-gray-200);text-align:center">-</td>'; return; }
+        if (i === j) { h += '<td class="c x">-</td>'; return; }
         const m = g.matches.find(x => (x.player1 === p && x.player2 === q) || (x.player1 === q && x.player2 === p));
-        if (!m || m.winner === undefined) { h += '<td style="text-align:center">-</td>'; return; }
+        if (!m || m.winner === undefined) { h += '<td class="c">-</td>'; return; }
         const isP1 = m.player1 === p;
         // W.O., desistencia, desqualificacao, Sem jogo: a marca no lugar do placar
         const _st = drawMatchStatus(m);
         if (_st && _st !== 'Finalizada') {
           const iWon = (isP1 && m.winner === 1) || (!isP1 && m.winner === 2);
           const mark = { WO: 'W.O.', Desistencia: 'Desist.', Desqualificacao: 'Desq.', SemJogo: 'Sem jogo' }[_st] || _st;
-          h += `<td style="text-align:center;color:${_st === 'SemJogo' ? '#64748B' : iWon ? '#10B981' : '#DC2626'};font-weight:700;font-size:11px">${iWon ? 'V · ' : ''}${mark}</td>`;
+          h += `<td class="c mk ${_st === 'SemJogo' ? 'is-muted' : iWon ? 'is-win' : 'is-loss'}">${iWon ? 'V · ' : ''}${mark}</td>`;
           return;
         }
-        h += `<td style="text-align:center">${m.score1 !== undefined && m.score1 !== '' ? (isP1 ? `${m.score1}-${m.score2}` : `${m.score2}-${m.score1}`) : '-'}</td>`;
+        h += `<td class="c">${m.score1 !== undefined && m.score1 !== '' ? (isP1 ? `${m.score1}-${m.score2}` : `${m.score2}-${m.score1}`) : '-'}</td>`;
       });
       h += '</tr>';
     });
     h += '</tbody></table></div></div>';
   });
+  h += '</div>';
 
-  // Painel Eliminatorias (sempre como aba)
-  h += `<div class="ge-panel" id="ge-panel-${groups.length}" style="display:none">`;
+  // Eliminatoria (embaixo dos grupos)
+  h += `<div class="ge-panel ge-elim" id="ge-panel-${groups.length}"><div class="ge-title"><b>Eliminatória</b></div>`;
   if (hasElim) {
     const elimDraw = { matches: d.groupsData.eliminationMatches, players: d.groupsData.eliminationMatches.filter(m => m.round === 1).flatMap(m => [m.player1, m.player2]).filter(p => p && p !== 'BYE') };
     h += renderBracket(elimDraw);
@@ -2052,26 +2071,19 @@ function renderGroupsElimination(d) {
     // Mostrar preview das eliminatorias com placeholders
     const totalGM = groups.reduce((s, g) => s + g.matches.filter(m => m.player1 && m.player2 && m.player1 !== 'BYE' && m.player2 !== 'BYE').length, 0);
     const doneGM = groups.reduce((s, g) => s + g.matches.filter(m => m.winner !== undefined && m.winner !== null).length, 0);
-    h += `<div style="padding:16px;background:var(--fabd-gray-100);border-radius:8px;margin-bottom:16px;text-align:center">
-      <p style="color:var(--fabd-gray-600);font-weight:600">Fase de grupos: ${doneGM}/${totalGM} partidas concluidas</p>
-      <p style="color:var(--fabd-gray-500);font-size:12px;margin-top:4px">Grupo encerrado ja mostra os classificados. O resto entra quando os grupos acabarem.</p></div>`;
+    h += `<div class="ge-note"><b>Fase de grupos: ${doneGM}/${totalGM} partidas concluídas</b><span>Grupo encerrado já mostra os classificados. O resto entra quando os grupos acabarem.</span></div>`;
     // Previa no formato de chave (igual a chave real), com rotulos no lugar dos nomes
     const previewMatches = buildGroupsElimPreview(groups, qualifiers);
     // Grupo que ja acabou: o rotulo vira o nome do classificado
     previewMatches.forEach(pm => { pm.player1 = resolveGroupQualifierLabel(d, pm.player1); pm.player2 = resolveGroupQualifierLabel(d, pm.player2); });
     if (previewMatches.length) h += renderBracket({ matches: previewMatches });
     if (bestThirds) {
-      h += `<p style="font-size:12px;color:var(--fabd-gray-500);text-align:center">Melhor 3o: mais vitorias, depois saldo de pontos, depois pontos feitos.<br>Se um 3o cair contra o 1o do proprio grupo, os dois 3os trocam de lugar.</p>`;
+      h += `<p class="ge-foot">Melhor 3º: mais vitórias, depois saldo de pontos, depois pontos feitos.<br>Se um 3º cair contra o 1º do próprio grupo, os dois 3ºs trocam de lugar.</p>`;
     }
   }
   h += '</div>';
 
   return h;
-}
-
-function setGeTab(idx){
-  document.querySelectorAll('#ge-tabs .tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
-  document.querySelectorAll('.ge-panel').forEach((p,i)=>p.style.display=i===idx?'':'none');
 }
 
 async function deleteDraw(i) {
@@ -2927,7 +2939,7 @@ async function saveScore() {
 
 // Editar jogo finalizado (lapis da aba Finalizadas): placar, arbitro e quadra.
 // O vencedor nao muda por aqui: trocar o vencedor mexe em quem avancou na
-// chave, e isso continua pelo desfazer (↻) + placar novo.
+// chave, e isso continua pelo Desfazer + placar novo.
 let editingMatchIdx=null;
 const _isSpecialScore=m=>!matchSetsText(m)||m.status==='WO'||m.status==='SemJogo';
 function showEditFinishedModal(idx){
@@ -2946,8 +2958,8 @@ function showEditFinishedModal(idx){
   }
   document.getElementById('edit-sets-container').innerHTML=h;
   document.getElementById('edit-sets-note').textContent=special
-    ?`${resultText(m)||'-'}: aqui da pra trocar so a quadra e o arbitro.`
-    :'O vencedor nao muda por aqui. Pra trocar o vencedor, use o desfazer (↻) e lance o placar de novo.';
+    ?`${resultText(m)||'-'}: aqui dá pra trocar só a quadra e o árbitro.`
+    :'O vencedor não muda por aqui. Pra trocar o vencedor, use o Desfazer e lance o placar de novo.';
   document.getElementById('edit-court').innerHTML=`<option value="">-</option>${getCourtOptions(m.court)}`;
   document.getElementById('edit-umpire').innerHTML=`<option value="">-</option>${getUmpireOptions(m.umpire)}`;
   openModal('modal-edit-finished');
@@ -2972,7 +2984,7 @@ async function saveEditFinished(){
       if(m.status==='Finalizada'){
         const newWinner=w1>w2?1:w2>w1?2:0;
         if(!newWinner){alert('O placar precisa ter um vencedor.');return;}
-        if(newWinner!==m.winner){alert('Esse placar troca o vencedor. Pra trocar o vencedor, use o desfazer (↻) e lance o placar de novo.');return;}
+        if(newWinner!==m.winner){alert('Esse placar troca o vencedor. Pra trocar o vencedor, use o Desfazer e lance o placar de novo.');return;}
       }
       m.score=scores.join(' / ');
     }
@@ -3166,9 +3178,9 @@ function wizUpdateEventInfo() {
   if(wizHasProfile){
     const autoType=getDrawTypeForCount(tournament,count);
     const profile=gameProfiles.find(p=>p.id===tournament.gameProfileId);
-    if(autoType&&profile)info+=`<br><br><div style="background:#D1FAE5;padding:10px;border-radius:6px;color:#065F46"><strong>&#10003; Sistema: ${esc(autoType)}</strong> (perfil: ${esc(profile.name)})</div>`;
+    if(autoType&&profile)info+=`<div class="note is-ok">${icon('circle-check')}<span><strong>Sistema: ${esc(autoType)}</strong> (perfil: ${esc(profile.name)})</span></div>`;
   } else if(count>=2) {
-    info+=`<br><br><div style="background:#FEF3C7;padding:10px;border-radius:6px;color:#92400E">&#9888; Sem sistema configurado. Escolha no proximo passo.</div>`;
+    info+=`<div class="note is-warn">${icon('triangle-alert')}<span>Sem sistema configurado. Escolha no pr&oacute;ximo passo.</span></div>`;
   }
   document.getElementById('wiz-event-info').innerHTML=info;
 }
@@ -3195,7 +3207,7 @@ function wizUpdateSummary() {
   if(type==='Eliminatoria')det=`Tamanho: ${document.getElementById('wiz-draw-size').value}`;
   else if(type==='Todos contra Todos'){const key=`${mod.value} ${cat.value}`;const c=players.filter(p=>(p.inscriptions||[]).some(i=>i.key===key)).length;det=`${c} jogadores, ${c*(c-1)/2} partidas`;}
   else det=`${document.getElementById('wiz-num-groups').value} grupos, ${document.getElementById('wiz-qualifiers').value} classificados/grupo`;
-  const pi=wizHasProfile?'<br><span style="color:#10B981">&#10003; Sistema automatico</span>':'';
+  const pi=wizHasProfile?`<br><span class="wiz-auto">${icon('circle-check')} Sistema autom&aacute;tico</span>`:'';
   document.getElementById('wiz-summary').innerHTML=`<strong>Nome:</strong> ${esc(name)}<br><strong>Tipo:</strong> ${esc(type)}${pi}<br><strong>Detalhes:</strong> ${det}<br><strong>Seeds:</strong> ${seeds}`;
 }
 
@@ -3222,12 +3234,13 @@ async function wizFinish() {
 function setSettingsTab(el, panelId) {
   document.querySelectorAll('#settings-tabs .tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['settings-general','settings-game','settings-umpires','settings-categories','settings-rankings','settings-events'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=id===panelId?'':'none';});
+  ['settings-general','settings-game','settings-umpires','settings-categories','settings-rankings','settings-events','settings-access'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=id===panelId?'':'none';});
   if(panelId==='settings-game')renderGameProfiles();
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
   if(panelId==='settings-rankings')renderScoringTables();
   if(panelId==='settings-events')renderLiveEvents();
+  if(panelId==='settings-access')renderAccessPage(); // Acessos (antes a página "Gerenciar Acessos")
 }
 
 // Configuracoes > Eventos: torneios publicados no site ao vivo
@@ -3277,12 +3290,12 @@ async function checkForUpdates(){
     const latestVersion=(data.tag_name||'').replace('v','');
     if(latestVersion&&(data.beta_channel?!data.up_to_date:isNewerVersion(latestVersion,APP_VERSION))){
       const exeAsset=(data.assets||[]).find(a=>a.name.endsWith('.exe'));
-      statusEl.innerHTML=`<span style="color:#F59E0B;font-weight:600">Nova versao disponivel: v${esc(latestVersion)}</span>`;
+      statusEl.innerHTML=`<span style="color:#D97706;font-weight:600">Nova versão disponível: v${esc(latestVersion)}</span>`;
       if(exeAsset){
         statusEl.innerHTML+=` <button class="btn btn-sm btn-primary" style="margin-left:8px" data-action="api.openExternal" data-arg-1="${esc(exeAsset.browser_download_url)}">Baixar v${esc(latestVersion)}</button>`;
       }
     } else {
-      statusEl.innerHTML=`<span style="color:#10B981;font-weight:600">&#10003; App atualizado (v${APP_VERSION})</span>`;
+      statusEl.innerHTML=`<span style="color:#0B7A43;font-weight:600">App atualizado (v${APP_VERSION})</span>`;
     }
   }catch(e){
     statusEl.innerHTML=`<span style="color:#DC2626">Erro ao verificar: ${esc(e.message)}</span>`;
@@ -4078,7 +4091,8 @@ function computeRoundRobinRanking(d){
 }
 
 // === TOAST ===
-function showToast(msg,type='success'){document.querySelectorAll('.toast').forEach(t=>t.remove());const c={success:{bg:'#D1FAE5',b:'#10B981',c:'#065F46',i:'&#10003;'},error:{bg:'#FEE2E2',b:'#EF4444',c:'#991B1B',i:'&#10007;'},warning:{bg:'#FEF3C7',b:'#F59E0B',c:'#92400E',i:'&#9888;'},info:{bg:'#DBEAFE',b:'#3B82F6',c:'#1E3A8A',i:'&#8505;'}}[type]||{bg:'#D1FAE5',b:'#10B981',c:'#065F46',i:'&#10003;'};const t=document.createElement('div');t.className='toast';t.style.cssText=`position:fixed;bottom:24px;right:24px;z-index:999;padding:12px 20px;border-radius:8px;background:${c.bg};border:1px solid ${c.b};color:${c.c};font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:400px;display:flex;align-items:center;gap:8px;`;t.innerHTML=`<span>${c.i}</span> ${esc(msg)}`;document.body.appendChild(t);setTimeout(()=>{if(t.parentNode)t.remove();},4000);}
+const TOAST_ICONS={success:'circle-check',error:'circle-x',warning:'triangle-alert',info:'info'};
+function showToast(msg,type='success'){document.querySelectorAll('.toast').forEach(t=>t.remove());const k=TOAST_ICONS[type]?type:'success';const t=document.createElement('div');t.className='toast is-'+k;t.setAttribute('role','status');t.innerHTML=`<span class="toast-ic">${icon(TOAST_ICONS[k])}</span><span class="toast-tx">${esc(msg)}</span>`;document.body.appendChild(t);setTimeout(()=>{if(t.parentNode)t.remove();},4000);}
 
 // === HELPERS ===
 function openModal(id){const el=document.getElementById(id);if(!el)return;el.classList.add('active');setTimeout(()=>{const f=el.querySelector('select,input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([readonly])');if(f)f.focus();},50);}
@@ -4249,19 +4263,22 @@ function _showUpdateToast() {
   if (!el) {
     el = document.createElement('div');
     el.id = 'update-modal';
+    el.className = 'upd-toast';
     el.setAttribute('role', 'status');
-    el.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99998;max-width:380px;width:92%;background:#fff;border:1px solid #BFDBFE;border-radius:14px;padding:16px;box-shadow:0 12px 40px rgba(15,23,42,.25)';
     document.body.appendChild(el);
   }
   const v = _updateInfo?.version || '?';
   el.innerHTML = `
-    <p style="margin:0 0 4px;color:#065F46;font-weight:700">Atualiza&ccedil;&atilde;o v${esc(String(v))} baixada</p>
-    <p style="margin:0 0 12px;color:#475569;font-size:13px">Reiniciar agora? O app fecha, instala sozinho e abre de novo. Se preferir, ela entra quando voc&ecirc; fechar o app.</p>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-secondary" data-action="updaterDeclineInstall">Depois</button>
-      <button class="btn btn-primary" data-action="updaterInstallNow">Reiniciar agora</button>
+    <span class="upd-toast-ic">${icon('download')}</span>
+    <div class="upd-toast-tx">
+      <b>Atualiza&ccedil;&atilde;o v${esc(String(v))} baixada</b>
+      <p>Reiniciar agora? O app fecha, instala sozinho e abre de novo. Se preferir, ela entra quando voc&ecirc; fechar o app.</p>
+      <div class="upd-toast-bts">
+        <button class="btn btn-secondary btn-sm" data-action="updaterDeclineInstall">Depois</button>
+        <button class="btn btn-primary btn-sm" data-action="updaterInstallNow">${icon('refresh-cw')} Reiniciar agora</button>
+      </div>
     </div>`;
-  el.style.display = 'block';
+  el.style.display = 'flex';
 }
 function _hideUpdateToast() {
   const el = document.getElementById('update-modal');
