@@ -337,18 +337,23 @@
 
         <!-- RELATORIOS -->
         <div class="page" id="page-reports">
-          <div class="quick-actions">
-            <div class="quick-action" data-action="printReport" data-arg-1="entries"><div class="icon">&#128203;</div><div class="label">Lista de Inscritos</div></div>
-            <div class="quick-action" data-action="printReport" data-arg-1="draws"><div class="icon">&#127960;</div><div class="label">Chaves / Brackets</div></div>
-            <div class="quick-action" data-action="printReport" data-arg-1="results"><div class="icon">&#128200;</div><div class="label">Resultados</div></div>
-            <div class="quick-action" data-action="printReport" data-arg-1="oop"><div class="icon">&#128197;</div><div class="label">Ordem de Jogo</div></div>
-            <div class="quick-action" data-action="showScoresheetModal"><div class="icon">&#128221;</div><div class="label">S&uacute;mulas</div></div>
-            <div class="quick-action" data-action="printReport" data-arg-1="winners"><div class="icon">&#127942;</div><div class="label">Premiacao</div></div>
-            <div class="quick-action" data-action="printReport" data-arg-1="classification"><div class="icon">&#127941;</div><div class="label">Classificacao Geral</div></div>
-            <div class="quick-action" data-action="printReport" data-arg-1="rankingFederados"><div class="icon">&#127913;</div><div class="label">Ranking Federados</div></div>
-            <div class="quick-action" data-action="printReport" data-arg-1="atletasPorClube"><div class="icon">&#128101;</div><div class="label">Atletas por Clube</div></div>
-            <div class="quick-action" data-action="printReport" data-arg-1="medalhasPorClube"><div class="icon">&#129351;</div><div class="label">Medalhas por Clube</div></div>
-            <div class="quick-action" data-action="printReport" data-arg-1="players"><div class="icon">&#128100;</div><div class="label">Jogadores</div></div>
+          <div class="pg-head"><div><h1>Relatórios</h1><p>Abra, confira e imprima. Os do torneio usam o torneio ativo.</p></div></div>
+          <div class="rp-sec is-red">Do torneio ativo</div>
+          <div class="rp-grid">
+            <div class="cd rp-card" data-action="printReport" data-arg-1="entries"><div class="rp-top"><span class="rp-ic"><i data-icon="clipboard-list"></i></span><div class="rp-tx"><b>Lista de inscritos</b><small>Atletas e eventos de cada um</small></div></div><span class="btn-soft rp-go"><i data-icon="eye"></i>Abrir</span></div>
+            <div class="cd rp-card" data-action="printReport" data-arg-1="draws"><div class="rp-top"><span class="rp-ic"><i data-icon="chave"></i></span><div class="rp-tx"><b>Chaves</b><small>Todas as chaves para imprimir</small></div></div><span class="btn-soft rp-go"><i data-icon="eye"></i>Abrir</span></div>
+            <div class="cd rp-card" data-action="printReport" data-arg-1="results"><div class="rp-top"><span class="rp-ic"><i data-icon="list-checks"></i></span><div class="rp-tx"><b>Resultados</b><small>Placar de cada jogo finalizado</small></div></div><span class="btn-soft rp-go"><i data-icon="eye"></i>Abrir</span></div>
+            <div class="cd rp-card" data-action="printReport" data-arg-1="oop"><div class="rp-top"><span class="rp-ic"><i data-icon="calendar-days"></i></span><div class="rp-tx"><b>Ordem de jogo</b><small>Por dia, quadra e horário</small></div></div><span class="btn-soft rp-go"><i data-icon="eye"></i>Abrir</span></div>
+            <div class="cd rp-card" data-action="showScoresheetModal"><div class="rp-top"><span class="rp-ic"><i data-icon="file-text"></i></span><div class="rp-tx"><b>Súmulas</b><small>Em branco ou preenchidas</small></div></div><span class="btn-soft rp-go"><i data-icon="eye"></i>Abrir</span></div>
+            <div class="cd rp-card" data-action="printReport" data-arg-1="winners"><div class="rp-top"><span class="rp-ic"><i data-icon="medal"></i></span><div class="rp-tx"><b>Premiação</b><small>Pódio de cada categoria</small></div></div><span class="btn-soft rp-go"><i data-icon="eye"></i>Abrir</span></div>
+            <div class="cd rp-card" data-action="printReport" data-arg-1="classification"><div class="rp-top"><span class="rp-ic"><i data-icon="list-ordered"></i></span><div class="rp-tx"><b>Classificação geral</b><small>Pontos por posição em cada chave</small></div></div><span class="btn-soft rp-go"><i data-icon="eye"></i>Abrir</span></div>
+          </div>
+          <div class="rp-sec">Da federação</div>
+          <div class="rp-grid">
+            <div class="cd rp-card" data-action="printReport" data-arg-1="rankingFederados"><div class="rp-top"><span class="rp-ic"><i data-icon="trophy"></i></span><div class="rp-tx"><b>Ranking federados</b><small>Só atletas de clubes adimplentes</small></div></div><span class="btn-soft rp-go"><i data-icon="eye"></i>Abrir</span></div>
+            <div class="cd rp-card" data-action="printReport" data-arg-1="atletasPorClube"><div class="rp-top"><span class="rp-ic"><i data-icon="users"></i></span><div class="rp-tx"><b>Atletas por clube</b><small>Quem joga por cada clube</small></div></div><span class="btn-soft rp-go"><i data-icon="eye"></i>Abrir</span></div>
+            <div class="cd rp-card" data-action="printReport" data-arg-1="medalhasPorClube"><div class="rp-top"><span class="rp-ic"><i data-icon="crown"></i></span><div class="rp-tx"><b>Medalhas por clube</b><small>Ouro, prata e bronze</small></div></div><span class="btn-soft rp-go"><i data-icon="eye"></i>Abrir</span></div>
+            <div class="cd rp-card" data-action="printReport" data-arg-1="players"><div class="rp-top"><span class="rp-ic"><i data-icon="user"></i></span><div class="rp-tx"><b>Jogadores</b><small>Cadastro completo</small></div></div><span class="btn-soft rp-go"><i data-icon="eye"></i>Abrir</span></div>
           </div>
         </div>
 
