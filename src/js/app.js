@@ -735,8 +735,9 @@ function updateOverview() {
 function renderTournamentPage() {
   const tb = document.getElementById('tournaments-table-body');
   const em = document.getElementById('tournaments-empty');
+  const ft = document.getElementById('tournaments-foot');
   if (!tournament) {
-    tb.innerHTML = ''; em.style.display = 'block'; return;
+    tb.innerHTML = ''; em.style.display = 'block'; if (ft) ft.textContent = ''; return;
   }
   em.style.display = 'none';
   const ev = [];
@@ -744,15 +745,20 @@ function renderTournamentPage() {
   if(tournament.events?.dm)ev.push('DM'); if(tournament.events?.df)ev.push('DF'); if(tournament.events?.mx)ev.push('MX');
   const profile = gameProfiles.find(p=>p.id===tournament.gameProfileId);
   const sysName = profile ? esc(profile.name) : '-';
+  const st = shellStatus(tournament, Date.now());
+  const rot = { live:'Ao vivo', run:'Em andamento', sched:'Agendado', done:'Finalizado', draft:'Rascunho' }[st.kind];
+  const local = [tournament.location, tournament.city].filter(Boolean).join(' · ');
   tb.innerHTML = `<tr>
-    <td><strong>${esc(tournament.name)}</strong></td><td>${esc(tournament.location)||'-'}</td>
-    <td>${fmtDate(tournament.startDate)}</td><td>${fmtDate(tournament.endDate)}</td>
-    <td>${ev.join(', ')||'-'}</td><td>${sysName}</td><td>${statusTag(tournament)}</td>
-    <td>
-      <button class="btn btn-sm btn-secondary" data-action="showTournamentConfig" title="Configuracao">&#9881;</button>
-      <button class="btn btn-sm btn-secondary" data-action="exportTournamentBackup" title="Backup">&#128230;</button>
-      <button class="btn btn-sm btn-danger" data-action="closeTournament">Fechar Torneio</button>
+    <td><div class="tt-name"><span class="tt-ic">${icon('trophy')}</span><div><b>${esc(tournament.name)}</b><small>${players.length} atletas · ${(tournament.matches||[]).length} jogos</small></div></div></td>
+    <td>${esc(local)||'-'}</td>
+    <td class="num">${esc(shellDateRange(tournament.startDate, tournament.endDate))||'-'}</td>
+    <td>${ev.map(e=>`<span class="chip">${e}</span>`).join('')||'-'}</td><td>${sysName}</td><td><span class="pill is-${st.kind}"><s></s>${rot}</span></td>
+    <td class="acts">
+      <button class="btn-icon" data-action="showTournamentConfig" title="Configuração">${icon('settings')}</button>
+      <button class="btn-icon" data-action="exportTournamentBackup" title="Backup">${icon('download')}</button>
+      <button class="btn-soft is-danger" data-action="closeTournament">Fechar torneio</button>
     </td></tr>`;
+  if (ft) ft.textContent = '1 torneio';
 }
 
 function showNewTournamentModal() {

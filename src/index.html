@@ -139,17 +139,23 @@
 
         <!-- TORNEIOS -->
         <div class="page" id="page-tournaments">
-          <div class="toolbar">
-            <div class="search-box"><span class="search-icon">&#128269;</span><input type="text" placeholder="Buscar torneios..." id="search-tournaments" data-action="filterTournaments" data-event="input"></div>
-            <button class="btn btn-primary" data-action="showNewTournamentModal">&#10133; Novo Torneio</button>
-            <button class="btn btn-secondary" data-action="importTournamentBackup">&#128229; Abrir Backup</button>
+          <div class="pg-head">
+            <div><h1>Torneios</h1><p>O torneio aberto no app aparece na faixa azul. Para trocar, abra um backup ou crie um novo.</p></div>
+            <div class="pg-actions">
+              <button class="btn btn-secondary" data-action="importTournamentBackup"><i data-icon="folder-open"></i>Abrir backup</button>
+              <button class="btn btn-primary" data-action="showNewTournamentModal"><i data-icon="plus"></i>Novo torneio</button>
+            </div>
           </div>
-          <div class="card">
+          <div class="toolbar">
+            <div class="search-box"><span class="search-icon"><i data-icon="search"></i></span><input type="text" placeholder="Buscar torneio, local..." id="search-tournaments" data-action="filterTournaments" data-event="input"></div>
+          </div>
+          <div class="cd">
             <div class="table-container">
-              <table><thead><tr><th>Nome</th><th>Local</th><th>Data Inicio</th><th>Data Fim</th><th>Eventos</th><th>Sistema</th><th>Status</th><th>Acoes</th></tr></thead>
+              <table><thead><tr><th>Torneio</th><th>Local</th><th>Datas</th><th>Eventos</th><th>Sistema</th><th>Situação</th><th></th></tr></thead>
               <tbody id="tournaments-table-body"></tbody></table>
             </div>
-            <div class="empty-state" id="tournaments-empty"><div class="icon">&#127942;</div><h3>Nenhum torneio cadastrado</h3><p>Clique em "Novo Torneio" para comecar</p></div>
+            <div class="empty-state" id="tournaments-empty"><i data-icon="trophy" data-icon-class="i es-ic"></i><h3>Nenhum torneio cadastrado</h3><p>Clique em "Novo torneio" para começar</p></div>
+            <div class="tbl-foot" id="tournaments-foot"></div>
           </div>
         </div>
 
