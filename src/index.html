@@ -2,11 +2,10 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://code.iconify.design; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.supabase.co; connect-src 'self' https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com https://*.supabase.co wss://*.supabase.co;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FABD - Planejador de Torneios</title>
   <link rel="stylesheet" href="css/styles.css">
-  <script src="https://code.iconify.design/iconify-icon/3.0.2/iconify-icon.min.js" integrity="sha384-WkEPiGpA8IY4DDeMxmVWYU+J3FdQ1CUSC9w1HiBdQOAk79Zwdbog/5HHsl3keRaM" crossorigin="anonymous"></script>
   <!-- DOMPurify vendored localmente (asar). SRI nao se aplica a file:// — Electron
        rejeita silenciosamente integrity= em scripts locais. Asar ja e empacotado
        pelo electron-builder; nao ha vetor MITM. -->
@@ -48,44 +47,60 @@
     </div>
   </div>
 
-  <!-- Barra de atualização automática (hidden por padrão, JS mostra quando há update) -->
-  <div id="update-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#1E3A8A;color:#fff;padding:8px 16px;font-size:13px;font-family:'Inter',sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.2);align-items:center;justify-content:center;gap:12px">
+  <!-- Barra de atualização automática (hidden por padrão, JS mostra quando há update): fica em cima do menu e empurra a tela -->
+  <div id="update-bar" style="display:none;flex:none;position:relative;z-index:20;background:#1E3A8A;color:#fff;padding:8px 16px;font-size:13px;font-family:'Inter',sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.2);align-items:center;justify-content:center;gap:12px">
     <span id="update-bar-text"></span>
     <button id="update-bar-btn" style="background:#fff;color:#1E3A8A;border:none;padding:4px 14px;border-radius:6px;font-weight:600;font-size:12px;cursor:pointer">Baixar</button>
     <button data-action="closeUpdateBar" style="background:none;border:none;color:#fff;cursor:pointer;font-size:16px;padding:4px">&times;</button>
   </div>
   <div class="app-container">
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <div id="sidebar-fed-logo-wrap" style="display:flex;align-items:center;justify-content:center">
-          <img src="assets/logo-fabd.jpg" alt="FABD" id="sidebar-fed-logo">
-          <div id="sidebar-fed-initials" style="display:none;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;align-items:center;justify-content:center;font-weight:800;font-size:18px;letter-spacing:0.5px"></div>
-        </div>
-        <h2 id="sidebar-fed-name">FEDERACAO ALAGOANA<br>DE BADMINTON</h2>
+    <!-- TOPO: marca da federacao + menu principal -->
+    <header class="top">
+      <div class="top-logo" id="sidebar-fed-logo-wrap">
+        <img src="assets/logo-fabd.jpg" alt="FABD" id="sidebar-fed-logo">
+        <div id="sidebar-fed-initials" style="display:none"></div>
       </div>
-      <nav class="sidebar-nav">
-        <div class="nav-section-title">Principal</div>
-        <div class="nav-item active" data-page="overview"><span class="icon"><iconify-icon icon="lucide:home"></iconify-icon></span><span>Visao Geral</span></div>
-        <div class="nav-item" data-page="tournaments"><span class="icon"><iconify-icon icon="lucide:trophy"></iconify-icon></span><span>Torneios</span></div>
-        <div class="nav-item" data-page="players"><span class="icon"><iconify-icon icon="lucide:users"></iconify-icon></span><span>Jogadores</span></div>
-        <div class="nav-section-title">Torneio Ativo</div>
-        <div class="nav-item" data-page="roster"><span class="icon"><iconify-icon icon="lucide:clipboard-list"></iconify-icon></span><span>Inscritos</span></div>
-        <div class="nav-item" data-page="draws"><span class="icon"><iconify-icon icon="lucide:list-tree"></iconify-icon></span><span>Chaves</span></div>
-        <div class="nav-item" data-page="schedule"><span class="icon"><iconify-icon icon="lucide:calendar"></iconify-icon></span><span>Agenda</span></div>
-        <div class="nav-item" data-page="matches"><span class="icon"><iconify-icon icon="mdi:badminton"></iconify-icon></span><span>Partidas</span></div>
-        <div class="nav-section-title">Outros</div>
-        <div class="nav-item" data-page="reports"><span class="icon"><iconify-icon icon="lucide:bar-chart-3"></iconify-icon></span><span>Relatorios</span></div>
-        <div class="nav-item" id="nav-access" data-page="access" style="display:none"><span class="icon"><iconify-icon icon="lucide:lock-keyhole"></iconify-icon></span><span>Gerenciar Acessos</span></div>
-        <div class="nav-item" data-page="settings"><span class="icon"><iconify-icon icon="lucide:settings"></iconify-icon></span><span>Configuracoes</span></div>
+      <div class="top-brand"><b>FABD Tournament Planner</b><small id="sidebar-fed-name">FEDERAÇÃO ALAGOANA DE BADMINTON</small></div>
+      <nav class="top-nav">
+        <div class="nav-item active" data-page="overview"><i data-icon="layout-dashboard"></i><span>Visão geral</span></div>
+        <div class="nav-item" data-page="tournaments"><i data-icon="trophy"></i><span>Torneios</span></div>
+        <div class="nav-item" data-page="players"><i data-icon="users"></i><span>Jogadores</span></div>
+        <div class="nav-item" data-page="reports"><i data-icon="chart-column"></i><span>Relatórios</span></div>
+        <div class="nav-item" data-page="settings"><i data-icon="settings"></i><span>Configurações</span></div>
+        <div class="nav-item" id="nav-access" data-page="access" style="display:none"><i data-icon="lock-keyhole"></i><span>Acessos</span></div>
       </nav>
-      <div class="sidebar-footer" id="app-version-footer">FABD Tournament Planner</div>
-    </aside>
+      <div class="top-right">
+        <button type="button" class="org-chip" id="organizer-badge" hidden></button>
+      </div>
+    </header>
+
+    <!-- FAIXA DO TORNEIO ATIVO + abas do torneio (shell.js) -->
+    <section class="band is-empty" id="shell-band">
+      <div class="band-r1">
+        <div class="band-info">
+          <span class="band-tag" id="band-tag" hidden><s></s><span id="band-tag-text"></span></span>
+          <h2 id="band-title">Nenhum torneio ativo</h2>
+          <div class="band-meta" id="band-meta"></div>
+        </div>
+        <div class="band-progress" id="band-progress" hidden>
+          <small id="band-progress-label">Jogos de hoje</small>
+          <div><b id="band-progress-count"></b> <small id="band-progress-end"></small></div>
+          <div class="band-bar"><i id="band-progress-bar"></i></div>
+        </div>
+      </div>
+      <nav class="band-tabs">
+        <div class="nav-item" data-page="roster"><i data-icon="clipboard-list"></i><span>Inscritos</span><span class="ct" id="tab-count-roster" hidden></span></div>
+        <div class="nav-item" data-page="draws"><i data-icon="chave"></i><span>Chaves</span><span class="ct" id="tab-count-draws" hidden></span></div>
+        <div class="nav-item" data-page="schedule"><i data-icon="calendar-days"></i><span>Agenda</span></div>
+        <div class="nav-item" data-page="matches"><i data-icon="peteca"></i><span>Partidas</span><span class="ct" id="tab-count-matches" hidden></span></div>
+      </nav>
+    </section>
 
     <!-- MAIN -->
     <main class="main-area">
-      <header class="header">
+      <!-- titulo e torneio da pagina: so pro leitor de tela (o menu e a faixa ja mostram) -->
+      <header class="header sr-only">
         <h1 id="page-title">Visao Geral</h1>
         <span class="breadcrumb" id="breadcrumb"></span>
         <div class="header-actions" id="header-actions"></div>
@@ -200,7 +215,7 @@
                 <div class="draws-search-bar">
                   <div class="search-box"><span class="search-icon">&#128269;</span><input type="text" placeholder="Buscar chaves..." id="search-draws" data-action="filterDraws" data-event="input"></div>
                   <button type="button" class="draws-filter-btn" id="draws-filter-btn" data-action="toggleDrawsFilterPopup" data-arg-1="$event" title="Filtrar chaves">
-                    <iconify-icon icon="lucide:filter"></iconify-icon>
+                    <i data-icon="funnel"></i>
                     <span class="filter-badge" id="draws-filter-badge" style="display:none">0</span>
                   </button>
                 </div>
@@ -536,6 +551,7 @@
 
       </div>
     </main>
+    <footer class="statusbar"><span id="app-version-footer">FABD Tournament Planner</span></footer>
   </div>
 
   <!-- MODAL: NOVO TORNEIO -->
@@ -1191,6 +1207,8 @@
   <script src="js/modules/schedule.js"></script>
   <script src="js/modules/reports.js"></script>
   <script src="js/modules/update-bar.js"></script>
+  <script src="js/modules/icons.js"></script>
+  <script src="js/modules/shell.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
