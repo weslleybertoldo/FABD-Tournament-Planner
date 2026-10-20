@@ -168,7 +168,7 @@ function schedulePlaceToDefine(book, slots, athletes, lastStart, role) {
 // Fim do aviso do Regenerar: quantos jogos ficaram sem horario ('' = nenhum)
 function scheduleMissingWarning(matches) {
   const n = matches.filter(m => !m.time).length;
-  return n ? ` ⚠ ${n} jogo(s) ficaram SEM horario: falta quadra ou descanso no dia (veja em Partidas).` : '';
+  return n ? ` Atenção: ${n} jogo(s) ficaram SEM horário: falta quadra ou descanso no dia (veja em Partidas).` : '';
 }
 
 // "HH:MM" <-> minutos (o modulo e puro: nao usa o timeToMin do app.js)

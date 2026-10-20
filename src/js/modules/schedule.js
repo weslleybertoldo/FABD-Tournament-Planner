@@ -410,12 +410,12 @@ function renderScheduleValidation() {
   _svSel = -1; _svButtons();
   const list = _svRows.map((r, idx) => ({ r, idx })).filter(o => o.r.day === day);
   const box = document.getElementById('sv-list');
-  if (!list.length) { box.innerHTML = '<p class="sv-empty">&#9989; Nenhum problema neste dia.</p>'; return; }
+  if (!list.length) { box.innerHTML = `<p class="sv-empty">${icon('circle-check')} Nenhum problema neste dia.</p>`; return; }
   let h = '<div class="sv-scroll"><table class="sv-table"><thead><tr><th>Nome</th><th>Chave</th><th>Rodada</th><th>Jogo</th><th>Hora</th><th>Coment&aacute;rio</th></tr></thead><tbody>';
   scheduleValidationGroups().forEach(g => {
     const rows = list.filter(o => o.r.grupo === g.id);
     if (!rows.length) return;
-    h += `<tr class="sv-group ${g.regra ? 'sv-regra' : 'sv-extra'}"><td colspan="6">${g.regra ? '&#9888;' : '&#9432;'} ${esc(g.titulo)} (${rows.length})</td></tr>`;
+    h += `<tr class="sv-group ${g.regra ? 'sv-regra' : 'sv-extra'}"><td colspan="6"><span class="sv-gi">${icon(g.regra ? 'triangle-alert' : 'info')}</span>${esc(g.titulo)} (${rows.length})</td></tr>`;
     rows.forEach(({ r, idx }) => {
       h += `<tr class="sv-row" data-sv-idx="${idx}" data-action="selectScheduleValidationRow" data-event="click dblclick" data-arg-1="${idx}" data-arg-2="$event"><td>${esc(r.nome)}</td><td>${esc(r.drawName || '-')}</td><td>${esc(r.roundName || '-')}</td><td>${r.num != null ? '#' + r.num : '-'}</td><td>${esc(r.time || '-')}</td><td>${esc(r.texto)}</td></tr>`;
     });
@@ -463,7 +463,7 @@ function renderScheduleValidationSettings() {
   const hora = id => `<input type="time" class="form-control sv-time" data-sv="${id}" value="${st[id]}" ${ev}>`;
   const linha = inner => `<label class="sv-opt">${inner}</label>`;
   document.getElementById('sv-settings').innerHTML =
-    '<p class="sv-hint">Regras da agenda: marcam &#9888; no jogo em Partidas e na Agenda.</p>' +
+    `<p class="sv-hint">Regras da agenda: marcam ${icon('triangle-alert')} no jogo em Partidas e na Agenda.</p>` +
     linha(`${chk('semHorario')} Jogo sem hor&aacute;rio`) +
     linha(`${chk('conflito')} Atleta em 2 jogos ao mesmo tempo`) +
     linha(`${chk('descanso')} Descanso m&iacute;nimo entre o fim de um jogo e o in&iacute;cio do outro: ${num('descansoMin', 0, 1440, 5)} min <span class="sv-hint">(no torneio: ${tournament.restMinBetweenGames || 20} min)</span>`) +

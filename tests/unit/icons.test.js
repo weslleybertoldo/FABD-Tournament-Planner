@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { loadModule } from './_loader.js';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const { icon, hydrateIcons, ICONS } = loadModule('src/js/modules/icons.js');
 
@@ -26,6 +28,14 @@ describe('icon (ícones desenhados no app, sem CDN)', () => {
   it('todos os ícones da casca existem (menu do topo, faixa e abas)', () => {
     ['layout-dashboard', 'trophy', 'users', 'chart-column', 'settings', 'lock-keyhole', 'clipboard-list', 'chave',
       'calendar-days', 'peteca', 'calendar', 'map-pin', 'funnel'].forEach(n => expect(ICONS[n], n).toBeTruthy());
+  });
+  it('todo ícone usado no app existe (data-icon do HTML e icon(\'...\') do JS)', () => {
+    const js = ['src/js/app.js', ...readdirSync('src/js/modules').map(f => join('src/js/modules', f))];
+    const nomes = new Set();
+    for (const m of readFileSync('src/index.html', 'utf8').matchAll(/data-icon="([a-z0-9-]+)"/g)) nomes.add(m[1]);
+    for (const f of js) for (const m of readFileSync(f, 'utf8').matchAll(/\bicon\('([a-z0-9-]+)'/g)) nomes.add(m[1]);
+    expect(nomes.size).toBeGreaterThan(40);
+    expect([...nomes].filter(n => !ICONS[n])).toEqual([]);
   });
 });
 

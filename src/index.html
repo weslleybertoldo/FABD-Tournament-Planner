@@ -13,45 +13,41 @@
 </head>
 <body>
   <!-- LOGIN OVERLAY -->
-  <div id="auth-overlay" style="display:none;position:fixed;inset:0;background:#0F172A;z-index:99999;align-items:center;justify-content:center;font-family:'Inter','Segoe UI',sans-serif">
-    <div style="background:#1E293B;border-radius:16px;padding:36px 32px;max-width:420px;width:92%;color:#fff;box-shadow:0 20px 60px rgba(0,0,0,.5)">
-      <div style="text-align:center;margin-bottom:24px">
-        <div style="width:64px;height:64px;background:#1E3A8A;border-radius:16px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:32px">&#127992;</div>
-        <h2 style="margin:0;font-size:20px;color:#fff">FABD Tournament Planner</h2>
-        <p style="margin:6px 0 0;font-size:13px;color:#94A3B8">Acesso restrito a organizadores autorizados</p>
+  <div id="auth-overlay" class="auth" style="display:none">
+    <div class="auth-card">
+      <div class="auth-head">
+        <div class="auth-logo"><i data-icon="peteca"></i></div>
+        <h2>FABD Tournament Planner</h2>
+        <p>Acesso restrito a organizadores autorizados</p>
+        <div class="auth-bar"></div>
       </div>
 
       <div id="auth-step-email">
-        <label style="display:block;font-size:13px;color:#CBD5E1;margin-bottom:6px">Email do organizador</label>
-        <input id="auth-email" type="email" autocomplete="email" placeholder="seu@email.com"
-          style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid #334155;background:#0F172A;color:#fff;font-size:15px;box-sizing:border-box">
-        <button id="auth-send-btn" data-action="authSendCode"
-          style="width:100%;margin-top:12px;padding:12px;background:#1E3A8A;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">Enviar codigo</button>
-        <div id="auth-email-msg" style="margin-top:10px;font-size:12px;color:#F59E0B;min-height:16px"></div>
+        <label class="auth-label" for="auth-email">E-mail do organizador</label>
+        <input id="auth-email" class="form-control auth-input" type="email" autocomplete="email" placeholder="seu@email.com">
+        <button id="auth-send-btn" class="btn btn-primary btn-lg auth-btn" data-action="authSendCode"><i data-icon="send"></i> Enviar c&oacute;digo</button>
+        <div id="auth-email-msg" class="auth-msg"></div>
       </div>
 
       <div id="auth-step-code" style="display:none">
-        <p style="font-size:13px;color:#CBD5E1;margin:0 0 6px">Codigo enviado para <strong id="auth-email-shown" style="color:#fff"></strong></p>
-        <p style="font-size:11px;color:#64748B;margin:0 0 12px">Confira sua caixa de entrada (e spam). Validade: 10 minutos.</p>
-        <input id="auth-code" type="text" inputmode="numeric" maxlength="6" pattern="[0-9]*" placeholder="000000"
-          style="width:100%;padding:14px;border-radius:10px;border:1px solid #334155;background:#0F172A;color:#fff;font-size:24px;letter-spacing:12px;text-align:center;font-weight:700;box-sizing:border-box">
-        <button id="auth-verify-btn" data-action="authVerifyCode"
-          style="width:100%;margin-top:12px;padding:12px;background:#10B981;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">Entrar</button>
-        <button data-action="authBackToEmail" style="width:100%;margin-top:8px;padding:10px;background:transparent;color:#94A3B8;border:1px solid #334155;border-radius:10px;font-size:13px;cursor:pointer">Voltar</button>
-        <div id="auth-code-msg" style="margin-top:10px;font-size:12px;color:#F59E0B;min-height:16px"></div>
+        <p class="auth-sent">C&oacute;digo enviado para <strong id="auth-email-shown"></strong></p>
+        <p class="auth-hint">Confira sua caixa de entrada (e o spam). Validade: 10 minutos.</p>
+        <input id="auth-code" class="form-control auth-code" type="text" inputmode="numeric" maxlength="6" pattern="[0-9]*" placeholder="000000">
+        <button id="auth-verify-btn" class="btn btn-primary btn-lg auth-btn" data-action="authVerifyCode"><i data-icon="lock-keyhole"></i> Entrar</button>
+        <button class="btn btn-secondary auth-btn" data-action="authBackToEmail"><i data-icon="arrow-left"></i> Voltar</button>
+        <div id="auth-code-msg" class="auth-msg"></div>
       </div>
 
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #334155;font-size:11px;color:#64748B;text-align:center">
-        Sem acesso? Solicite a <strong style="color:#94A3B8">admin@fabd.com</strong>
-      </div>
+      <div class="auth-foot">Sem acesso? Solicite a <strong>admin@fabd.com</strong></div>
     </div>
   </div>
 
   <!-- Barra de atualização automática (hidden por padrão, JS mostra quando há update): fica em cima do menu e empurra a tela -->
-  <div id="update-bar" style="display:none;flex:none;position:relative;z-index:20;background:#1E3A8A;color:#fff;padding:8px 16px;font-size:13px;font-family:'Inter',sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.2);align-items:center;justify-content:center;gap:12px">
+  <div id="update-bar" class="upd-bar" style="display:none">
+    <i data-icon="sparkles"></i>
     <span id="update-bar-text"></span>
-    <button id="update-bar-btn" style="background:#fff;color:#1E3A8A;border:none;padding:4px 14px;border-radius:6px;font-weight:600;font-size:12px;cursor:pointer">Baixar</button>
-    <button data-action="closeUpdateBar" style="background:none;border:none;color:#fff;cursor:pointer;font-size:16px;padding:4px">&times;</button>
+    <button id="update-bar-btn" class="upd-bar-btn"><i data-icon="download"></i> Baixar</button>
+    <button class="upd-bar-x" data-action="closeUpdateBar" aria-label="Fechar"><i data-icon="x"></i></button>
   </div>
   <div class="app-container">
 
@@ -449,9 +445,9 @@
                 <div class="form-group">
                   <label>Sistema de Disputa (para todos os eventos)</label>
                   <select class="form-control" id="gp-fixed-type">
-                    <option value="Eliminatoria">Eliminatoria (mata-mata)</option>
+                    <option value="Eliminatoria">Eliminat&oacute;ria (mata-mata)</option>
                     <option value="Todos contra Todos">Todos contra Todos (round robin)</option>
-                    <option value="Grupos + Eliminatoria">Fase de Grupos + Eliminatoria</option>
+                    <option value="Grupos + Eliminatoria">Fase de grupos + eliminat&oacute;ria</option>
                   </select>
                 </div>
               </div>
@@ -574,15 +570,15 @@
   <!-- MODAL: NOVO TORNEIO -->
   <div class="modal-overlay" id="modal-tournament">
     <div class="modal">
-      <div class="modal-header"><h3 id="modal-tournament-title">Novo Torneio</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-tournament">&times;</button></div>
+      <div class="modal-header"><h3 id="modal-tournament-title">Novo torneio</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-tournament" aria-label="Fechar"><i data-icon="x"></i></button></div>
       <div class="modal-body">
-        <div class="form-group"><label>Nome do Torneio *</label><input type="text" class="form-control" id="t-name" placeholder="Ex: I Festival Alagoano de Badminton" required><div class="form-error">Campo obrigatorio</div></div>
+        <div class="form-group"><label>Nome do torneio *</label><input type="text" class="form-control" id="t-name" placeholder="Ex: I Festival Alagoano de Badminton" required><div class="form-error">Campo obrigat&oacute;rio</div></div>
         <div class="form-row">
-          <div class="form-group"><label>Data de Inicio *</label><input type="date" class="form-control" id="t-start" required></div>
-          <div class="form-group"><label>Data de Termino *</label><input type="date" class="form-control" id="t-end" required></div>
+          <div class="form-group"><label>Data de in&iacute;cio *</label><input type="date" class="form-control" id="t-start" required></div>
+          <div class="form-group"><label>Data de t&eacute;rmino *</label><input type="date" class="form-control" id="t-end" required></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Local</label><input type="text" class="form-control" id="t-location" placeholder="Ex: Ginasio de Esportes"></div>
+          <div class="form-group"><label>Local</label><input type="text" class="form-control" id="t-location" placeholder="Ex: Gin&aacute;sio de Esportes"></div>
           <div class="form-group"><label>Cidade</label><input type="text" class="form-control" id="t-city" value="Maceio - AL"></div>
         </div>
         <div class="form-group"><label>Eventos</label>
@@ -594,43 +590,43 @@
             <label><input type="checkbox" id="t-ev-mx" checked> Duplas Mistas</label>
           </div>
         </div>
-        <div class="form-group"><label>Numero de Quadras</label>
-            <div class="spinner"><input type="number" class="form-control" id="t-courts" value="4" min="1" max="20"><div class="spinner-btns"><button data-action="spinUp" data-arg-1="t-courts" data-arg-2="20">&#9650;</button><button data-action="spinDown" data-arg-1="t-courts" data-arg-2="1">&#9660;</button></div></div>
+        <div class="form-group"><label>N&uacute;mero de quadras</label>
+            <div class="spinner"><input type="number" class="form-control" id="t-courts" value="4" min="1" max="20"><div class="spinner-btns"><button data-action="spinUp" data-arg-1="t-courts" data-arg-2="20" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="t-courts" data-arg-2="1" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div></div>
         </div>
       </div>
-      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-tournament">Cancelar</button><button class="btn btn-primary" data-action="saveTournament">&#128190; Salvar Torneio</button></div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-tournament">Cancelar</button><button class="btn btn-primary" data-action="saveTournament"><i data-icon="save"></i> Salvar torneio</button></div>
     </div>
   </div>
 
   <!-- MODAL: JOGADOR -->
   <div class="modal-overlay" id="modal-player">
     <div class="modal" style="width:700px">
-      <div class="modal-header"><h3 id="modal-player-title">Novo Jogador</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-player">&times;</button></div>
+      <div class="modal-header"><h3 id="modal-player-title">Novo jogador</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-player" aria-label="Fechar"><i data-icon="x"></i></button></div>
       <div class="modal-body">
         <!-- Abas do jogador -->
         <div class="tabs" id="player-tabs">
           <div class="tab active" data-action="setPlayerTab" data-arg-1="$el" data-arg-2="p-tab-dados">Dados</div>
           <div class="tab" data-action="setPlayerTab" data-arg-1="$el" data-arg-2="p-tab-categorias">Categorias</div>
-          <div class="tab" data-action="setPlayerTab" data-arg-1="$el" data-arg-2="p-tab-inscricao">Inscricao</div>
+          <div class="tab" data-action="setPlayerTab" data-arg-1="$el" data-arg-2="p-tab-inscricao">Inscri&ccedil;&atilde;o</div>
         </div>
 
         <!-- Aba Dados -->
         <div id="p-tab-dados">
           <div class="form-row">
-            <div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="p-firstname" placeholder="Nome" required><div class="form-error">Campo obrigatorio</div></div>
-            <div class="form-group"><label>Sobrenome *</label><input type="text" class="form-control" id="p-lastname" placeholder="Sobrenome" required><div class="form-error">Campo obrigatorio</div></div>
+            <div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="p-firstname" placeholder="Nome" required><div class="form-error">Campo obrigat&oacute;rio</div></div>
+            <div class="form-group"><label>Sobrenome *</label><input type="text" class="form-control" id="p-lastname" placeholder="Sobrenome" required><div class="form-error">Campo obrigat&oacute;rio</div></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Genero *</label><select class="form-control" id="p-gender" required data-action="onGenderChange" data-event="change"><option value="">Selecione...</option><option value="M">Masculino</option><option value="F">Feminino</option></select><div class="form-error">Selecione o genero</div></div>
-            <div class="form-group"><label>Data de Nascimento</label><input type="date" class="form-control" id="p-dob" data-action="onDobChange" data-event="change"><div class="form-hint">Categoria automatica: <strong id="p-autocat">-</strong></div></div>
+            <div class="form-group"><label>G&ecirc;nero *</label><select class="form-control" id="p-gender" required data-action="onGenderChange" data-event="change"><option value="">Selecione...</option><option value="M">Masculino</option><option value="F">Feminino</option></select><div class="form-error">Selecione o g&ecirc;nero</div></div>
+            <div class="form-group"><label>Data de nascimento</label><input type="date" class="form-control" id="p-dob" data-action="onDobChange" data-event="change"><div class="form-hint">Categoria autom&aacute;tica: <strong id="p-autocat">-</strong></div></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Clube</label><input type="text" class="form-control" id="p-club" placeholder="Ex: Clube de Badminton Maceio"></div>
+            <div class="form-group"><label>Clube</label><input type="text" class="form-control" id="p-club" placeholder="Ex: Clube de Badminton Macei&oacute;"></div>
             <div class="form-group"><label>Estado</label><input type="text" class="form-control" id="p-state" value="AL" maxlength="2"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Classificacao / Ranking</label>
-              <div class="spinner"><input type="number" class="form-control" id="p-ranking" placeholder="Ex: 1" min="1" max="9999"><div class="spinner-btns"><button data-action="spinUp" data-arg-1="p-ranking" data-arg-2="9999">&#9650;</button><button data-action="spinDown" data-arg-1="p-ranking" data-arg-2="1">&#9660;</button></div></div>
+            <div class="form-group"><label>Classifica&ccedil;&atilde;o / ranking</label>
+              <div class="spinner"><input type="number" class="form-control" id="p-ranking" placeholder="Ex: 1" min="1" max="9999"><div class="spinner-btns"><button data-action="spinUp" data-arg-1="p-ranking" data-arg-2="9999" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="p-ranking" data-arg-2="1" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div></div>
             </div>
             <div class="form-group"><label>Telefone</label><input type="tel" class="form-control" id="p-phone" placeholder="(82) 99999-0000"></div>
           </div>
@@ -639,8 +635,8 @@
 
         <!-- Aba Categorias -->
         <div id="p-tab-categorias" style="display:none">
-          <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:12px">
-            Marque as categorias em que este jogador esta inscrito. Para duplas, selecione o parceiro(a).
+          <p class="modal-lead">
+            Marque as categorias em que este jogador est&aacute; inscrito. Para duplas, selecione o parceiro(a).
           </p>
           <div id="p-categories-list" style="max-height:400px;overflow-y:auto"></div>
         </div>
@@ -651,11 +647,11 @@
                 <label>Valor por categoria (R$)</label>
                 <div class="spinner">
                   <input type="number" class="form-control" id="p-valor-categoria" value="30" min="0" max="500" step="5">
-                  <div class="spinner-btns"><button data-action="spinUp" data-arg-1="p-valor-categoria" data-arg-2="500">&#9650;</button><button data-action="spinDown" data-arg-1="p-valor-categoria" data-arg-2="0">&#9660;</button></div>
+                  <div class="spinner-btns"><button data-action="spinUp" data-arg-1="p-valor-categoria" data-arg-2="500" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="p-valor-categoria" data-arg-2="0" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div>
                 </div>
               </div>
               <div class="form-group">
-                <label>Status Pagamento</label>
+                <label>Status do pagamento</label>
                 <select class="form-control" id="p-pagamento-status">
                   <option value="pago">Pago</option>
                   <option value="pendente">Pendente</option>
@@ -664,29 +660,29 @@
               </div>
             </div>
           </div>
-          <div id="p-inscricao-resumo" style="background:var(--fabd-gray-100);border-radius:8px;padding:16px"></div>
+          <div id="p-inscricao-resumo" class="soft-box"></div>
         </div>
       </div>
-      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-player">Cancelar</button><button class="btn btn-primary" data-action="savePlayer">&#128190; Salvar Jogador</button></div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-player">Cancelar</button><button class="btn btn-primary" data-action="savePlayer"><i data-icon="save"></i> Salvar jogador</button></div>
     </div>
   </div>
 
   <!-- MODAL: INSCREVER JOGADOR -->
   <div class="modal-overlay" id="modal-entry">
     <div class="modal">
-      <div class="modal-header"><h3>Inscrever Jogador</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-entry">&times;</button></div>
+      <div class="modal-header"><h3>Inscrever jogador</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-entry" aria-label="Fechar"><i data-icon="x"></i></button></div>
       <div class="modal-body">
         <div class="form-group"><label>Selecione o jogador</label><select class="form-control" id="entry-player"></select></div>
         <div class="form-group"><label>Eventos</label><div class="check-group" id="entry-events-container"></div></div>
       </div>
-      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-entry">Cancelar</button><button class="btn btn-primary" data-action="addEntry">&#10003; Inscrever</button></div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-entry">Cancelar</button><button class="btn btn-primary" data-action="addEntry"><i data-icon="user-plus"></i> Inscrever</button></div>
     </div>
   </div>
 
   <!-- MODAL: WIZARD DE CHAVE -->
   <div class="modal-overlay" id="modal-draw-wizard">
     <div class="modal" style="width:700px">
-      <div class="modal-header"><h3>Assistente de Criacao de Chave</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-draw-wizard">&times;</button></div>
+      <div class="modal-header"><h3>Assistente de cria&ccedil;&atilde;o de chave</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-draw-wizard" aria-label="Fechar"><i data-icon="x"></i></button></div>
       <div class="modal-body">
         <div class="wizard-steps" id="draw-wizard-steps">
           <div class="wizard-step active" data-step="0"><div class="step-num">1</div><div>Evento</div></div>
@@ -725,31 +721,31 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Nome da Chave (gerado automaticamente)</label>
-            <input type="text" class="form-control" id="wiz-name" readonly style="background:var(--fabd-gray-100);font-weight:700;font-size:16px;color:var(--fabd-blue)">
+            <label>Nome da chave (gerado automaticamente)</label>
+            <input type="text" class="form-control" id="wiz-name" readonly>
           </div>
           <input type="hidden" id="wiz-event">
-          <div id="wiz-event-info" style="padding:12px;background:var(--fabd-gray-100);border-radius:6px;font-size:13px;color:var(--fabd-gray-600)"></div>
+          <div id="wiz-event-info" class="soft-box wiz-info"></div>
         </div>
 
         <!-- Passo 2: Tipo -->
         <div class="wizard-page" id="wiz-step-1">
-          <div class="form-group"><label>Tipo de Chave</label>
+          <div class="form-group"><label>Tipo de chave</label>
             <select class="form-control" id="wiz-type" data-action="wizUpdateTypeInfo" data-event="change">
-              <option value="Eliminatoria">Eliminatoria (mata-mata)</option>
+              <option value="Eliminatoria">Eliminat&oacute;ria (mata-mata)</option>
               <option value="Todos contra Todos">Todos contra Todos (round robin)</option>
-              <option value="Grupos + Eliminatoria">Fase de Grupos + Eliminatoria</option>
+              <option value="Grupos + Eliminatoria">Fase de grupos + eliminat&oacute;ria</option>
             </select>
           </div>
-          <div id="wiz-type-info" style="padding:12px;background:var(--fabd-gray-100);border-radius:6px;font-size:13px;color:var(--fabd-gray-600)"></div>
+          <div id="wiz-type-info" class="soft-box wiz-info"></div>
         </div>
 
         <!-- Passo 3: Config -->
         <div class="wizard-page" id="wiz-step-2">
           <div id="wiz-config-elim">
-            <div class="form-group"><label>Tamanho da chave</label><select class="form-control" id="wiz-draw-size"></select><div class="form-hint">Byes serao adicionados automaticamente se necessario</div></div>
+            <div class="form-group"><label>Tamanho da chave</label><select class="form-control" id="wiz-draw-size"></select><div class="form-hint">Byes ser&atilde;o adicionados automaticamente, se necess&aacute;rio</div></div>
             <div class="form-group">
-              <label><input type="checkbox" id="wiz-consolation"> Incluir chave de consolacao</label>
+              <label><input type="checkbox" id="wiz-consolation"> Incluir chave de consola&ccedil;&atilde;o</label>
             </div>
           </div>
           <div id="wiz-config-rr" style="display:none">
@@ -759,34 +755,34 @@
           </div>
           <div id="wiz-config-groups" style="display:none">
             <div class="form-row">
-              <div class="form-group"><label>Numero de grupos</label>
-                <div class="spinner"><input type="number" class="form-control" id="wiz-num-groups" value="2" min="2" max="8"><div class="spinner-btns"><button data-action="spinUp" data-arg-1="wiz-num-groups" data-arg-2="8">&#9650;</button><button data-action="spinDown" data-arg-1="wiz-num-groups" data-arg-2="2">&#9660;</button></div></div>
+              <div class="form-group"><label>N&uacute;mero de grupos</label>
+                <div class="spinner"><input type="number" class="form-control" id="wiz-num-groups" value="2" min="2" max="8"><div class="spinner-btns"><button data-action="spinUp" data-arg-1="wiz-num-groups" data-arg-2="8" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="wiz-num-groups" data-arg-2="2" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div></div>
               </div>
               <div class="form-group"><label>Classificados por grupo</label>
-                <div class="spinner"><input type="number" class="form-control" id="wiz-qualifiers" value="2" min="1" max="4"><div class="spinner-btns"><button data-action="spinUp" data-arg-1="wiz-qualifiers" data-arg-2="4">&#9650;</button><button data-action="spinDown" data-arg-1="wiz-qualifiers" data-arg-2="1">&#9660;</button></div></div>
+                <div class="spinner"><input type="number" class="form-control" id="wiz-qualifiers" value="2" min="1" max="4"><div class="spinner-btns"><button data-action="spinUp" data-arg-1="wiz-qualifiers" data-arg-2="4" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="wiz-qualifiers" data-arg-2="1" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div></div>
               </div>
             </div>
           </div>
-          <div class="form-group"><label>Cabecas de chave (seeds)</label>
-            <div class="spinner"><input type="number" class="form-control" id="wiz-seeds" value="0" min="0" max="16"><div class="spinner-btns"><button data-action="spinUp" data-arg-1="wiz-seeds" data-arg-2="16">&#9650;</button><button data-action="spinDown" data-arg-1="wiz-seeds" data-arg-2="0">&#9660;</button></div></div>
-            <div class="form-hint">Jogadores com melhor classificacao serao separados</div>
+          <div class="form-group"><label>Cabe&ccedil;as de chave (seeds)</label>
+            <div class="spinner"><input type="number" class="form-control" id="wiz-seeds" value="0" min="0" max="16"><div class="spinner-btns"><button data-action="spinUp" data-arg-1="wiz-seeds" data-arg-2="16" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="wiz-seeds" data-arg-2="0" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div></div>
+            <div class="form-hint">Jogadores com melhor classifica&ccedil;&atilde;o ser&atilde;o separados</div>
           </div>
         </div>
 
         <!-- Passo 4: Confirmar -->
         <div class="wizard-page" id="wiz-step-3">
-          <div style="padding:16px;background:var(--fabd-gray-100);border-radius:8px">
-            <h3 style="margin-bottom:12px;color:var(--fabd-blue)">Resumo da Chave</h3>
-            <div id="wiz-summary" style="font-size:14px;line-height:1.8"></div>
+          <div class="soft-box">
+            <h4>Resumo da chave</h4>
+            <div id="wiz-summary" style="font-size:13.5px;line-height:1.8"></div>
           </div>
         </div>
 
         <div class="wizard-footer">
-          <button class="btn btn-secondary" id="wiz-btn-back" data-action="wizBack" style="display:none">&#9664; Voltar</button>
+          <button class="btn btn-secondary" id="wiz-btn-back" data-action="wizBack" style="display:none"><i data-icon="arrow-left"></i> Voltar</button>
           <div style="flex:1"></div>
           <button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-draw-wizard">Cancelar</button>
-          <button class="btn btn-primary" id="wiz-btn-next" data-action="wizNext">Proximo &#9654;</button>
-          <button class="btn btn-success" id="wiz-btn-finish" data-action="wizFinish" style="display:none">&#10003; Criar Chave</button>
+          <button class="btn btn-primary" id="wiz-btn-next" data-action="wizNext">Pr&oacute;ximo <i data-icon="arrow-right"></i></button>
+          <button class="btn btn-success" id="wiz-btn-finish" data-action="wizFinish" style="display:none"><i data-icon="check"></i> Criar chave</button>
         </div>
       </div>
     </div>
@@ -795,12 +791,12 @@
   <!-- MODAL: PLACAR -->
   <div class="modal-overlay" id="modal-score">
     <div class="modal" style="width:500px">
-      <div class="modal-header"><h3>Registrar Placar</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-score">&times;</button></div>
+      <div class="modal-header"><h3>Registrar placar</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-score" aria-label="Fechar"><i data-icon="x"></i></button></div>
       <div class="modal-body">
-        <div style="text-align:center;margin-bottom:16px">
-          <strong id="score-p1" style="color:var(--fabd-blue);font-size:16px"></strong>
-          <span style="color:var(--fabd-gray-500);margin:0 12px">vs</span>
-          <strong id="score-p2" style="color:var(--fabd-red);font-size:16px"></strong>
+        <div class="sc-head">
+          <strong id="score-p1" class="sc-p1"></strong>
+          <span class="sc-vs">vs</span>
+          <strong id="score-p2" class="sc-p2"></strong>
         </div>
         <div class="form-group" style="margin-bottom:12px"><label>Situação</label>
           <div class="sit-pills" id="score-situacao">
@@ -823,36 +819,36 @@
           </div>
         </div>
       </div>
-      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-score">Cancelar</button><button class="btn btn-primary" data-action="saveScore">&#128190; Salvar Placar</button></div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-score">Cancelar</button><button class="btn btn-primary" data-action="saveScore"><i data-icon="save"></i> Salvar placar</button></div>
     </div>
   </div>
 
   <!-- MODAL: VALIDAR PROGRAMACAO (Agenda) -->
   <div class="modal-overlay" id="modal-schedule-validation">
     <div class="modal" style="width:920px;max-width:96vw">
-      <div class="modal-header"><h3>&#9989; Validar programa&ccedil;&atilde;o</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-schedule-validation">&times;</button></div>
+      <div class="modal-header"><h3>Validar programa&ccedil;&atilde;o</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-schedule-validation" aria-label="Fechar"><i data-icon="x"></i></button></div>
       <div class="modal-body">
         <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px">
           <div class="form-group" style="margin:0;min-width:280px"><label>Dia</label><select class="form-control" id="sv-day" data-action="renderScheduleValidation" data-event="change"></select></div>
           <div style="flex:1"></div>
-          <button class="btn btn-sm btn-primary" id="sv-tab-list" data-action="setScheduleValidationTab" data-arg-1="list">Lista</button>
-          <button class="btn btn-sm btn-secondary" id="sv-tab-settings" data-action="setScheduleValidationTab" data-arg-1="settings">Configura&ccedil;&otilde;es</button>
+          <button class="btn btn-sm btn-primary" id="sv-tab-list" data-action="setScheduleValidationTab" data-arg-1="list"><i data-icon="list-checks"></i> Lista</button>
+          <button class="btn btn-sm btn-secondary" id="sv-tab-settings" data-action="setScheduleValidationTab" data-arg-1="settings"><i data-icon="settings"></i> Configura&ccedil;&otilde;es</button>
         </div>
         <div id="sv-list"></div>
         <div id="sv-settings" style="display:none"></div>
       </div>
-      <div class="modal-footer"><button class="btn btn-secondary" id="sv-show-draw" data-action="scheduleValidationShowDraw" disabled>Ver chave</button><button class="btn btn-secondary" id="sv-show-match" data-action="scheduleValidationShowMatch" disabled>Ver jogo</button><button class="btn btn-secondary" data-action="printScheduleValidation">&#128424; Imprimir</button><button class="btn btn-primary" data-action="closeModal" data-arg-1="modal-schedule-validation">Fechar</button></div>
+      <div class="modal-footer"><button class="btn btn-secondary" id="sv-show-draw" data-action="scheduleValidationShowDraw" disabled><i data-icon="chave"></i> Ver chave</button><button class="btn btn-secondary" id="sv-show-match" data-action="scheduleValidationShowMatch" disabled><i data-icon="eye"></i> Ver jogo</button><button class="btn btn-secondary" data-action="printScheduleValidation"><i data-icon="printer"></i> Imprimir</button><button class="btn btn-primary" data-action="closeModal" data-arg-1="modal-schedule-validation">Fechar</button></div>
     </div>
   </div>
 
   <!-- MODAL: SUMULAS (em branco pro arbitro ou preenchidas dos jogos finalizados) -->
   <div class="modal-overlay" id="modal-scoresheet">
     <div class="modal" style="width:520px">
-      <div class="modal-header"><h3>&#128221; S&uacute;mulas</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-scoresheet">&times;</button></div>
+      <div class="modal-header"><h3>S&uacute;mulas</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-scoresheet" aria-label="Fechar"><i data-icon="x"></i></button></div>
       <div class="modal-body">
         <div class="form-group"><label>Tipo</label><select class="form-control" id="ss-kind" data-action="updateScoresheetCount" data-event="change"><option value="blank">Em branco (pro &aacute;rbitro)</option><option value="filled">Preenchidas (jogos finalizados)</option></select></div>
-        <p id="ss-help-blank" style="font-size:12px;color:var(--fabd-gray-600);margin-bottom:12px">1 s&uacute;mula por folha A4 paisagem, com o cabe&ccedil;alho do jogo preenchido. O &aacute;rbitro preenche o resto &agrave; m&atilde;o.</p>
-        <p id="ss-help-filled" style="display:none;font-size:12px;color:var(--fabd-gray-600);margin-bottom:12px">1 s&uacute;mula por folha A4 paisagem com o resultado: vencedor, placar, hor&aacute;rios e a grade ponto a ponto do app do &aacute;rbitro (jogo lan&ccedil;ado no Planner sai s&oacute; com o placar de cada game).</p>
+        <p id="ss-help-blank" class="muted-sm" style="margin-bottom:12px">1 s&uacute;mula por folha A4 paisagem, com o cabe&ccedil;alho do jogo preenchido. O &aacute;rbitro preenche o resto &agrave; m&atilde;o.</p>
+        <p id="ss-help-filled" class="muted-sm" style="display:none;margin-bottom:12px">1 s&uacute;mula por folha A4 paisagem com o resultado: vencedor, placar, hor&aacute;rios e a grade ponto a ponto do app do &aacute;rbitro (jogo lan&ccedil;ado no Planner sai s&oacute; com o placar de cada game).</p>
         <div class="form-row">
           <div class="form-group"><label>Dia</label><select class="form-control" id="ss-day" data-action="updateScoresheetCount" data-event="change"></select></div>
           <div class="form-group"><label>Quadra</label><select class="form-control" id="ss-court" data-action="updateScoresheetCount" data-event="change"></select></div>
@@ -862,44 +858,44 @@
           <div class="form-group"><label>at&eacute;</label><input type="time" class="form-control" id="ss-to" data-action="updateScoresheetCount" data-event="change input"></div>
         </div>
         <div id="ss-blank-opts">
-          <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:4px"><input type="checkbox" id="ss-skip-unknown" checked data-action="updateScoresheetCount" data-event="change"> Pular jogos com atleta a definir</label>
-          <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="ss-skip-printed" checked data-action="updateScoresheetCount" data-event="change"> Pular as j&aacute; impressas</label>
+          <label class="chk-line"><input type="checkbox" id="ss-skip-unknown" checked data-action="updateScoresheetCount" data-event="change"> Pular jogos com atleta a definir</label>
+          <label class="chk-line"><input type="checkbox" id="ss-skip-printed" checked data-action="updateScoresheetCount" data-event="change"> Pular as j&aacute; impressas</label>
         </div>
-        <p style="font-size:12px;color:var(--fabd-gray-600);margin-top:8px">A quadra s&oacute; filtra os jogos que j&aacute; t&ecirc;m quadra; jogo sem quadra sai com a quadra em branco.</p>
-        <p id="ss-count" style="font-size:14px;font-weight:700;color:var(--fabd-blue);margin-top:10px"></p>
+        <p class="muted-sm" style="margin-top:8px">A quadra s&oacute; filtra os jogos que j&aacute; t&ecirc;m quadra; jogo sem quadra sai com a quadra em branco.</p>
+        <p id="ss-count" style="font-size:14px;font-weight:700;color:var(--nv);margin-top:10px"></p>
       </div>
-      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-scoresheet">Cancelar</button><button class="btn btn-primary" data-action="printScoresheets">&#128424; Gerar s&uacute;mulas</button></div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-scoresheet">Cancelar</button><button class="btn btn-primary" data-action="printScoresheets"><i data-icon="printer"></i> Gerar s&uacute;mulas</button></div>
     </div>
   </div>
   <!-- MODAL: EDITAR JOGO FINALIZADO (lapis da aba Finalizadas) -->
   <div class="modal-overlay" id="modal-edit-finished">
     <div class="modal" style="width:520px">
-      <div class="modal-header"><h3>&#9998; Editar jogo finalizado</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-edit-finished">&times;</button></div>
+      <div class="modal-header"><h3>Editar jogo finalizado</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-edit-finished" aria-label="Fechar"><i data-icon="x"></i></button></div>
       <div class="modal-body">
-        <div style="text-align:center;margin-bottom:12px">
-          <strong id="edit-p1" style="color:var(--fabd-blue);font-size:15px"></strong>
-          <span style="color:var(--fabd-gray-500);margin:0 12px">vs</span>
-          <strong id="edit-p2" style="color:var(--fabd-red);font-size:15px"></strong>
+        <div class="sc-head">
+          <strong id="edit-p1" class="sc-p1"></strong>
+          <span class="sc-vs">vs</span>
+          <strong id="edit-p2" class="sc-p2"></strong>
         </div>
         <div class="score-sets" id="edit-sets-container"></div>
-        <p id="edit-sets-note" style="font-size:12px;color:var(--fabd-gray-600);margin-top:8px"></p>
+        <p id="edit-sets-note" class="muted-sm" style="margin-top:8px"></p>
         <div class="form-row" style="margin-top:12px">
           <div class="form-group"><label>Quadra</label><select class="form-control" id="edit-court"></select></div>
-          <div class="form-group"><label>Arbitro</label><select class="form-control" id="edit-umpire"></select></div>
+          <div class="form-group"><label>&Aacute;rbitro</label><select class="form-control" id="edit-umpire"></select></div>
         </div>
       </div>
-      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-edit-finished">Cancelar</button><button class="btn btn-primary" data-action="saveEditFinished">&#128190; Salvar</button></div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-edit-finished">Cancelar</button><button class="btn btn-primary" data-action="saveEditFinished"><i data-icon="save"></i> Salvar</button></div>
     </div>
   </div>
   <!-- MODAL: TROCAR ATLETA (botao Trocar do Inscritos) -->
   <div class="modal-overlay" id="modal-swap-athlete">
     <div class="modal" style="width:780px">
-      <div class="modal-header"><h3 id="swap-title">&#8644; Trocar atleta</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-swap-athlete">&times;</button></div>
+      <div class="modal-header"><h3 id="swap-title">Trocar atleta</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-swap-athlete" aria-label="Fechar"><i data-icon="x"></i></button></div>
       <div class="modal-body">
         <div class="form-row">
           <div class="form-group"><label>Quem sai?</label><div id="swap-out"></div></div>
           <div class="form-group"><label>Quem entra?</label><select class="form-control" id="swap-in" data-action="renderSwapAthlete" data-event="change"></select>
-            <p style="font-size:12px;color:var(--fabd-gray-600);margin-top:6px">N&atilde;o achou? Cadastre o atleta em Jogadores.</p></div>
+            <p class="muted-sm" style="margin-top:6px">N&atilde;o achou? Cadastre o atleta em Jogadores.</p></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label id="swap-mine-title">Jogos da dupla</label><div id="swap-mine"></div></div>
@@ -907,7 +903,7 @@
         </div>
         <div id="swap-problems"></div>
       </div>
-      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-swap-athlete">Cancelar</button><button class="btn btn-primary" id="swap-ok" data-action="confirmSwapAthlete">&#8644; Trocar</button></div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-swap-athlete">Cancelar</button><button class="btn btn-primary" id="swap-ok" data-action="confirmSwapAthlete"><i data-icon="arrow-left-right"></i> Trocar</button></div>
     </div>
   </div>
 
@@ -915,60 +911,58 @@
   <div class="modal-overlay" id="modal-tournament-config">
     <div class="modal" style="width:960px">
       <div class="modal-header">
-        <h3>&#9881; Configuracao do Torneio</h3>
-        <button class="modal-close" data-action="closeModal" data-arg-1="modal-tournament-config">&times;</button>
+        <h3>Configura&ccedil;&atilde;o do torneio</h3>
+        <button class="modal-close" data-action="closeModal" data-arg-1="modal-tournament-config" aria-label="Fechar"><i data-icon="x"></i></button>
       </div>
       <div class="modal-body">
-        <div style="margin-bottom:16px;padding:12px;background:var(--fabd-blue);color:white;border-radius:8px;font-size:14px">
-          <strong id="tc-tournament-name"></strong>
-        </div>
+        <div class="tc-strip"><i data-icon="trophy"></i><strong id="tc-tournament-name"></strong></div>
 
         <div class="tabs" id="tc-tabs">
-          <div class="tab active" data-action="setTcTab" data-arg-1="$el" data-arg-2="tc-tab-system">Sistema de Disputa</div>
-          <div class="tab" data-action="setTcTab" data-arg-1="$el" data-arg-2="tc-tab-scoring">Pontuacao</div>
+          <div class="tab active" data-action="setTcTab" data-arg-1="$el" data-arg-2="tc-tab-system">Sistema de disputa</div>
+          <div class="tab" data-action="setTcTab" data-arg-1="$el" data-arg-2="tc-tab-scoring">Pontua&ccedil;&atilde;o</div>
           <div class="tab" data-action="setTcTab" data-arg-1="$el" data-arg-2="tc-tab-courts">Quadras</div>
-          <div class="tab" data-action="setTcTab" data-arg-1="$el" data-arg-2="tc-tab-schedule">Programacao</div>
+          <div class="tab" data-action="setTcTab" data-arg-1="$el" data-arg-2="tc-tab-schedule">Programa&ccedil;&atilde;o</div>
           <div class="tab" data-action="setTcTab" data-arg-1="$el" data-arg-2="tc-tab-ranking">Ranking</div>
-          <div class="tab" data-action="setTcTab" data-arg-1="$el" data-arg-2="tc-tab-clubes">Clubes Ativos</div>
-          <div class="tab" data-action="setTcTab" data-arg-1="$el" data-arg-2="tc-tab-pricing">Valor das Inscricoes</div>
+          <div class="tab" data-action="setTcTab" data-arg-1="$el" data-arg-2="tc-tab-clubes">Clubes ativos</div>
+          <div class="tab" data-action="setTcTab" data-arg-1="$el" data-arg-2="tc-tab-pricing">Valor das inscri&ccedil;&otilde;es</div>
         </div>
 
         <!-- Aba: Sistema de Disputa -->
         <div id="tc-tab-system">
           <div class="form-group">
-            <label>Perfil de Sistema de Disputa</label>
+            <label>Perfil de sistema de disputa</label>
             <select class="form-control" id="tc-profile-select" data-action="updateTournamentConfigPreview" data-event="change">
               <option value="">Nenhum (selecionar manualmente)</option>
             </select>
           </div>
-          <div id="tc-profile-preview" style="background:var(--fabd-gray-100);border-radius:8px;padding:16px;font-size:13px;margin-top:12px"></div>
+          <div id="tc-profile-preview" class="soft-box" style="font-size:13px;margin-top:12px"></div>
         </div>
 
         <!-- Aba: Pontuacao -->
         <div id="tc-tab-scoring" style="display:none">
-          <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
-            Defina o formato de pontuacao especifico para este torneio.
+          <p class="modal-lead">
+            Defina o formato de pontua&ccedil;&atilde;o espec&iacute;fico para este torneio.
           </p>
           <div class="form-row-3">
             <div class="form-group">
               <label>Sets (melhor de)</label>
               <div class="spinner">
                 <input type="number" class="form-control" id="tc-sets" value="3" min="1" max="5">
-                <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-sets" data-arg-2="5">&#9650;</button><button data-action="spinDown" data-arg-1="tc-sets" data-arg-2="1">&#9660;</button></div>
+                <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-sets" data-arg-2="5" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="tc-sets" data-arg-2="1" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div>
               </div>
             </div>
             <div class="form-group">
               <label>Pontos por set</label>
               <div class="spinner">
                 <input type="number" class="form-control" id="tc-points" value="21" min="11" max="30">
-                <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-points" data-arg-2="30">&#9650;</button><button data-action="spinDown" data-arg-1="tc-points" data-arg-2="11">&#9660;</button></div>
+                <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-points" data-arg-2="30" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="tc-points" data-arg-2="11" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div>
               </div>
             </div>
             <div class="form-group">
-              <label>Maximo de pontos</label>
+              <label>M&aacute;ximo de pontos</label>
               <div class="spinner">
                 <input type="number" class="form-control" id="tc-maxpoints" value="30" min="21" max="50">
-                <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-maxpoints" data-arg-2="50">&#9650;</button><button data-action="spinDown" data-arg-1="tc-maxpoints" data-arg-2="21">&#9660;</button></div>
+                <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-maxpoints" data-arg-2="50" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="tc-maxpoints" data-arg-2="21" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div>
               </div>
             </div>
           </div>
@@ -977,11 +971,11 @@
               <label>Intervalo entre sets (min)</label>
               <div class="spinner">
                 <input type="number" class="form-control" id="tc-interval" value="1" min="0" max="10">
-                <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-interval" data-arg-2="10">&#9650;</button><button data-action="spinDown" data-arg-1="tc-interval" data-arg-2="0">&#9660;</button></div>
+                <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-interval" data-arg-2="10" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="tc-interval" data-arg-2="0" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div>
               </div>
             </div>
             <div class="form-group">
-              <label>Ponto decisivo no 3o set</label>
+              <label>Ponto decisivo no 3&ordm; set</label>
               <select class="form-control" id="tc-deciding">
                 <option value="normal">Normal (21 pontos)</option>
                 <option value="15">Reduzido (15 pontos)</option>
@@ -993,47 +987,47 @@
 
         <!-- Aba: Quadras e Tempo -->
         <div id="tc-tab-courts" style="display:none">
-          <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
-            Configure quadras e tempo de descanso para este torneio. Horarios e pausas sao configurados na aba Programacao.
+          <p class="modal-lead">
+            Configure quadras e tempo de descanso para este torneio. Hor&aacute;rios e pausas s&atilde;o configurados na aba Programa&ccedil;&atilde;o.
           </p>
           <div class="form-row">
             <div class="form-group">
-              <label>Numero de quadras</label>
+              <label>N&uacute;mero de quadras</label>
               <div class="spinner">
                 <input type="number" class="form-control" id="tc-courts" value="4" min="1" max="20">
-                <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-courts" data-arg-2="20">&#9650;</button><button data-action="spinDown" data-arg-1="tc-courts" data-arg-2="1">&#9660;</button></div>
+                <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-courts" data-arg-2="20" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="tc-courts" data-arg-2="1" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div>
               </div>
             </div>
             <div class="form-group">
-              <label>Duracao media por partida (min)</label>
+              <label>Dura&ccedil;&atilde;o m&eacute;dia por partida (min)</label>
               <div class="spinner">
                 <input type="number" class="form-control" id="tc-duration" value="30" min="10" max="120">
-                <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-duration" data-arg-2="120">&#9650;</button><button data-action="spinDown" data-arg-1="tc-duration" data-arg-2="10">&#9660;</button></div>
+                <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-duration" data-arg-2="120" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="tc-duration" data-arg-2="10" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div>
               </div>
             </div>
           </div>
-          <div style="background:var(--fabd-gray-100);border-radius:8px;padding:16px;margin:16px 0">
-            <h4 style="margin-bottom:12px;color:var(--fabd-blue)">Tempo de Descanso</h4>
+          <div class="soft-box" style="margin:16px 0">
+            <h4>Tempo de descanso</h4>
             <div class="form-row">
               <div class="form-group">
                 <label>Descanso do atleta entre jogos (min)</label>
                 <div class="spinner">
                   <input type="number" class="form-control" id="tc-rest-min" value="20" min="0" max="120">
-                  <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-rest-min" data-arg-2="120">&#9650;</button><button data-action="spinDown" data-arg-1="tc-rest-min" data-arg-2="0">&#9660;</button></div>
+                  <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-rest-min" data-arg-2="120" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="tc-rest-min" data-arg-2="0" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div>
                 </div>
               </div>
               <div class="form-group">
                 <label>Descanso entre sets (min)</label>
                 <div class="spinner">
                   <input type="number" class="form-control" id="tc-rest-sets" value="2" min="0" max="10">
-                  <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-rest-sets" data-arg-2="10">&#9650;</button><button data-action="spinDown" data-arg-1="tc-rest-sets" data-arg-2="0">&#9660;</button></div>
+                  <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-rest-sets" data-arg-2="10" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="tc-rest-sets" data-arg-2="0" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div>
                 </div>
               </div>
               <div class="form-group">
                 <label>Intervalo aos 11 pontos (min)</label>
                 <div class="spinner">
                   <input type="number" class="form-control" id="tc-rest-mid" value="1" min="0" max="5">
-                  <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-rest-mid" data-arg-2="5">&#9650;</button><button data-action="spinDown" data-arg-1="tc-rest-mid" data-arg-2="0">&#9660;</button></div>
+                  <div class="spinner-btns"><button data-action="spinUp" data-arg-1="tc-rest-mid" data-arg-2="5" aria-label="Aumentar"><i data-icon="chevron-up"></i></button><button data-action="spinDown" data-arg-1="tc-rest-mid" data-arg-2="0" aria-label="Diminuir"><i data-icon="chevron-down"></i></button></div>
                 </div>
               </div>
             </div>
@@ -1046,30 +1040,30 @@
 
         <!-- Aba: Programacao por Dia -->
         <div id="tc-tab-schedule" style="display:none">
-          <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
-            Configure horarios e categorias para cada dia do torneio.
+          <p class="modal-lead">
+            Configure hor&aacute;rios e categorias para cada dia do torneio.
           </p>
           <div id="tc-day-schedule-container"></div>
         </div>
 
         <!-- Aba: Ranking de Pontuacao -->
         <div id="tc-tab-ranking" style="display:none">
-          <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
+          <p class="modal-lead">
             Selecione o ranking de pontuação a ser usado nos relatórios deste torneio. Crie ou edite rankings em <strong>Configurações &rarr; Ranking</strong>.
           </p>
           <div class="form-group">
             <label>Ranking deste torneio</label>
             <select class="form-control" id="tc-ranking-select" data-action="updateTcRankingPreview" data-event="change"></select>
           </div>
-          <div style="background:var(--fabd-gray-100);border-radius:8px;padding:16px;margin-top:12px">
-            <h4 style="margin-bottom:8px;color:var(--fabd-gray-700);font-size:13px">Tabela de pontos</h4>
+          <div class="soft-box" style="margin-top:12px">
+            <h4>Tabela de pontos</h4>
             <div id="tc-ranking-preview"></div>
           </div>
         </div>
 
         <!-- Aba: Clubes Ativos -->
         <div id="tc-tab-clubes" style="display:none">
-          <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
+          <p class="modal-lead">
             Status dos clubes neste torneio. Apenas atletas de clubes <strong>Adimplentes</strong> entram no relatório <strong>Ranking Federados</strong>.
           </p>
           <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap">
@@ -1077,22 +1071,22 @@
             <button class="btn btn-sm btn-secondary" data-action="setAllClubStatus" data-arg-1="inadimplente">Marcar todos Inadimplentes</button>
             <button class="btn btn-sm btn-secondary" data-action="setAllClubStatus" data-arg-1="sc">Limpar status (S/C)</button>
           </div>
-          <div id="tc-clubes-list" style="background:#fff;border:1px solid var(--fabd-gray-200);border-radius:8px;overflow:hidden">
+          <div id="tc-clubes-list" style="background:#fff;border:1px solid var(--ln);border-radius:10px;overflow:hidden">
             <p style="padding:24px;text-align:center;color:var(--fabd-gray-500)">Carregando clubes...</p>
           </div>
         </div>
 
         <!-- Aba: Valor das Inscricoes -->
         <div id="tc-tab-pricing" style="display:none">
-          <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
-            Defina o valor por inscricao. Ao alterar, todos os jogadores serao atualizados automaticamente.
+          <p class="modal-lead">
+            Defina o valor por inscri&ccedil;&atilde;o. Ao alterar, todos os jogadores ser&atilde;o atualizados automaticamente.
           </p>
-          <div style="background:var(--fabd-gray-100);border-radius:8px;padding:20px;margin-bottom:16px">
+          <div class="soft-box" style="margin-bottom:16px">
             <div class="form-group" style="margin-bottom:12px">
-              <label style="font-weight:700">Valor padrao por inscricao (R$)</label>
-              <input type="number" class="form-control" id="tc-valor-padrao" value="30" min="0" step="5" style="width:150px;font-size:18px;font-weight:700;text-align:center">
+              <label style="font-weight:700">Valor padr&atilde;o por inscri&ccedil;&atilde;o (R$)</label>
+              <input type="number" class="form-control tc-price" id="tc-valor-padrao" value="30" min="0" step="5">
             </div>
-            <button class="btn btn-primary" data-action="applyPricingToAll">&#128176; Aplicar valor a todos os jogadores</button>
+            <button class="btn btn-primary" data-action="applyPricingToAll"><i data-icon="banknote"></i> Aplicar valor a todos os jogadores</button>
           </div>
           <div id="tc-pricing-summary" style="font-size:13px;color:var(--fabd-gray-600)"></div>
         </div>
@@ -1100,7 +1094,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-tournament-config">Cancelar</button>
-        <button class="btn btn-primary" data-action="saveTournamentConfig">&#128190; Salvar Configuracao</button>
+        <button class="btn btn-primary" data-action="saveTournamentConfig"><i data-icon="save"></i> Salvar configura&ccedil;&atilde;o</button>
       </div>
     </div>
   </div>
@@ -1108,39 +1102,42 @@
   <!-- MODAL: IMPORTAR JOGADORES -->
   <div class="modal-overlay" id="modal-import">
     <div class="modal" style="width:800px">
-      <div class="modal-header"><h3>Importar Jogadores</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-import">&times;</button></div>
+      <div class="modal-header"><h3>Importar jogadores</h3><button class="modal-close" data-action="closeModal" data-arg-1="modal-import" aria-label="Fechar"><i data-icon="x"></i></button></div>
       <div class="modal-body">
         <!-- Passo 1: Selecionar arquivo -->
         <div id="import-step-1">
-          <div style="background:var(--fabd-gray-100);border-radius:8px;padding:20px;text-align:center;margin-bottom:16px">
-            <div style="font-size:48px;margin-bottom:8px">&#128196;</div>
-            <h3 style="margin-bottom:8px">Selecione o arquivo CSV</h3>
-            <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
-              O arquivo deve seguir o modelo de importacao.<br>
-              <a href="#" data-action="downloadImportTemplate" data-prevent-default="true" style="color:var(--fabd-blue)">Clique aqui para baixar o modelo</a>
+          <div class="imp-drop">
+            <div class="imp-ic"><i data-icon="file-spreadsheet"></i></div>
+            <h3>Selecione o arquivo CSV</h3>
+            <p>
+              O arquivo deve seguir o modelo de importa&ccedil;&atilde;o.<br>
+              <a href="#" data-action="downloadImportTemplate" data-prevent-default="true">Clique aqui para baixar o modelo</a>
             </p>
-            <button class="btn btn-primary btn-lg" data-action="selectImportFile">&#128193; Selecionar Arquivo CSV</button>
+            <button class="btn btn-primary btn-lg" data-action="selectImportFile"><i data-icon="folder-open"></i> Selecionar arquivo CSV</button>
           </div>
-          <div style="background:#FEF3C7;border-radius:8px;padding:16px;font-size:13px">
-            <strong style="color:#92400E">Instrucoes:</strong>
-            <ol style="margin:8px 0 0 20px;color:#92400E;line-height:1.8">
-              <li>Baixe o modelo clicando no link acima</li>
-              <li>Abra no Excel ou Google Sheets</li>
-              <li>Preencha os dados dos jogadores (uma linha por jogador)</li>
-              <li>Salve como CSV (separado por virgulas ou ponto e virgula)</li>
-              <li>Clique em "Selecionar Arquivo CSV" e escolha o arquivo salvo</li>
-            </ol>
+          <div class="note is-warn">
+            <i data-icon="info"></i>
+            <div>
+              <strong>Instru&ccedil;&otilde;es:</strong>
+              <ol>
+                <li>Baixe o modelo clicando no link acima</li>
+                <li>Abra no Excel ou Google Sheets</li>
+                <li>Preencha os dados dos jogadores (uma linha por jogador)</li>
+                <li>Salve como CSV (separado por v&iacute;rgulas ou ponto e v&iacute;rgula)</li>
+                <li>Clique em "Selecionar arquivo CSV" e escolha o arquivo salvo</li>
+              </ol>
+            </div>
           </div>
         </div>
 
         <!-- Passo 2: Preview dos dados -->
         <div id="import-step-2" style="display:none">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="imp-head">
             <div>
-              <strong id="import-file-name" style="color:var(--fabd-blue)"></strong>
+              <strong id="import-file-name"></strong>
               <span id="import-count" style="font-size:13px;color:var(--fabd-gray-600);margin-left:8px"></span>
             </div>
-            <button class="btn btn-sm btn-secondary" data-action="importBackToStep1">&#9664; Trocar arquivo</button>
+            <button class="btn btn-sm btn-secondary" data-action="importBackToStep1"><i data-icon="arrow-left"></i> Trocar arquivo</button>
           </div>
 
           <div class="form-group">
@@ -1154,12 +1151,12 @@
             </table>
           </div>
 
-          <div style="margin-top:12px;padding:12px;background:#D1FAE5;border-radius:8px;font-size:13px;color:#065F46" id="import-summary"></div>
+          <div class="note is-ok" style="margin-top:12px;display:block" id="import-summary"></div>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-import">Cancelar</button>
-        <button class="btn btn-success" id="import-btn-confirm" data-action="confirmImport" style="display:none">&#10003; Importar Jogadores</button>
+        <button class="btn btn-success" id="import-btn-confirm" data-action="confirmImport" style="display:none"><i data-icon="check"></i> Importar jogadores</button>
       </div>
     </div>
   </div>
@@ -1168,33 +1165,33 @@
   <div class="modal-overlay" id="modal-scoring-table">
     <div class="modal" style="width:560px">
       <div class="modal-header">
-        <h3 id="st-modal-title">Novo Ranking</h3>
-        <button class="modal-close" data-action="closeModal" data-arg-1="modal-scoring-table">&times;</button>
+        <h3 id="st-modal-title">Novo ranking</h3>
+        <button class="modal-close" data-action="closeModal" data-arg-1="modal-scoring-table" aria-label="Fechar"><i data-icon="x"></i></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="st-id">
         <div class="form-group">
-          <label>Nome do Ranking</label>
+          <label>Nome do ranking</label>
           <input type="text" class="form-control" id="st-name" placeholder="Ex: Estadual Alagoas, FABD Etapa, etc.">
         </div>
-        <p style="font-size:12px;color:var(--fabd-gray-600);margin:12px 0 8px">Defina quantos pontos cada faixa de colocação recebe:</p>
-        <div style="display:grid;grid-template-columns:1fr 130px;gap:8px 12px;align-items:center;background:var(--fabd-gray-100);padding:14px;border-radius:8px">
-          <div style="font-weight:600;font-size:13px;color:var(--fabd-gray-700)">Colocação</div>
-          <div style="font-weight:600;font-size:13px;color:var(--fabd-gray-700);text-align:right">Pontos</div>
-          <label style="font-size:13px">1º (Campeão)</label><input type="number" class="form-control" id="st-p1" min="0" style="text-align:right">
-          <label style="font-size:13px">2º (Vice)</label><input type="number" class="form-control" id="st-p2" min="0" style="text-align:right">
-          <label style="font-size:13px">3º/4º (Semifinal)</label><input type="number" class="form-control" id="st-p3" min="0" style="text-align:right">
-          <label style="font-size:13px">5º-8º (Quartas)</label><input type="number" class="form-control" id="st-p5" min="0" style="text-align:right">
-          <label style="font-size:13px">9º-16º (Oitavas)</label><input type="number" class="form-control" id="st-p9" min="0" style="text-align:right">
-          <label style="font-size:13px">17º-32º (R32)</label><input type="number" class="form-control" id="st-p17" min="0" style="text-align:right">
-          <label style="font-size:13px">33º-64º (R64)</label><input type="number" class="form-control" id="st-p33" min="0" style="text-align:right">
-          <label style="font-size:13px">65º-128º (R128)</label><input type="number" class="form-control" id="st-p65" min="0" style="text-align:right">
-          <label style="font-size:13px">129º-256º (R256)</label><input type="number" class="form-control" id="st-p129" min="0" style="text-align:right">
+        <p class="muted-sm" style="margin:12px 0 8px">Defina quantos pontos cada faixa de colocação recebe:</p>
+        <div class="st-grid">
+          <div class="st-gh">Coloca&ccedil;&atilde;o</div>
+          <div class="st-gh" style="text-align:right">Pontos</div>
+          <label>1º (Campeão)</label><input type="number" class="form-control" id="st-p1" min="0">
+          <label>2º (Vice)</label><input type="number" class="form-control" id="st-p2" min="0">
+          <label>3º/4º (Semifinal)</label><input type="number" class="form-control" id="st-p3" min="0">
+          <label>5º-8º (Quartas)</label><input type="number" class="form-control" id="st-p5" min="0">
+          <label>9º-16º (Oitavas)</label><input type="number" class="form-control" id="st-p9" min="0">
+          <label>17º-32º (R32)</label><input type="number" class="form-control" id="st-p17" min="0">
+          <label>33º-64º (R64)</label><input type="number" class="form-control" id="st-p33" min="0">
+          <label>65º-128º (R128)</label><input type="number" class="form-control" id="st-p65" min="0">
+          <label>129º-256º (R256)</label><input type="number" class="form-control" id="st-p129" min="0">
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" data-action="closeModal" data-arg-1="modal-scoring-table">Cancelar</button>
-        <button class="btn btn-primary" data-action="saveScoringTableForm">&#128190; Salvar</button>
+        <button class="btn btn-primary" data-action="saveScoringTableForm"><i data-icon="save"></i> Salvar</button>
       </div>
     </div>
   </div>
