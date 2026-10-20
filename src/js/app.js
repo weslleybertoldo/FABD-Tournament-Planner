@@ -29,6 +29,9 @@ const MODALITIES = [
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     console.log('[INIT] Starting app...');
+    // Casca (menu do topo + faixa do torneio): ícones e faixa já atrás do login
+    hydrateIcons();
+    renderShell();
     // Gate de autenticacao: bloqueia o app ate o organizador estar logado
     const authOk = await ensureAuthenticated();
     console.log('[INIT] Auth result:', authOk);
@@ -380,24 +383,28 @@ async function removeFederationLogo() {
 function showOrganizerBadge(st) {
   if (!st) return;
   applyAccessVisibility(st);
+  // Organizador no canto do menu do topo (clique = sair, igual antes)
   let el = document.getElementById('organizer-badge');
   if (!el) {
-    el = document.createElement('div');
+    el = document.createElement('button');
     el.id = 'organizer-badge';
-    el.style.cssText = 'position:fixed;bottom:8px;right:12px;background:#1E3A8A;color:#fff;padding:4px 10px;border-radius:12px;font-size:11px;z-index:9000;font-family:Inter,sans-serif;cursor:pointer';
-    el.title = 'Clique para sair';
+    el.className = 'org-chip org-chip-solto';
+    document.body.appendChild(el);
+  }
+  if (!el.dataset.pronto) {
+    el.dataset.pronto = '1';
     el.onclick = async () => {
       if (!confirm('Deseja sair do app?')) return;
       await window.api.authSignOut();
       location.reload();
     };
-    document.body.appendChild(el);
   }
   const name = st.organizer?.name || 'Organizador';
-  const role = st.organizer?.role === 'super_admin' ? '★' : (st.organizer?.role === 'admin' ? '⚡' : '');
+  const role = st.organizer?.role === 'super_admin' ? 'Super admin' : (st.organizer?.role === 'admin' ? 'Admin' : 'Organizador');
   const fed = st.federation?.short_name ? ` · ${st.federation.short_name}` : '';
-  el.textContent = `${role} ${name}${fed}`.trim();
+  el.innerHTML = `<span class="org-av">${esc(shellInitials(name))}</span><span class="org-tx"><b>${esc(name)}</b><small>${esc(role + fed)}</small></span>${icon('log-out', 'i org-out')}`;
   el.title = `${st.organizer?.email || ''} · ${st.federation?.name || ''} · clique para sair`;
+  el.hidden = false;
 }
 
 async function loadData(autoLoad=false) {
@@ -679,6 +686,7 @@ function navigateTo(page) {
     case 'schedule': showTournamentPages(); renderSchedule(); break;
     case 'access': renderAccessPage(); break;
   }
+  renderShell();
 }
 
 // === VALIDATION ===
@@ -720,6 +728,7 @@ function updateOverview() {
   if (!tournament) {
     c.innerHTML = '<div class="empty-state"><div class="icon">&#127942;</div><h3>Nenhum torneio ativo</h3><p>Crie um novo torneio ou abra um backup</p></div>';
     document.getElementById('breadcrumb').textContent = '';
+    renderShell();
     return;
   }
   document.getElementById('breadcrumb').textContent = tournament.name;
@@ -727,6 +736,7 @@ function updateOverview() {
     <tr><td><strong>${esc(tournament.name)}</strong></td><td>${fmtDate(tournament.startDate)} - ${fmtDate(tournament.endDate)}</td><td>${esc(tournament.location)||'-'}</td><td>${statusTag(tournament)}</td>
     <td><button class="btn btn-sm btn-primary" data-action="navigateTo" data-arg-1="players">Gerenciar</button></td></tr>
   </tbody></table>`;
+  renderShell();
 }
 
 // === TOURNAMENT PAGE ===
