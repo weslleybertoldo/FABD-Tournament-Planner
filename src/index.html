@@ -216,18 +216,18 @@
 
         <!-- CHAVES -->
         <div class="page" id="page-draws">
-          <div class="empty-state" id="draws-no-tournament"><div class="icon">&#127960;</div><h3>Nenhum torneio selecionado</h3><p>Selecione um torneio para gerenciar as chaves</p><button class="btn btn-primary" data-action="navigateTo" data-arg-1="tournaments">Ir para Torneios</button></div>
+          <div class="empty-state" id="draws-no-tournament"><i data-icon="chave" data-icon-class="i es-ic"></i><h3>Nenhum torneio selecionado</h3><p>Selecione um torneio para gerenciar as chaves</p><button class="btn btn-primary" data-action="navigateTo" data-arg-1="tournaments">Ir para Torneios</button></div>
           <div id="draws-content" style="display:none">
             <div class="toolbar">
-              <button class="btn btn-success" data-action="generateAllDraws">&#127922; Sortear Todas</button>
-              <button class="btn btn-secondary" data-action="syncDrawsWithPlayers">&#128260; Sincronizar Atletas</button>
+              <button class="btn btn-primary" data-action="generateAllDraws"><i data-icon="shuffle"></i>Sortear todas</button>
+              <button class="btn btn-secondary" data-action="syncDrawsWithPlayers"><i data-icon="refresh-cw"></i>Sincronizar atletas</button>
+              <div class="ro-sum" id="draws-summary"></div>
             </div>
             <div class="draws-layout">
               <!-- Painel lateral com lista de chaves -->
               <div class="draws-sidebar" id="draws-sidebar">
-                <div class="draws-sidebar-title">Chaves</div>
                 <div class="draws-search-bar">
-                  <div class="search-box"><span class="search-icon">&#128269;</span><input type="text" placeholder="Buscar chaves..." id="search-draws" data-action="filterDraws" data-event="input"></div>
+                  <div class="search-box"><span class="search-icon"><i data-icon="search"></i></span><input type="text" placeholder="Buscar chave..." id="search-draws" data-action="filterDraws" data-event="input"></div>
                   <button type="button" class="draws-filter-btn" id="draws-filter-btn" data-action="toggleDrawsFilterPopup" data-arg-1="$event" title="Filtrar chaves">
                     <i data-icon="funnel"></i>
                     <span class="filter-badge" id="draws-filter-badge" style="display:none">0</span>
@@ -249,13 +249,13 @@
                   </div>
                 </div>
                 <div id="draws-list">
-                  <div style="padding:16px;text-align:center;color:var(--fabd-gray-500);font-size:13px">Nenhuma chave criada</div>
+                  <div class="dl-empty">Nenhuma chave criada</div>
                 </div>
               </div>
               <!-- Area principal com detalhes da chave selecionada -->
               <div class="draws-main">
-                <div class="card" id="draws-detail">
-                  <div class="empty-state"><div class="icon">&#127960;</div><h3>Selecione uma chave</h3><p>Clique em uma chave na lateral para visualizar</p></div>
+                <div class="cd dd" id="draws-detail">
+                  <div class="empty-state"><i data-icon="chave" data-icon-class="i es-ic"></i><h3>Selecione uma chave</h3><p>Clique em uma chave na lateral para visualizar</p></div>
                 </div>
               </div>
             </div>

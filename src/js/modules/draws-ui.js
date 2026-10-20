@@ -36,6 +36,24 @@ function computeDrawState(d){
   return{sorteio:has?'sim':'sem',premio:d.awarded?'sim':'nao',final:allFinished?'sim':'nao'};
 }
 
+// Etiqueta da chave na lista (layout novo, W20 parte 6). Mesmas regras do
+// filtro (computeDrawState) + "Ao vivo" (jogo da chave em quadra) e "Em
+// andamento" (já tem resultado), lidos dos jogos de sempre.
+function drawSituation(d, matches){
+  const st=computeDrawState(d);
+  if(st.premio==='sim')return{kind:'awarded',label:'Premiada'};
+  if(st.final==='sim')return{kind:'done',label:'Finalizada'};
+  if((matches||[]).some(m=>m.drawName===d.name&&m.status==='Em Quadra'))return{kind:'live',label:'Ao vivo'};
+  const real=(d.matches||[]).filter(m=>!m.isBye&&m.player1&&m.player2&&m.player2!=='BYE'&&m.player1!=='BYE');
+  if(real.some(m=>m.winner!==undefined&&m.winner!==null))return{kind:'run',label:'Em andamento'};
+  if(st.sorteio==='sim')return{kind:'sched',label:'Sorteada'};
+  return{kind:'draft',label:'Pendente'};
+}
+
+function drawTypeLabel(t){
+  return {'Eliminatoria':'Eliminatória','Grupos + Eliminatoria':'Grupos + Eliminatória'}[t]||t||'-';
+}
+
 function applyDrawFilters(draws){
   const groups=['sorteio','premio','final'];
   const anyActive=groups.some(g=>drawFilters[g].size>0);
@@ -141,15 +159,21 @@ function renderDraws() {
   const draws=applyDrawFilters(filteredByText);
   const sorted=sortDraws(draws);
 
+  const sum=document.getElementById('draws-summary');
+  if(sum){
+    const sits=allDraws.map(d=>drawSituation(d,tournament.matches).kind);
+    sum.textContent=allDraws.length?`${allDraws.length} chaves · ${sits.filter(k=>k!=='draft').length} sorteadas · ${sits.filter(k=>k==='done'||k==='awarded').length} finalizadas`:'';
+  }
+
   if (!sorted.length) {
     const hasFilters=_countActiveDrawFilters()>0;
     const msg=q?'Nenhuma chave encontrada':hasFilters?'Nenhuma chave atende aos filtros':'Nenhuma chave criada';
-    listEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--fabd-gray-500);font-size:13px">${msg}</div>`;
+    listEl.innerHTML = `<div class="dl-empty">${msg}</div>`;
     detailEl.innerHTML = q
-      ? '<div class="empty-state"><div class="icon">&#128269;</div><h3>Nenhuma chave encontrada</h3><p>Tente ajustar a busca para localizar uma chave.</p></div>'
+      ? `<div class="empty-state">${icon('search','i es-ic')}<h3>Nenhuma chave encontrada</h3><p>Tente ajustar a busca para localizar uma chave.</p></div>`
       : hasFilters
-        ? '<div class="empty-state"><div class="icon">&#128295;</div><h3>Nenhuma chave atende aos filtros</h3><p>Altere ou remova os filtros para ver as chaves disponíveis.</p></div>'
-        : '<div class="empty-state"><div class="icon">&#127960;</div><h3>Crie uma chave</h3></div>';
+        ? `<div class="empty-state">${icon('funnel','i es-ic')}<h3>Nenhuma chave atende aos filtros</h3><p>Altere ou remova os filtros para ver as chaves disponíveis.</p></div>`
+        : `<div class="empty-state">${icon('chave','i es-ic')}<h3>Crie uma chave</h3></div>`;
     return;
   }
 
@@ -157,13 +181,11 @@ function renderDraws() {
   sorted.forEach((d,i) => {
     const origIdx=allDraws.indexOf(d);
     const has = d.matches?.length > 0;
-    const realMatches=has?(d.matches||[]).filter(m=>!m.isBye&&m.player1&&m.player2&&m.player2!=='BYE'&&m.player1!=='BYE'):[];
-    const allFinished=realMatches.length>0&&realMatches.every(m=>m.winner!==undefined&&m.winner!==null);
-    const st = d.awarded ? '<span class="tag" style="background:#D1FAE5;color:#065F46;border:1px solid #10B981">&#127942; Premiado</span>' : allFinished ? '<span class="tag" style="background:#DBEAFE;color:#1E3A8A;border:1px solid #2563EB">JOGOS FINALIZADOS</span>' : has ? '<span class="tag tag-green">Sorteado</span>' : '<span class="tag tag-yellow">Pendente</span>';
+    const sit = drawSituation(d, tournament.matches);
     const isActive=(selectedDrawIdx<0&&i===0)?origIdx===allDraws.indexOf(sorted[0]):origIdx===selectedDrawIdx;
     lh += `<div class="draws-list-item${isActive?' active':''}" data-idx="${origIdx}" data-action="selectDraw" data-arg-1="${origIdx}">
-      <div class="draw-item-name">${esc(d.name)}</div>
-      <div class="draw-item-info">${esc(d.type)} - ${d.players?.length||0} jogadores - ${has?(d.type==='Eliminatoria'?(d.players?.length||0)-1:((d.players?.length||0)*((d.players?.length||0)-1)/2)):0} jogos ${st}</div>
+      <div class="dl-top"><div class="draw-item-name">${esc(d.name)}</div><span class="pill is-${sit.kind}"><s></s>${sit.label}</span></div>
+      <div class="draw-item-info">${esc(drawTypeLabel(d.type))} · ${d.players?.length||0} jogadores · ${has?(d.type==='Eliminatoria'?(d.players?.length||0)-1:((d.players?.length||0)*((d.players?.length||0)-1)/2)):0} jogos</div>
     </div>`;
   });
   listEl.innerHTML = lh;
@@ -190,31 +212,21 @@ function renderDrawDetail(idx) {
   const has = d.matches?.length > 0;
   const evNames = {SM:'Simples Masculino',SF:'Simples Feminino',DM:'Duplas Masculinas',DF:'Duplas Femininas',DX:'Duplas Mistas'};
 
-  let h = `<div class="card-header"><h3>${esc(d.name)}</h3><div>
-    <button class="btn btn-sm btn-success" data-action="generateSingleDraw" data-arg-1="${idx}">&#127922; Sortear esta chave</button>
-    ${has?`<button class="btn btn-sm" style="background:#EFF6FF;color:#1E40AF;border:1px solid #3B82F6" data-action="regenerateDrawSchedule" data-arg-1="${idx}">&#128260; Regenerar agenda</button>`:''}
-    ${has?`<button class="btn btn-sm" style="background:${d.awarded?'#D1FAE5;color:#065F46;border:1px solid #10B981':'#FEF3C7;color:#92400E;border:1px solid #F59E0B'}" data-action="toggleAwarded" data-arg-1="${idx}">${d.awarded?'&#10003; Premiado':'&#127942; Premiar'}</button>`:''}
-    <button class="btn btn-sm btn-danger" data-action="deleteDraw" data-arg-1="${idx}">Excluir</button>
+  const nJog = d.players?.length||0;
+  let h = `<div class="dd-head"><div class="dd-tt"><h2>${esc(d.name)}</h2><p>${esc(evNames[d.event]||d.event)} · ${esc(drawTypeLabel(d.type))} · ${nJog} jogadores</p></div><div class="dd-actions">
+    <button class="btn btn-sm btn-primary" data-action="generateSingleDraw" data-arg-1="${idx}">${icon('shuffle')}Sortear esta chave</button>
+    ${has?`<button class="btn btn-sm btn-secondary" data-action="regenerateDrawSchedule" data-arg-1="${idx}">${icon('clock')}Regenerar agenda</button>`:''}
+    ${has?`<button class="btn btn-sm btn-secondary${d.awarded?' is-ok':''}" data-action="toggleAwarded" data-arg-1="${idx}">${icon(d.awarded?'check':'award')}${d.awarded?'Premiado':'Premiar'}</button>`:''}
+    <button class="btn btn-sm btn-secondary is-danger" data-action="deleteDraw" data-arg-1="${idx}">${icon('trash-2')}Excluir</button>
   </div></div>
-  <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-    <div><span style="font-size:12px;color:var(--fabd-gray-500)">Evento:</span> <span class="tag tag-blue">${esc(evNames[d.event]||d.event)}</span></div>
-    <div><span style="font-size:12px;color:var(--fabd-gray-500)">Tipo:</span> <span class="tag tag-gray">${esc(d.type)}</span></div>
-    <div><span style="font-size:12px;color:var(--fabd-gray-500)">Jogadores:</span> <strong>${d.players?.length||0}</strong></div>
-    ${d.type==='Grupos + Eliminatoria'?`
-      <div style="display:flex;gap:12px;align-items:center;padding:6px 10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fabd-gray-600)" title="${has?'Re-sorteie a chave para aplicar mudancas':'Quantidade de grupos'}">
-          <span>Grupos:</span>
-          <input type="number" min="1" max="8" value="${d.numGroups||2}" ${has?'disabled':''} data-action="updateDrawNumGroups" data-event="change" data-arg-1="${idx}" data-arg-2="$value" style="width:54px;padding:4px 6px;border:1px solid #CBD5E1;border-radius:6px;text-align:center;font-weight:700;${has?'background:#F1F5F9;cursor:not-allowed':''}">
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fabd-gray-600)" title="${has?'Re-sorteie a chave para aplicar mudancas':'Quantos se classificam por grupo para a eliminatoria'}">
-          <span>Classificados/grupo:</span>
-          <input type="number" min="1" max="4" value="${d.groupQualifiers||2}" ${has?'disabled':''} data-action="updateDrawQualifiers" data-event="change" data-arg-1="${idx}" data-arg-2="$value" style="width:54px;padding:4px 6px;border:1px solid #CBD5E1;border-radius:6px;text-align:center;font-weight:700;${has?'background:#F1F5F9;cursor:not-allowed':''}">
-        </label>
-        ${has?'<span style="font-size:11px;color:#D97706">(re-sorteie para mudar)</span>':''}
-      </div>
-    `:''}
-  </div>`;
-
+  ${d.type==='Grupos + Eliminatoria'?`<div class="dd-cfg">
+    <label title="${has?'Re-sorteie a chave para aplicar mudancas':'Quantidade de grupos'}"><span>Grupos</span>
+      <input class="inp-mini" type="number" min="1" max="8" value="${d.numGroups||2}" ${has?'disabled':''} data-action="updateDrawNumGroups" data-event="change" data-arg-1="${idx}" data-arg-2="$value"></label>
+    <label title="${has?'Re-sorteie a chave para aplicar mudancas':'Quantos se classificam por grupo para a eliminatoria'}"><span>Classificados por grupo</span>
+      <input class="inp-mini" type="number" min="1" max="4" value="${d.groupQualifiers||2}" ${has?'disabled':''} data-action="updateDrawQualifiers" data-event="change" data-arg-1="${idx}" data-arg-2="$value"></label>
+    ${has?'<em>re-sorteie para mudar</em>':''}
+  </div>`:''}
+  <div class="dd-body">`;
   if (has && d.type==='Eliminatoria') h += renderBracket(d);
   else if (has && d.type==='Grupos + Eliminatoria') {
     // Try to propagate groups to elimination if ready
@@ -258,18 +270,18 @@ function renderDrawDetail(idx) {
     // Lista de jogadores com opcao de definir cabecas de chave
     const seedList=d.seeds_list||[];
     const maxSeeds=Math.min(Math.floor((d.players||[]).length/2),8);
-    h += `<div style="background:var(--fabd-gray-100);border-radius:8px;padding:24px">
-      <h3 style="color:var(--fabd-gray-600);margin-bottom:16px">Definir Cabecas de Chave</h3>
-      <p style="color:var(--fabd-gray-500);font-size:13px;margin-bottom:12px">Selecione os jogadores cabeca de chave na ordem (1o seed, 2o seed, etc). Eles serao posicionados estrategicamente no bracket.</p>
-      <div style="display:flex;gap:24px;flex-wrap:wrap">
-        <div style="flex:1;min-width:200px">
-          <h4 style="margin-bottom:8px;font-size:13px;color:var(--fabd-gray-600)">Cabecas de Chave</h4>
-          <div id="seeds-container" style="margin-bottom:12px">`;
+    h += `<div class="seed-box">
+      <h3>Definir cabeças de chave</h3>
+      <p>Selecione os jogadores cabeça de chave na ordem (1º, 2º, etc.). Eles serão posicionados estrategicamente na chave.</p>
+      <div class="seed-cols">
+        <div>
+          <h4>Cabeças de chave</h4>
+          <div id="seeds-container">`;
     for(let s=0;s<maxSeeds;s++){
       const current=seedList[s]||'';
-      h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-weight:700;color:var(--fabd-blue);min-width:24px">${s+1}.</span>
-        <select class="form-control" style="flex:1;padding:4px 8px;font-size:12px" data-action="updateSeed" data-event="change" data-arg-1="${idx}" data-arg-2="${s}" data-arg-3="$value">
+      h+=`<div class="seed-row">
+        <span class="seed-n">${s+1}.</span>
+        <select class="sel-mini" data-action="updateSeed" data-event="change" data-arg-1="${idx}" data-arg-2="${s}" data-arg-3="$value">
           <option value="">- Selecionar -</option>`;
       (d.players||[]).forEach(p=>{
         const used=seedList.includes(p)&&seedList[s]!==p;
@@ -278,16 +290,16 @@ function renderDrawDetail(idx) {
       h+=`</select></div>`;
     }
     h+=`</div></div>
-        <div style="flex:1;min-width:200px">
-          <h4 style="margin-bottom:8px;font-size:13px;color:var(--fabd-gray-600)">Jogadores (${(d.players||[]).length})</h4>
-          <div style="font-size:13px;color:var(--fabd-gray-700)">`;
+        <div>
+          <h4>Jogadores (${(d.players||[]).length})</h4>
+          <div class="seed-list">`;
     (d.players||[]).forEach(p=>{
       const seedNum=seedList.indexOf(p);
-      h+=`<div style="padding:4px 0;${seedNum>=0?'font-weight:700;color:var(--fabd-blue)':''}">${seedNum>=0?`[${seedNum+1}] `:''}${esc(p)}</div>`;
+      h+=`<div${seedNum>=0?' class="is-seed"':''}>${seedNum>=0?`[${seedNum+1}] `:''}${esc(p)}</div>`;
     });
     h+=`</div></div></div>
-      <div style="margin-top:16px;text-align:center">
-        <button class="btn btn-success" data-action="generateSingleDraw" data-arg-1="${idx}">&#127922; Sortear Agora</button>
+      <div class="seed-go">
+        <button class="btn btn-primary" data-action="generateSingleDraw" data-arg-1="${idx}">${icon('shuffle')}Sortear agora</button>
       </div>
     </div>`;
   }
@@ -305,34 +317,23 @@ function renderDrawDetail(idx) {
   if(has&&allDrawMatchesFinished){
     const ranking=computeDrawRanking(d);
     if(ranking&&ranking.length){
-      h+=`<div style="margin-top:24px;background:linear-gradient(135deg,#FEF3C7 0%,#FFFBEB 100%);border-radius:12px;padding:20px;border:2px solid #F59E0B">
-        <h3 style="color:#92400E;margin-bottom:16px;display:flex;align-items:center;gap:8px"><span style="font-size:20px">&#127942;</span> Ranking / Premiacao</h3>`;
+      h+=`<div class="rk"><div class="rk-title">${icon('trophy')}Ranking / Premiação</div>`;
       if(d.type==='Eliminatoria'||d.type==='Grupos + Eliminatoria'){
         ranking.forEach(r=>{
-          const medal=r.pos===1?'\uD83E\uDD47':r.pos===2?'\uD83E\uDD48':'\uD83E\uDD49';
-          const label=r.pos===1?'1o Lugar - Ouro':r.pos===2?'2o Lugar - Prata':'3o Lugar - Bronze';
-          const bg=r.pos===1?'#FEF3C7':r.pos===2?'#F3F4F6':'#FED7AA';
-          const color=r.pos===1?'#D97706':r.pos===2?'#6B7280':'#92400E';
-          h+=`<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:${bg};border-radius:8px;margin-bottom:8px;border-left:4px solid ${color}">
-            <span style="font-size:28px">${medal}</span>
-            <div><div style="font-size:11px;color:${color};font-weight:700;text-transform:uppercase;letter-spacing:0.5px">${label}</div>
-            <div style="font-size:16px;font-weight:700;color:#1a1a1a">${esc(r.name)}</div></div></div>`;
+          const label=r.pos===1?'1º lugar · Ouro':r.pos===2?'2º lugar · Prata':'3º lugar · Bronze';
+          h+=`<div class="rk-row is-p${Math.min(r.pos,3)}"><span class="rk-pos">${r.pos}º</span><div><small>${label}</small><b>${esc(r.name)}</b></div></div>`;
         });
       } else {
-        h+='<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#1E3A8A"><th style="color:white;padding:6px 10px;text-align:center;font-size:11px">Pos.</th><th style="color:white;padding:6px 10px;text-align:left;font-size:11px">Jogador</th><th style="color:white;padding:6px 10px;text-align:center;font-size:11px">V</th><th style="color:white;padding:6px 10px;text-align:center;font-size:11px">D</th><th style="color:white;padding:6px 10px;text-align:center;font-size:11px">Pts+</th><th style="color:white;padding:6px 10px;text-align:center;font-size:11px">Pts-</th><th style="color:white;padding:6px 10px;text-align:center;font-size:11px">Diff</th></tr></thead><tbody>';
+        h+='<div class="table-container"><table class="tbl-mini"><thead><tr><th class="c">Pos.</th><th>Jogador</th><th class="c">V</th><th class="c">D</th><th class="c">Pts+</th><th class="c">Pts-</th><th class="c">Saldo</th></tr></thead><tbody>';
         ranking.forEach((r,i)=>{
-          const medal=r.pos===1?'\uD83E\uDD47':r.pos===2?'\uD83E\uDD48':r.pos===3?'\uD83E\uDD49':'';
-          const bg=i%2===0?'#fff':'#f8f9fa';
-          const fw=r.pos<=3?'700':'400';
-          const color=r.pos===1?'#D97706':r.pos===2?'#6B7280':r.pos===3?'#92400E':'#1a1a1a';
-          h+=`<tr style="background:${bg}"><td style="text-align:center;padding:6px 10px;font-weight:${fw};color:${color}">${medal} ${i+1}o</td><td style="padding:6px 10px;font-weight:${fw}">${esc(r.name)}</td><td style="text-align:center;padding:6px 10px">${r.wins}</td><td style="text-align:center;padding:6px 10px">${r.losses}</td><td style="text-align:center;padding:6px 10px">${r.ptsFor}</td><td style="text-align:center;padding:6px 10px">${r.ptsAgainst}</td><td style="text-align:center;padding:6px 10px;font-weight:700;color:${r.ptsDiff>0?'#059669':r.ptsDiff<0?'#DC2626':'#666'}">${r.ptsDiff>0?'+':''}${r.ptsDiff}</td></tr>`;
+          h+=`<tr${r.pos<=3?` class="is-p${r.pos}"`:''}><td class="c pos">${i+1}º</td><td class="nm">${esc(r.name)}</td><td class="c">${r.wins}</td><td class="c">${r.losses}</td><td class="c">${r.ptsFor}</td><td class="c">${r.ptsAgainst}</td><td class="c diff${r.ptsDiff>0?' is-pos':r.ptsDiff<0?' is-neg':''}">${r.ptsDiff>0?'+':''}${r.ptsDiff}</td></tr>`;
         });
-        h+='</tbody></table>';
+        h+='</tbody></table></div>';
       }
       h+='</div>';
     }
   }
 
-  detailEl.innerHTML = h;
+  detailEl.innerHTML = h + '</div>';
 }
 
