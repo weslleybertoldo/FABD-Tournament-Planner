@@ -68,7 +68,6 @@
         <div class="nav-item" data-page="players"><i data-icon="users"></i><span>Jogadores</span></div>
         <div class="nav-item" data-page="reports"><i data-icon="chart-column"></i><span>Relatórios</span></div>
         <div class="nav-item" data-page="settings"><i data-icon="settings"></i><span>Configurações</span></div>
-        <div class="nav-item" id="nav-access" data-page="access" style="display:none"><i data-icon="lock-keyhole"></i><span>Acessos</span></div>
       </nav>
       <div class="top-right">
         <button type="button" class="org-chip" id="organizer-badge" hidden></button>
@@ -357,104 +356,74 @@
           </div>
         </div>
 
-        <!-- GERENCIAR ACESSOS (admin/super_admin only) -->
-        <div class="page" id="page-access">
-          <div class="card">
-            <div class="card-header">
-              <h3>&#128274; Gerenciar Acessos da Federacao</h3>
-              <div id="access-fed-switcher" style="display:none">
-                <label style="font-size:12px;color:#64748B;margin-right:6px">Federacao:</label>
-                <select id="access-fed-select" class="form-control" style="width:auto;display:inline-block;padding:6px 10px;font-size:13px" data-action="loadAccessOrganizers" data-event="change"></select>
-              </div>
-            </div>
-            <p style="color:#64748B;font-size:13px;margin-bottom:16px">
-              Adicione organizadores autorizados a usar o app FABD Tournament Planner pela sua federacao.
-              Cada organizador faz login com email + codigo enviado por email.
-            </p>
-            <div id="access-list" style="margin-bottom:24px">
-              <p style="color:#94A3B8">Carregando...</p>
-            </div>
-            <div style="border-top:1px solid #E5E7EB;padding-top:20px">
-              <h4 style="margin-bottom:12px;font-size:15px;color:#1F2937">Adicionar novo organizador</h4>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-                <input type="email" id="access-new-email" class="form-control" placeholder="email@exemplo.com">
-                <input type="text" id="access-new-name" class="form-control" placeholder="Nome completo">
-              </div>
-              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-                <select id="access-new-role" class="form-control" style="width:auto;padding:8px 12px">
-                  <option value="organizer">Organizador</option>
-                  <option value="admin">Admin (gerencia outros organizers)</option>
-                </select>
-                <button class="btn btn-primary" data-action="addAccessOrganizer">+ Adicionar</button>
-                <span id="access-msg" style="font-size:12px;color:#10B981"></span>
-              </div>
-              <p style="font-size:11px;color:#94A3B8;margin-top:8px">
-                Apos adicionado, a pessoa abre o app, faz login com este email e ja entra autorizado.
-              </p>
-            </div>
-          </div>
-        </div>
-
         <!-- CONFIGURACOES -->
         <div class="page" id="page-settings">
-          <div class="tabs" id="settings-tabs">
-            <div class="tab active" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-general">Geral</div>
-            <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-game">Configuracao de Jogo</div>
-            <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-umpires">Arbitros</div>
-            <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-categories">Categorias</div>
-            <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-rankings">Ranking</div>
-            <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-events">Eventos</div>
+          <div class="pg-head"><div><h1>Configurações</h1><p>Dados da federação, sistema de disputa, árbitros e acessos.</p></div></div>
+          <div class="tabs st-tabs" id="settings-tabs">
+            <div class="tab active" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-general"><i data-icon="settings"></i>Geral</div>
+            <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-game"><i data-icon="swords"></i>Configuração de jogo</div>
+            <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-umpires"><i data-icon="user"></i>Árbitros</div>
+            <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-categories"><i data-icon="list"></i>Categorias</div>
+            <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-rankings"><i data-icon="trophy"></i>Ranking</div>
+            <div class="tab" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-events"><i data-icon="calendar-days"></i>Eventos</div>
+            <!-- Acessos: só admin/super_admin (applyAccessVisibility), como o item do menu de antes -->
+            <div class="tab" id="nav-access" style="display:none" data-action="setSettingsTab" data-arg-1="$el" data-arg-2="settings-access"><i data-icon="lock-keyhole"></i>Acessos</div>
           </div>
-          <div class="card" id="settings-general">
-            <div class="card-header"><h3>Configuracoes Gerais</h3></div>
-            <div class="form-row">
-              <div class="form-group"><label>Nome da Organizacao</label><input type="text" class="form-control" id="cfg-org-name" value="Federacao Alagoana de Badminton"></div>
-              <div class="form-group"><label>Sigla</label><input type="text" class="form-control" id="cfg-org-abbr" value="FABD"></div>
-            </div>
-            <div class="form-row">
-              <div class="form-group"><label>Cidade</label><input type="text" class="form-control" id="cfg-city" value="Maceio"></div>
-              <div class="form-group"><label>Estado</label><input type="text" class="form-control" id="cfg-state" value="Alagoas"></div>
-            </div>
-            <div class="form-group"><label>E-mail de Contato</label><input type="email" class="form-control" id="cfg-email" placeholder="contato@fabd.org.br"></div>
-            <button class="btn btn-primary" data-action="saveSettings">&#128190; Salvar</button>
-
-            <!-- LOGO DA FEDERACAO -->
-            <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--fabd-gray-200)">
-              <h4 style="margin-bottom:8px;color:var(--fabd-gray-700)">Logo da Federacao</h4>
-              <p style="font-size:12px;color:var(--fabd-gray-500);margin-bottom:12px">Arquivo PNG, JPG, WebP ou SVG (max 2MB). Aparece no topo da barra lateral, no site ao vivo e no app do arbitro. Se nao tiver logo, o sistema usa a sigla.</p>
-              <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-                <div id="logo-preview" style="width:80px;height:80px;border-radius:12px;border:2px dashed var(--fabd-gray-300);display:flex;align-items:center;justify-content:center;background:var(--fabd-gray-50);overflow:hidden;color:var(--fabd-gray-400);font-weight:800;font-size:14px">
-                  sem logo
+          <div class="st-geral" id="settings-general">
+            <div class="cd">
+              <div class="ch"><span class="bar3"></span><h3>Organização</h3></div>
+              <div class="st-body">
+                <div class="form-group"><label>Nome da organização</label><input type="text" class="form-control" id="cfg-org-name" value="Federacao Alagoana de Badminton"></div>
+                <div class="form-row">
+                  <div class="form-group"><label>Sigla</label><input type="text" class="form-control" id="cfg-org-abbr" value="FABD"></div>
+                  <div class="form-group"><label>E-mail de contato</label><input type="email" class="form-control" id="cfg-email" placeholder="contato@fabd.org.br"></div>
                 </div>
-                <div style="display:flex;flex-direction:column;gap:8px">
-                  <input type="file" id="logo-file-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" data-action="uploadFederationLogo" data-event="change" data-arg-1="$event">
-                  <div style="display:flex;gap:8px;flex-wrap:wrap">
-                    <button class="btn btn-primary" style="font-size:13px;padding:8px 14px" data-action="clickLogoFileInput">Enviar Logo</button>
-                    <button class="btn btn-danger" id="logo-remove-btn" style="font-size:13px;padding:8px 14px;display:none" data-action="removeFederationLogo">Remover</button>
-                  </div>
-                  <span id="logo-msg" style="font-size:12px;color:var(--fabd-gray-500)"></span>
+                <div class="form-row">
+                  <div class="form-group"><label>Cidade</label><input type="text" class="form-control" id="cfg-city" value="Maceio"></div>
+                  <div class="form-group"><label>Estado</label><input type="text" class="form-control" id="cfg-state" value="Alagoas"></div>
                 </div>
+                <div class="st-actions"><button class="btn btn-primary" data-action="saveSettings"><i data-icon="check"></i>Salvar</button></div>
               </div>
             </div>
-            <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--fabd-gray-200)">
-              <h4 style="margin-bottom:8px;color:var(--fabd-gray-700)">Atualizacao</h4>
-              <p style="font-size:12px;color:var(--fabd-gray-500);margin-bottom:8px" id="current-version"></p>
-              <button class="btn btn-secondary" data-action="checkForUpdates">&#128260; Verificar Atualizacoes</button>
-              <span id="update-status" style="margin-left:8px;font-size:13px"></span>
+            <div class="st-side">
+              <!-- LOGO DA FEDERACAO -->
+              <div class="cd">
+                <div class="ch"><span class="bar3"></span><h3>Logo da federação</h3></div>
+                <div class="st-body st-logo">
+                  <div id="logo-preview" class="st-logo-pv">sem logo</div>
+                  <div class="st-logo-tx">
+                    <p>Aparece no menu, no site ao vivo e no app do árbitro. PNG, JPG, WebP ou SVG até 2 MB. Sem logo, o app usa a sigla.</p>
+                    <input type="file" id="logo-file-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" data-action="uploadFederationLogo" data-event="change" data-arg-1="$event">
+                    <div class="st-btns">
+                      <button class="btn btn-primary" data-action="clickLogoFileInput"><i data-icon="camera"></i>Enviar logo</button>
+                      <button class="btn btn-secondary is-danger" id="logo-remove-btn" style="display:none" data-action="removeFederationLogo"><i data-icon="trash-2"></i>Remover</button>
+                    </div>
+                    <span id="logo-msg" class="st-msg"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="cd">
+                <div class="ch"><span class="bar3"></span><h3>Atualização</h3></div>
+                <div class="st-body st-upd">
+                  <span class="st-upd-ic"><i data-icon="download"></i></span>
+                  <div class="st-upd-tx"><b id="current-version"></b><span id="update-status"></span></div>
+                  <button class="btn btn-secondary" data-action="checkForUpdates"><i data-icon="refresh-cw"></i>Verificar atualizações</button>
+                </div>
+              </div>
             </div>
           </div>
 
           <!-- CONFIGURACAO DE JOGO -->
           <div class="card" id="settings-game" style="display:none">
-            <div class="card-header"><h3>Configuracao de Jogo</h3></div>
+            <div class="card-header"><h3>Configuração de jogo</h3></div>
             <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
-              Configure como o sistema de disputa e escolhido automaticamente.<br>
-              <strong>Ex:</strong> Se tiver 2 a 4 atletas &rarr; Todos contra Todos. Se tiver 8+ &rarr; Eliminatoria.
+              Configure como o sistema de disputa é escolhido automaticamente.<br>
+              <strong>Ex:</strong> com 2 a 4 atletas, Todos contra Todos; com 8 ou mais, Eliminatória.
             </p>
 
             <!-- Lista de perfis salvos -->
-            <div class="card-header" style="margin-top:8px"><h3>Perfis de Sistema de Disputa</h3>
-              <button class="btn btn-sm btn-primary" data-action="addGameProfile">&#10133; Novo Perfil</button>
+            <div class="card-header" style="margin-top:8px"><h3>Perfis de sistema de disputa</h3>
+              <button class="btn btn-sm btn-primary" data-action="addGameProfile"><i data-icon="plus"></i>Novo perfil</button>
             </div>
             <div id="game-profiles-list"></div>
 
@@ -493,19 +462,19 @@
                   <div style="font-size:13px;font-weight:700;color:#1E3A8A;margin-bottom:6px">Como funciona?</div>
                   <div style="font-size:12px;color:#1E40AF;line-height:1.6">
                     Defina regras por <strong>quantidade de atletas inscritos</strong>:<br>
-                    &bull; Se tiver <strong>2 a 4</strong> atletas &rarr; usar <em>Todos contra Todos</em><br>
-                    &bull; Se tiver <strong>5 a 7</strong> atletas &rarr; usar <em>Grupos + Eliminatoria</em><br>
-                    &bull; Se tiver <strong>8 ou mais</strong> &rarr; usar <em>Eliminatoria (mata-mata)</em>
+                    &bull; Com <strong>2 a 4</strong> atletas: usar <em>Todos contra Todos</em><br>
+                    &bull; Com <strong>5 a 7</strong> atletas: usar <em>Grupos + Eliminatória</em><br>
+                    &bull; Com <strong>8 ou mais</strong>: usar <em>Eliminatória (mata-mata)</em>
                   </div>
                 </div>
                 <div style="font-size:13px;font-weight:600;color:var(--fabd-gray-700);margin-bottom:8px">Regras por faixa de atletas:</div>
                 <div id="gp-ranges-container"></div>
-                <button class="btn btn-sm btn-secondary" data-action="addRange" style="margin-top:8px">&#10133; Adicionar Faixa</button>
+                <button class="btn btn-sm btn-secondary" data-action="addRange" style="margin-top:8px"><i data-icon="plus"></i>Adicionar faixa</button>
               </div>
 
               <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
                 <button class="btn btn-secondary" data-action="cancelProfileEditor">Cancelar</button>
-                <button class="btn btn-primary" data-action="saveGameProfile">&#128190; Salvar Perfil</button>
+                <button class="btn btn-primary" data-action="saveGameProfile"><i data-icon="save"></i>Salvar perfil</button>
               </div>
             </div>
           </div>
@@ -513,18 +482,18 @@
           <!-- ARBITROS -->
           <div class="card" id="settings-umpires" style="display:none">
             <div class="card-header">
-              <h3>Lista de Arbitros</h3>
+              <h3>Lista de árbitros</h3>
             </div>
             <p style="font-size:13px;color:var(--fabd-gray-600);margin-bottom:16px">
-              Gerencie a lista de arbitros disponveis. Esta lista sera usada em todos os torneios.
+              Gerencie a lista de árbitros disponíveis. Esta lista será usada em todos os torneios.
             </p>
             <div class="form-row" style="margin-bottom:16px">
               <div class="form-group" style="margin-bottom:0">
-                <label>Nome do Arbitro</label>
-                <input type="text" class="form-control" id="umpire-name" placeholder="Nome completo do arbitro">
+                <label>Nome do árbitro</label>
+                <input type="text" class="form-control" id="umpire-name" placeholder="Nome completo do árbitro">
               </div>
               <div class="form-group" style="margin-bottom:0">
-                <label>Nivel</label>
+                <label>Nível</label>
                 <select class="form-control" id="umpire-level">
                   <option value="Estadual">Estadual</option>
                   <option value="Nacional">Nacional</option>
@@ -533,12 +502,12 @@
                 </select>
               </div>
               <div style="display:flex;align-items:flex-end">
-                <button class="btn btn-primary" data-action="addUmpire">&#10133; Adicionar</button>
+                <button class="btn btn-primary" data-action="addUmpire"><i data-icon="plus"></i>Adicionar</button>
               </div>
             </div>
             <div class="table-container">
               <table>
-                <thead><tr><th>#</th><th>Nome</th><th>Nivel</th><th>Acoes</th></tr></thead>
+                <thead><tr><th>#</th><th>Nome</th><th>Nível</th><th>Ações</th></tr></thead>
                 <tbody id="umpires-table-body"></tbody>
               </table>
             </div>
@@ -553,16 +522,46 @@
 
           <!-- RANKINGS DE PONTUACAO -->
           <div class="card" id="settings-rankings" style="display:none">
-            <div class="card-header"><h3>Rankings de Pontuação</h3></div>
+            <div class="card-header"><h3>Rankings de pontuação</h3></div>
             <div id="settings-rankings-content" style="min-height:200px">
               <div style="padding:40px;text-align:center;color:var(--fabd-gray-400)">Carregando...</div>
             </div>
           </div>
           <div class="card" id="settings-events" style="display:none">
-            <div class="card-header"><h3>Eventos no Site Ao Vivo</h3></div>
+            <div class="card-header"><h3>Eventos no site ao vivo</h3></div>
             <p style="font-size:13px;color:var(--fabd-gray-500);margin:0 0 12px">Torneios publicados no site ao vivo. <strong>Fechar</strong> remove o evento da listagem pública — se o torneio for aberto novamente no Planner, ele volta a aparecer.</p>
             <div id="settings-events-content" style="min-height:120px">
               <div style="padding:40px;text-align:center;color:var(--fabd-gray-400)">Carregando...</div>
+            </div>
+          </div>
+
+          <!-- ACESSOS (antes "Gerenciar Acessos", item do menu; só admin/super_admin) -->
+          <div class="cd" id="settings-access" style="display:none">
+            <div class="ch"><span class="bar3"></span><h3>Acessos da federação</h3>
+              <div id="access-fed-switcher" class="st-fed" style="display:none">
+                <label for="access-fed-select">Federação:</label>
+                <select id="access-fed-select" class="sel-mini" data-action="loadAccessOrganizers" data-event="change"></select>
+              </div>
+            </div>
+            <div class="st-body">
+              <p class="st-help">Adicione organizadores autorizados a usar o app FABD Tournament Planner pela sua federação. Cada organizador faz login com e-mail + código enviado por e-mail.</p>
+              <div id="access-list" class="st-acc-list"><p class="mut">Carregando...</p></div>
+              <div class="st-add">
+                <h4>Adicionar novo organizador</h4>
+                <div class="form-row">
+                  <input type="email" id="access-new-email" class="form-control" placeholder="email@exemplo.com">
+                  <input type="text" id="access-new-name" class="form-control" placeholder="Nome completo">
+                </div>
+                <div class="st-add-row">
+                  <select id="access-new-role" class="form-control" style="width:auto">
+                    <option value="organizer">Organizador</option>
+                    <option value="admin">Admin (gerencia outros organizers)</option>
+                  </select>
+                  <button class="btn btn-primary" data-action="addAccessOrganizer"><i data-icon="user-plus"></i>Adicionar</button>
+                  <span id="access-msg" class="st-msg"></span>
+                </div>
+                <p class="st-help sm">Depois de adicionada, a pessoa abre o app, faz login com este e-mail e já entra autorizada.</p>
+              </div>
             </div>
           </div>
         </div>

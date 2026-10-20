@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateOverview();
     console.log('[INIT] Overview updated');
     const verEl=document.getElementById('current-version');
-    if(verEl)verEl.textContent=`Versao atual: v${APP_VERSION}`;
+    if(verEl)verEl.textContent=`Versão atual: v${APP_VERSION}`;
     setupAutoUpdaterUI();
     console.log('[INIT] Done!');
   } catch(e) {
@@ -240,21 +240,21 @@ async function loadAccessOrganizers() {
   cnt.innerHTML = '<p style="color:#94A3B8">Carregando...</p>';
   const r = await window.api.organizersList(_accessCurrentFedId);
   if (!r.ok) { cnt.innerHTML = `<p style="color:#EF4444">Erro: ${esc(r.error)}</p>`; return; }
-  if (!r.organizers.length) { cnt.innerHTML = '<p style="color:#94A3B8">Nenhum organizador nesta federacao ainda.</p>'; return; }
+  if (!r.organizers.length) { cnt.innerHTML = '<p class="mut">Nenhum organizador nesta federação ainda.</p>'; return; }
   const me = (await window.api.authStatus())?.organizer?.email?.toLowerCase();
-  let h = '<table class="data-table" style="width:100%;font-size:13px"><thead><tr><th>Status</th><th>Nome</th><th>Email</th><th>Role</th><th>Ultimo login</th><th></th></tr></thead><tbody>';
+  let h = '<table class="mt-tbl st-acc"><thead><tr><th>Situação</th><th>Nome</th><th>E-mail</th><th>Papel</th><th>Último login</th><th></th></tr></thead><tbody>';
   r.organizers.forEach(o => {
     const fmt = o.last_login_at ? new Date(o.last_login_at).toLocaleString('pt-BR') : 'Nunca';
     const isMe = o.email?.toLowerCase() === me;
-    const dot = o.active ? '<span style="display:inline-block;width:8px;height:8px;background:#10B981;border-radius:50%"></span>' : '<span style="display:inline-block;width:8px;height:8px;background:#EF4444;border-radius:50%"></span>';
+    const dot = o.active ? '<span class="pill is-on"><s></s>Ativo</span>' : '<span class="pill is-off"><s></s>Inativo</span>';
     // O1: remover emojis, usar texto simples (institucional).
-    const roleBadge = o.role === 'super_admin' ? '<span style="background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Super admin</span>'
-      : o.role === 'admin' ? '<span style="background:#DBEAFE;color:#1E40AF;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Admin</span>'
-      : '<span style="background:#F3F4F6;color:#6B7280;padding:2px 8px;border-radius:10px;font-size:11px">Organizer</span>';
-    const actions = isMe ? '<span style="color:#94A3B8;font-size:11px">(voce)</span>' :
-      `<button class="btn btn-sm" style="background:#F3F4F6;color:#374151;margin-right:4px" data-action="toggleAccessOrganizer" data-arg-1="${esc(o.email)}" data-arg-2="${!o.active}">${o.active?'Desativar':'Ativar'}</button>
-       <button class="btn btn-sm btn-danger" data-action="removeAccessOrganizer" data-arg-1="${esc(o.email)}">Remover</button>`;
-    h += `<tr><td>${dot}</td><td><strong>${esc(o.name)}</strong></td><td>${esc(o.email)}</td><td>${roleBadge}</td><td style="font-size:11px;color:#64748B">${fmt}</td><td>${actions}</td></tr>`;
+    const roleBadge = o.role === 'super_admin' ? '<span class="pill is-super">Super admin</span>'
+      : o.role === 'admin' ? '<span class="pill is-sched">Admin</span>'
+      : '<span class="pill">Organizer</span>';
+    const actions = isMe ? '<span class="mut">(você)</span>' :
+      `<button class="btn-soft is-gray" data-action="toggleAccessOrganizer" data-arg-1="${esc(o.email)}" data-arg-2="${!o.active}">${o.active?'Desativar':'Ativar'}</button>
+       <button class="btn-soft is-danger" data-action="removeAccessOrganizer" data-arg-1="${esc(o.email)}">Remover</button>`;
+    h += `<tr><td>${dot}</td><td><strong>${esc(o.name)}</strong></td><td>${esc(o.email)}</td><td>${roleBadge}</td><td class="mut">${fmt}</td><td class="acts">${actions}</td></tr>`;
   });
   h += '</tbody></table>';
   cnt.innerHTML = h;
@@ -668,6 +668,8 @@ function setupNavigation() {
 }
 
 function navigateTo(page) {
+  // Acessos virou aba das Configurações (layout novo, W20 parte 10)
+  if (page === 'access') { navigateTo('settings'); const t = document.getElementById('nav-access'); if (t) setSettingsTab(t, 'settings-access'); return; }
   currentPage = page;
   document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -3232,12 +3234,13 @@ async function wizFinish() {
 function setSettingsTab(el, panelId) {
   document.querySelectorAll('#settings-tabs .tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['settings-general','settings-game','settings-umpires','settings-categories','settings-rankings','settings-events'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=id===panelId?'':'none';});
+  ['settings-general','settings-game','settings-umpires','settings-categories','settings-rankings','settings-events','settings-access'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=id===panelId?'':'none';});
   if(panelId==='settings-game')renderGameProfiles();
   if(panelId==='settings-umpires')renderUmpires();
   if(panelId==='settings-categories')renderCategoriesInfo();
   if(panelId==='settings-rankings')renderScoringTables();
   if(panelId==='settings-events')renderLiveEvents();
+  if(panelId==='settings-access')renderAccessPage(); // Acessos (antes a página "Gerenciar Acessos")
 }
 
 // Configuracoes > Eventos: torneios publicados no site ao vivo
@@ -3287,12 +3290,12 @@ async function checkForUpdates(){
     const latestVersion=(data.tag_name||'').replace('v','');
     if(latestVersion&&(data.beta_channel?!data.up_to_date:isNewerVersion(latestVersion,APP_VERSION))){
       const exeAsset=(data.assets||[]).find(a=>a.name.endsWith('.exe'));
-      statusEl.innerHTML=`<span style="color:#F59E0B;font-weight:600">Nova versao disponivel: v${esc(latestVersion)}</span>`;
+      statusEl.innerHTML=`<span style="color:#D97706;font-weight:600">Nova versão disponível: v${esc(latestVersion)}</span>`;
       if(exeAsset){
         statusEl.innerHTML+=` <button class="btn btn-sm btn-primary" style="margin-left:8px" data-action="api.openExternal" data-arg-1="${esc(exeAsset.browser_download_url)}">Baixar v${esc(latestVersion)}</button>`;
       }
     } else {
-      statusEl.innerHTML=`<span style="color:#10B981;font-weight:600">&#10003; App atualizado (v${APP_VERSION})</span>`;
+      statusEl.innerHTML=`<span style="color:#0B7A43;font-weight:600">App atualizado (v${APP_VERSION})</span>`;
     }
   }catch(e){
     statusEl.innerHTML=`<span style="color:#DC2626">Erro ao verificar: ${esc(e.message)}</span>`;

@@ -690,6 +690,46 @@ td.ro-empty { text-align: center; color: var(--mu); padding: 40px 20px; }
   .rp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* === CONFIGURAÇÕES (W20 parte 10): abas com ícone, Geral em cartões e a aba Acessos === */
+.tabs.st-tabs { border-bottom: 1px solid var(--ln); margin-bottom: 16px; gap: 2px; flex-wrap: wrap; }
+.st-tabs .tab { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 13.5px; font-weight: 500; color: var(--mu); border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.st-tabs .tab svg.i { width: 16px; height: 16px; }
+.st-tabs .tab:hover { color: var(--nv); }
+.st-tabs .tab.active { color: var(--nv); font-weight: 650; border-bottom-color: var(--rd); }
+.st-geral { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.st-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.st-body { padding: 18px 20px 20px; }
+.st-actions { display: flex; justify-content: flex-end; margin-top: 4px; }
+.st-logo { display: flex; gap: 18px; align-items: flex-start; }
+.st-logo-pv { width: 128px; height: 88px; border-radius: 12px; border: 2px dashed #CBD5E1; background: #fff; box-shadow: inset 0 0 0 1px var(--ln); display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--mu2); font-weight: 700; font-size: 18px; flex: none; }
+.st-logo-pv img { object-fit: contain !important; padding: 8px; }
+.st-logo-tx { min-width: 0; }
+.st-logo-tx p { font-size: 12.5px; color: var(--mu); line-height: 1.5; margin-bottom: 12px; }
+.st-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.st-msg { display: block; font-size: 12px; color: var(--mu); margin-top: 6px; }
+.st-upd { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.st-upd-ic { width: 40px; height: 40px; border-radius: 50%; background: #EAF0FA; color: var(--bl); display: flex; align-items: center; justify-content: center; flex: none; }
+.st-upd-ic svg.i { width: 18px; height: 18px; }
+.st-upd-tx { min-width: 0; flex: 1; }
+.st-upd-tx b { display: block; font-size: 14px; font-weight: 650; color: var(--tx); }
+#update-status { display: block; font-size: 12.5px; color: var(--mu); margin-top: 2px; }
+#update-status .btn { margin: 6px 0 0 !important; }
+.st-fed { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--mu); }
+.st-help { font-size: 13px; color: var(--mu); margin-bottom: 14px; line-height: 1.5; }
+.st-help.sm { font-size: 12px; margin: 10px 0 0; }
+.st-acc-list { margin-bottom: 22px; }
+.st-add { border-top: 1px solid var(--ln); padding-top: 18px; }
+.st-add h4 { font-size: 14px; font-weight: 650; color: var(--tx); margin-bottom: 12px; }
+.st-add .form-row { margin-bottom: 12px; }
+.st-add-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.pill.is-on { background: #E8F6EE; color: #0B7A43; }
+.pill.is-off { background: #FDECEC; color: #C81E1E; }
+.pill.is-on s, .pill.is-off s { display: block; }
+.pill.is-super { background: #FEF3C7; color: #92400E; }
+@media (max-width: 1100px) {
+  .st-geral { grid-template-columns: 1fr; }
+}
+
 /* === AGENDA (W20 parte 7): botões dos dias, lista de sempre com o cartão novo e a grade do dia === */
 .seg .tab svg.i { width: 15px; height: 15px; }
 .sch-info { font-size: 12.5px; color: var(--mu); white-space: nowrap; }
