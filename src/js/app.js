@@ -1863,15 +1863,15 @@ function renderBracket(d) {
   const svgH = totalH + 50;
   const oY = 35;
 
-  let h = '<div style="overflow-x:auto;padding:10px 0">';
-  h += '<svg width="' + svgW + '" height="' + svgH + '" xmlns="http://www.w3.org/2000/svg" style="font-family:Segoe UI,sans-serif">';
+  let h = '<div class="bk-wrap">';
+  h += '<svg width="' + svgW + '" height="' + svgH + '" xmlns="http://www.w3.org/2000/svg" style="font-family:inherit">';
 
   for (let r = 1; r <= totalRounds; r++) {
     const ms = rounds[r] || [];
     const x = (r - 1) * (matchW + connW);
 
-    h += '<rect x="' + x + '" y="0" width="' + matchW + '" height="26" rx="4" fill="#1E3A8A"/>';
-    h += '<text x="' + (x + matchW/2) + '" y="17" text-anchor="middle" fill="white" font-size="11" font-weight="700" letter-spacing="1">' + rName(r) + '</text>';
+    h += '<rect x="' + x + '" y="0" width="' + matchW + '" height="26" rx="6" fill="#EEF2F7"/>';
+    h += '<text x="' + (x + matchW/2) + '" y="17" text-anchor="middle" fill="#0E2A5E" font-size="10.5" font-weight="700" letter-spacing="1">' + rName(r) + '</text>';
 
     ms.forEach((m, i) => {
       const pos = positions[r + '-' + i];
@@ -1883,26 +1883,26 @@ function renderBracket(d) {
       const p2 = getDisp(r, i, 2);
       const future = (!m.player1 && !m.player2 && r > 1) || m.isPreview;
       const dash = (future || isBye) ? ' stroke-dasharray="5,3"' : '';
-      const sc = isBye ? '#CED4DA' : '#343A40';
-      const f1 = m.winner === 1 ? '#D1FAE5' : '#fff';
-      const f2 = m.winner === 2 ? '#D1FAE5' : '#fff';
+      const sc = isBye ? '#E2E8F0' : '#CBD5E1';
+      const f1 = m.winner === 1 ? '#E8F6EE' : '#fff';
+      const f2 = m.winner === 2 ? '#E8F6EE' : '#fff';
 
-      h += '<rect x="'+x+'" y="'+y+'" width="'+matchW+'" height="'+(matchH/2)+'" fill="'+f1+'" stroke="'+sc+'" stroke-width="2"'+dash+'/>';
-      h += '<rect x="'+x+'" y="'+(y+matchH/2)+'" width="'+matchW+'" height="'+(matchH/2)+'" fill="'+f2+'" stroke="'+sc+'" stroke-width="2"'+dash+'/>';
+      h += '<rect x="'+x+'" y="'+y+'" width="'+matchW+'" height="'+(matchH/2)+'" fill="'+f1+'" stroke="'+sc+'" stroke-width="1.5"'+dash+'/>';
+      h += '<rect x="'+x+'" y="'+(y+matchH/2)+'" width="'+matchW+'" height="'+(matchH/2)+'" fill="'+f2+'" stroke="'+sc+'" stroke-width="1.5"'+dash+'/>';
 
-      if (num && !isBye) h += '<text x="'+(x+8)+'" y="'+(y+13)+'" fill="#C41E2A" font-size="10" font-weight="700">Jogo '+String(num).padStart(2,'0')+'</text>';
-      if (isBye) h += '<text x="'+(x+8)+'" y="'+(y+13)+'" fill="#ADB5BD" font-size="10" font-weight="700">BYE</text>';
+      if (num && !isBye) h += '<text x="'+(x+8)+'" y="'+(y+13)+'" fill="#64748B" font-size="10" font-weight="600">Jogo '+String(num).padStart(2,'0')+'</text>';
+      if (isBye) h += '<text x="'+(x+8)+'" y="'+(y+13)+'" fill="#94A3B8" font-size="10" font-weight="600">BYE</text>';
 
       const clipId='clip-'+r+'-'+i;
       h += '<clipPath id="'+clipId+'"><rect x="'+(x+6)+'" y="'+y+'" width="'+(matchW-50)+'" height="'+matchH+'"/></clipPath>';
-      const c1 = m.winner===1?'#065F46':(isBye?'#ADB5BD':'#1E3A8A');
+      const c1 = m.winner===1?'#0B7A43':(isBye?'#94A3B8':'#0F172A');
       h += '<text clip-path="url(#'+clipId+')" x="'+(x+8)+'" y="'+(y+30)+'" fill="'+c1+'" font-size="12" font-weight="600">'+esc(p1||'-')+'</text>';
 
-      const c2 = m.winner===2?'#065F46':(isBye?'#DEE2E6':'#1E3A8A');
+      const c2 = m.winner===2?'#0B7A43':(isBye?'#CBD5E1':'#0F172A');
       h += '<text clip-path="url(#'+clipId+')" x="'+(x+8)+'" y="'+(y+matchH/2+22)+'" fill="'+c2+'" font-size="12" font-weight="600">'+(isBye?'- - -':esc(p2||'-'))+'</text>';
 
-      if (m.score1) h += '<text x="'+(x+matchW-8)+'" y="'+(y+30)+'" text-anchor="end" fill="#495057" font-size="11" font-weight="700">'+esc(m.score1)+'</text>';
-      if (m.score2) h += '<text x="'+(x+matchW-8)+'" y="'+(y+matchH/2+22)+'" text-anchor="end" fill="#495057" font-size="11" font-weight="700">'+esc(m.score2)+'</text>';
+      if (m.score1) h += '<text x="'+(x+matchW-8)+'" y="'+(y+30)+'" text-anchor="end" fill="#334155" font-size="11" font-weight="700">'+esc(m.score1)+'</text>';
+      if (m.score2) h += '<text x="'+(x+matchW-8)+'" y="'+(y+matchH/2+22)+'" text-anchor="end" fill="#334155" font-size="11" font-weight="700">'+esc(m.score2)+'</text>';
 
       // LINHAS CONECTORAS
       if (r < totalRounds) {
@@ -1911,7 +1911,7 @@ function renderBracket(d) {
         const mx = lx + connW / 2;
 
         // Linha horizontal saindo do jogo
-        h += '<line x1="'+lx+'" y1="'+myMidY+'" x2="'+mx+'" y2="'+myMidY+'" stroke="#343A40" stroke-width="2"/>';
+        h += '<line x1="'+lx+'" y1="'+myMidY+'" x2="'+mx+'" y2="'+myMidY+'" stroke="#CBD5E1" stroke-width="1.5"/>';
 
         // Linha vertical conectando par (so no jogo de cima do par)
         if (i % 2 === 0) {
@@ -1919,13 +1919,13 @@ function renderBracket(d) {
           if (pairPos) {
             const pairMidY = pairPos.y + oY + matchH / 2;
             // Vertical
-            h += '<line x1="'+mx+'" y1="'+myMidY+'" x2="'+mx+'" y2="'+pairMidY+'" stroke="#343A40" stroke-width="2"/>';
+            h += '<line x1="'+mx+'" y1="'+myMidY+'" x2="'+mx+'" y2="'+pairMidY+'" stroke="#CBD5E1" stroke-width="1.5"/>';
             // Horizontal saindo pro proximo jogo
             const nextI = Math.floor(i / 2);
             const nextPos = positions[(r+1) + '-' + nextI];
             if (nextPos) {
               const nextMidY = nextPos.y + oY + matchH / 2;
-              h += '<line x1="'+mx+'" y1="'+nextMidY+'" x2="'+(lx+connW)+'" y2="'+nextMidY+'" stroke="#343A40" stroke-width="2"/>';
+              h += '<line x1="'+mx+'" y1="'+nextMidY+'" x2="'+(lx+connW)+'" y2="'+nextMidY+'" stroke="#CBD5E1" stroke-width="1.5"/>';
             }
           }
         }
@@ -1939,17 +1939,18 @@ function renderBracket(d) {
   if (cp) {
     const cx = totalRounds * (matchW + connW);
     const cy = cp.cy + oY;
-    h += '<line x1="'+((totalRounds-1)*(matchW+connW)+matchW)+'" y1="'+cy+'" x2="'+cx+'" y2="'+cy+'" stroke="#343A40" stroke-width="2"/>';
+    h += '<line x1="'+((totalRounds-1)*(matchW+connW)+matchW)+'" y1="'+cy+'" x2="'+cx+'" y2="'+cy+'" stroke="#CBD5E1" stroke-width="1.5"/>';
     const champW=250;
     const champ = finalM && finalM.winner === 1 ? finalM.player1 : finalM && finalM.winner === 2 ? finalM.player2 : 'A definir';
     // Dupla: um nome abaixo do outro, e a caixa cresce 17px por linha extra
     const champLines = fitChampionLines(champ, champW - 20);
     const champH = 56 + (champLines.length - 1) * 17;
     const champTop = cy - champH / 2;
-    h += '<rect x="'+cx+'" y="'+champTop+'" width="'+champW+'" height="'+champH+'" rx="8" fill="#FEF3C7" stroke="#F59E0B" stroke-width="3"/>';
-    h += '<text x="'+(cx+champW/2)+'" y="'+(champTop+20)+'" text-anchor="middle" fill="#92400E" font-size="10" font-weight="700">CAMPEAO</text>';
+    const temCampeao = champ !== 'A definir';
+    h += '<rect x="'+cx+'" y="'+champTop+'" width="'+champW+'" height="'+champH+'" rx="10" fill="'+(temCampeao?'#FFF8E6':'#fff')+'" stroke="'+(temCampeao?'#E5B54A':'#CBD5E1')+'" stroke-width="1.5"'+(temCampeao?'':' stroke-dasharray="5,3"')+'/>';
+    h += '<text x="'+(cx+champW/2)+'" y="'+(champTop+20)+'" text-anchor="middle" fill="#0E2A5E" font-size="10.5" font-weight="700" letter-spacing="1">CAMPEÃO</text>';
     champLines.forEach((ln, k) => {
-      h += '<text x="'+(cx+champW/2)+'" y="'+(champTop+42+k*17)+'" text-anchor="middle" fill="#92400E" font-size="'+ln.size+'" font-weight="800">'+esc(ln.text)+'</text>';
+      h += '<text x="'+(cx+champW/2)+'" y="'+(champTop+42+k*17)+'" text-anchor="middle" fill="#0F172A" font-size="'+ln.size+'" font-weight="700">'+esc(ln.text)+'</text>';
     });
   }
 
@@ -1959,27 +1960,26 @@ function renderBracket(d) {
 
 function renderRoundRobin(d) {
   if(!d.players?.length) return '';
-  let h='<div class="table-container"><table><thead><tr><th>#</th><th>Jogador</th>';
-  d.players.forEach((_,i)=>h+=`<th>${i+1}</th>`);
-  h+='<th>V</th><th>D</th><th>Pts</th></tr></thead><tbody>';
+  let h='<div class="table-container"><table class="tbl-mini"><thead><tr><th class="c">#</th><th>Jogador</th>';
+  d.players.forEach((_,i)=>h+=`<th class="c">${i+1}</th>`);
+  h+='<th class="c">V</th><th class="c">D</th><th class="c">Pts</th></tr></thead><tbody>';
   d.players.forEach((p,i)=>{
-    h+=`<tr><td>${i+1}</td><td><strong>${esc(p)}</strong></td>`;
+    h+=`<tr><td class="c pos">${i+1}</td><td class="nm"><strong>${esc(p)}</strong></td>`;
     d.players.forEach((q,j)=>{
-      if(i===j){h+='<td style="background:var(--fabd-gray-200)">-</td>';return;}
+      if(i===j){h+='<td class="c x">-</td>';return;}
       // Buscar por nome dos jogadores (mais robusto que p1idx/p2idx)
       const m=(d.matches||[]).find(x=>(x.player1===p&&x.player2===q)||(x.player1===q&&x.player2===p));
-      if(!m||m.winner===undefined){h+='<td>-</td>';return;}
+      if(!m||m.winner===undefined){h+='<td class="c">-</td>';return;}
       const isP1=m.player1===p;
-      // WO
       // W.O., desistencia, desqualificacao, Sem jogo: a marca no lugar do placar
       const _st=typeof drawMatchStatus==='function'?drawMatchStatus(m):((m.score1==='W.O.'||m.score2==='W.O.')?'WO':'');
       if(_st&&_st!=='Finalizada'){
         const iWon=(isP1&&m.winner===1)||(!isP1&&m.winner===2);
         const mark={WO:'W.O.',Desistencia:'Desist.',Desqualificacao:'Desq.',SemJogo:'Sem jogo'}[_st]||_st;
-        h+=`<td style="color:${_st==='SemJogo'?'#64748B':iWon?'#10B981':'#DC2626'};font-weight:700;font-size:11px">${iWon?'V · ':''}${mark}</td>`;
+        h+=`<td class="c mk ${_st==='SemJogo'?'is-muted':iWon?'is-win':'is-loss'}">${iWon?'V · ':''}${mark}</td>`;
         return;
       }
-      h+=`<td>${m.score1!==undefined&&m.score1!==''?(isP1?`${m.score1}-${m.score2}`:`${m.score2}-${m.score1}`):'-'}</td>`;
+      h+=`<td class="c">${m.score1!==undefined&&m.score1!==''?(isP1?`${m.score1}-${m.score2}`:`${m.score2}-${m.score1}`):'-'}</td>`;
     });
     let w=0,l=0;
     (d.matches||[]).forEach(m=>{
@@ -1989,7 +1989,7 @@ function renderRoundRobin(d) {
       if((isP1&&m.winner===1)||(isP2&&m.winner===2))w++;
       if((isP1&&m.winner===2)||(isP2&&m.winner===1))l++;
     });
-    h+=`<td>${w}</td><td>${l}</td><td><strong>${w*2}</strong></td></tr>`;
+    h+=`<td class="c">${w}</td><td class="c">${l}</td><td class="c"><strong>${w*2}</strong></td></tr>`;
   });
   return h+'</tbody></table></div>';
 }
@@ -2009,15 +2009,8 @@ function renderGroupsElimination(d) {
   const groups = d.groupsData.groups;
   const hasElim = groupsFinished && d.groupsData.eliminationMatches?.length;
 
-  // Abas: Grupo A | Grupo B | ... | Eliminatorias (sempre visivel)
-  h += `<div class="tabs" id="ge-tabs" style="margin-bottom:16px">`;
-  groups.forEach((g, i) => {
-    h += `<div class="tab${i === 0 ? ' active' : ''}" data-action="setGeTab" data-arg-1="${i}">${esc(g.name)}</div>`;
-  });
-  h += `<div class="tab" data-action="setGeTab" data-arg-1="${groups.length}">Eliminatorias</div>`;
-  h += `</div>`;
-
-  // Paineis dos grupos
+  // Layout novo (W20 parte 6): os grupos lado a lado e a eliminatoria embaixo, sem
+  // abas — as mesmas tabelas (classificacao e confrontos) e a mesma chave.
   groups.forEach(g => {
     const gLabel = (g.name || 'Grupo').replace('Grupo ', '');
     const groupMatches = d.matches.filter(m => m.group === gLabel && m.phase === 'group');
@@ -2026,47 +2019,49 @@ function renderGroupsElimination(d) {
   const bestThirds = usesBestThirds(groups, qualifiers);
   // Com os grupos encerrados, os 2 melhores 3os tambem aparecem como classificados
   const bestThirdNames = bestThirds && groupsFinished ? new Set(rankGroupThirds(groups).slice(0, 2).map(t => t.name)) : new Set();
+  h += '<div class="ge-grid">';
   groups.forEach((g, gi) => {
     const standings = computeGroupStandings(g.players, g.matches);
 
-    h += `<div class="ge-panel" id="ge-panel-${gi}" style="${gi > 0 ? 'display:none' : ''}">`;
+    h += `<div class="ge-panel" id="ge-panel-${gi}"><div class="ge-title"><b>${esc(g.name)}</b><span>${qualifiers} ${qualifiers > 1 ? 'passam' : 'passa'}</span></div>`;
     // Classificacao
-    h += '<div class="table-container"><table><thead><tr><th style="text-align:center;width:40px">Pos</th><th>Jogador</th><th style="text-align:center">V</th><th style="text-align:center">D</th><th style="text-align:center">Pts+</th><th style="text-align:center">Pts-</th><th style="text-align:center">Diff</th></tr></thead><tbody>';
+    h += '<div class="table-container"><table class="tbl-mini"><thead><tr><th class="c">Pos</th><th>Jogador</th><th class="c">V</th><th class="c">D</th><th class="c">Pts+</th><th class="c">Pts-</th><th class="c">Saldo</th></tr></thead><tbody>';
     standings.forEach((s, i) => {
       // quem nao completou o grupo (W.O., desistencia...) nunca se classifica (BWF 16.2.5)
       const isQ = !s.withdrawn && (i < qualifiers || bestThirdNames.has(s.name));
-      const badge = i < qualifiers ? 'Classif.' : 'Classif. (melhor 3o)';
-      h += `<tr style="background:${isQ ? '#D1FAE5' : i % 2 === 0 ? '#fff' : '#f8f9fa'}"><td style="text-align:center;font-weight:${isQ ? '700' : '400'};color:${isQ ? '#065F46' : '#1a1a1a'}">${i + 1}o</td><td style="font-weight:${isQ ? '700' : '400'}">${s.withdrawn ? `<span style="color:#94A3B8;text-decoration:line-through">${esc(s.name)}</span> <span style="background:#64748B;color:white;font-size:10px;padding:1px 6px;border-radius:10px">não completou</span>` : esc(s.name)}${isQ ? ` <span style="background:#10B981;color:white;font-size:10px;padding:1px 6px;border-radius:10px">${badge}</span>` : ''}</td><td style="text-align:center">${s.wins}</td><td style="text-align:center">${s.losses}</td><td style="text-align:center">${s.ptsFor}</td><td style="text-align:center">${s.ptsAgainst}</td><td style="text-align:center;font-weight:700;color:${s.ptsDiff > 0 ? '#059669' : s.ptsDiff < 0 ? '#DC2626' : '#666'}">${s.ptsDiff > 0 ? '+' : ''}${s.ptsDiff}</td></tr>`;
+      const badge = i < qualifiers ? 'Classif.' : 'Classif. (melhor 3º)';
+      h += `<tr${isQ ? ' class="is-q"' : ''}><td class="c pos">${i + 1}º</td><td class="nm">${s.withdrawn ? `<span class="ge-out">${esc(s.name)}</span> <span class="pill">não completou</span>` : esc(s.name)}${isQ ? ` <span class="pill is-confirmado">${badge}</span>` : ''}</td><td class="c">${s.wins}</td><td class="c">${s.losses}</td><td class="c">${s.ptsFor}</td><td class="c">${s.ptsAgainst}</td><td class="c diff${s.ptsDiff > 0 ? ' is-pos' : s.ptsDiff < 0 ? ' is-neg' : ''}">${s.ptsDiff > 0 ? '+' : ''}${s.ptsDiff}</td></tr>`;
     });
     h += '</tbody></table></div>';
     // Confrontos
-    h += '<div class="table-container" style="margin-top:8px"><table><thead><tr><th>#</th><th>Jogador</th>';
-    g.players.forEach((_, i) => h += `<th style="text-align:center">${i + 1}</th>`);
+    h += '<div class="table-container ge-vs"><table class="tbl-mini"><thead><tr><th class="c">#</th><th>Jogador</th>';
+    g.players.forEach((_, i) => h += `<th class="c">${i + 1}</th>`);
     h += '</tr></thead><tbody>';
     g.players.forEach((p, i) => {
-      h += `<tr><td>${i + 1}</td><td><strong>${esc(p)}</strong></td>`;
+      h += `<tr><td class="c pos">${i + 1}</td><td class="nm"><strong>${esc(p)}</strong></td>`;
       g.players.forEach((q, j) => {
-        if (i === j) { h += '<td style="background:var(--fabd-gray-200);text-align:center">-</td>'; return; }
+        if (i === j) { h += '<td class="c x">-</td>'; return; }
         const m = g.matches.find(x => (x.player1 === p && x.player2 === q) || (x.player1 === q && x.player2 === p));
-        if (!m || m.winner === undefined) { h += '<td style="text-align:center">-</td>'; return; }
+        if (!m || m.winner === undefined) { h += '<td class="c">-</td>'; return; }
         const isP1 = m.player1 === p;
         // W.O., desistencia, desqualificacao, Sem jogo: a marca no lugar do placar
         const _st = drawMatchStatus(m);
         if (_st && _st !== 'Finalizada') {
           const iWon = (isP1 && m.winner === 1) || (!isP1 && m.winner === 2);
           const mark = { WO: 'W.O.', Desistencia: 'Desist.', Desqualificacao: 'Desq.', SemJogo: 'Sem jogo' }[_st] || _st;
-          h += `<td style="text-align:center;color:${_st === 'SemJogo' ? '#64748B' : iWon ? '#10B981' : '#DC2626'};font-weight:700;font-size:11px">${iWon ? 'V · ' : ''}${mark}</td>`;
+          h += `<td class="c mk ${_st === 'SemJogo' ? 'is-muted' : iWon ? 'is-win' : 'is-loss'}">${iWon ? 'V · ' : ''}${mark}</td>`;
           return;
         }
-        h += `<td style="text-align:center">${m.score1 !== undefined && m.score1 !== '' ? (isP1 ? `${m.score1}-${m.score2}` : `${m.score2}-${m.score1}`) : '-'}</td>`;
+        h += `<td class="c">${m.score1 !== undefined && m.score1 !== '' ? (isP1 ? `${m.score1}-${m.score2}` : `${m.score2}-${m.score1}`) : '-'}</td>`;
       });
       h += '</tr>';
     });
     h += '</tbody></table></div></div>';
   });
+  h += '</div>';
 
-  // Painel Eliminatorias (sempre como aba)
-  h += `<div class="ge-panel" id="ge-panel-${groups.length}" style="display:none">`;
+  // Eliminatoria (embaixo dos grupos)
+  h += `<div class="ge-panel ge-elim" id="ge-panel-${groups.length}"><div class="ge-title"><b>Eliminatória</b></div>`;
   if (hasElim) {
     const elimDraw = { matches: d.groupsData.eliminationMatches, players: d.groupsData.eliminationMatches.filter(m => m.round === 1).flatMap(m => [m.player1, m.player2]).filter(p => p && p !== 'BYE') };
     h += renderBracket(elimDraw);
@@ -2074,26 +2069,19 @@ function renderGroupsElimination(d) {
     // Mostrar preview das eliminatorias com placeholders
     const totalGM = groups.reduce((s, g) => s + g.matches.filter(m => m.player1 && m.player2 && m.player1 !== 'BYE' && m.player2 !== 'BYE').length, 0);
     const doneGM = groups.reduce((s, g) => s + g.matches.filter(m => m.winner !== undefined && m.winner !== null).length, 0);
-    h += `<div style="padding:16px;background:var(--fabd-gray-100);border-radius:8px;margin-bottom:16px;text-align:center">
-      <p style="color:var(--fabd-gray-600);font-weight:600">Fase de grupos: ${doneGM}/${totalGM} partidas concluidas</p>
-      <p style="color:var(--fabd-gray-500);font-size:12px;margin-top:4px">Grupo encerrado ja mostra os classificados. O resto entra quando os grupos acabarem.</p></div>`;
+    h += `<div class="ge-note"><b>Fase de grupos: ${doneGM}/${totalGM} partidas concluídas</b><span>Grupo encerrado já mostra os classificados. O resto entra quando os grupos acabarem.</span></div>`;
     // Previa no formato de chave (igual a chave real), com rotulos no lugar dos nomes
     const previewMatches = buildGroupsElimPreview(groups, qualifiers);
     // Grupo que ja acabou: o rotulo vira o nome do classificado
     previewMatches.forEach(pm => { pm.player1 = resolveGroupQualifierLabel(d, pm.player1); pm.player2 = resolveGroupQualifierLabel(d, pm.player2); });
     if (previewMatches.length) h += renderBracket({ matches: previewMatches });
     if (bestThirds) {
-      h += `<p style="font-size:12px;color:var(--fabd-gray-500);text-align:center">Melhor 3o: mais vitorias, depois saldo de pontos, depois pontos feitos.<br>Se um 3o cair contra o 1o do proprio grupo, os dois 3os trocam de lugar.</p>`;
+      h += `<p class="ge-foot">Melhor 3º: mais vitórias, depois saldo de pontos, depois pontos feitos.<br>Se um 3º cair contra o 1º do próprio grupo, os dois 3ºs trocam de lugar.</p>`;
     }
   }
   h += '</div>';
 
   return h;
-}
-
-function setGeTab(idx){
-  document.querySelectorAll('#ge-tabs .tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
-  document.querySelectorAll('.ge-panel').forEach((p,i)=>p.style.display=i===idx?'':'none');
 }
 
 async function deleteDraw(i) {
