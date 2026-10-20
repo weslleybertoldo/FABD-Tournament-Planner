@@ -623,6 +623,28 @@ td.acts .btn-soft { margin-left: 4px; }
 #page-tournaments .cd { overflow: hidden; }
 #page-tournaments .toolbar .search-box { flex: 0 1 380px; }
 
+/* === JOGADORES (W20 parte 4) === */
+#page-players .cd { overflow: hidden; }
+#page-players .toolbar .search-box { flex: 0 1 380px; }
+.pl-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pl-name b { font-weight: 600; color: var(--tx); }
+.pl-name small { display: block; font-size: 11.5px; color: #B45309; margin-top: 2px; }
+.pl-name.is-err b { color: #C81E1E; }
+.pl-name.is-warn b { color: #B45309; }
+.pl-av { width: 30px; height: 30px; border-radius: 50%; background: #EAF0FA; color: var(--bl); display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; flex: none; }
+.pl-av::before { content: attr(data-ini); }
+.pl-alert { display: inline-flex; vertical-align: -2px; margin-left: 5px; cursor: help; }
+.pl-alert svg.i { width: 14px; height: 14px; }
+.pl-alert.is-err { color: #C81E1E; }
+.pl-alert.is-warn { color: #D97706; }
+.pl-g { display: inline-flex; width: 24px; height: 22px; border-radius: 6px; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; background: #F1F5F9; color: #475569; }
+.pl-ev { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 650; border-radius: 6px; padding: 2px 7px; background: #EAF0FA; color: var(--bl); margin: 1px 4px 1px 0; white-space: nowrap; }
+.pl-ev em { font-style: normal; font-weight: 500; color: #475569; }
+.pl-mut { color: var(--mu); }
+.btn-icon.is-danger:hover { background: #FDECEC; color: #C81E1E; }
+.btn-secondary.is-danger { color: #C81E1E; }
+.btn-secondary.is-danger:hover:not(:disabled) { background: #FDECEC; border-color: #F5C2C2; }
+
 /* === QUICK ACTIONS === */
 .quick-actions {
   display: grid;

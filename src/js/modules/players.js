@@ -11,39 +11,50 @@
 function renderPlayers() {
   const tb = document.getElementById('players-table-body');
   const em = document.getElementById('players-empty');
+  const ft = document.getElementById('players-foot');
+  if (ft) ft.textContent = '';
   if (!tournament) { tb.innerHTML=''; em.style.display='block'; em.querySelector('h3').textContent='Nenhum torneio ativo'; return; }
-  if (!players.length) { tb.innerHTML=''; em.style.display='block'; return; }
+  if (!players.length) { tb.innerHTML=''; em.style.display='block'; em.querySelector('h3').textContent='Nenhum jogador cadastrado'; return; }
   em.style.display = 'none';
+  // Layout novo (W20 parte 4): os mesmos dados e avisos de antes; as iniciais do
+  // avatar vão por CSS (data-ini) pra busca, que lê o texto da linha, não mudar.
+  const aviso = (cls, title) => `<span class="pl-alert ${cls}" title="${esc(title)}">${icon('triangle-alert')}</span>`;
   let h = '';
   players.forEach(p => {
     const autoCat = calculateCategory(p.dob);
-    const inscriptions = (p.inscriptions||[]).length;
     const hasConflict = checkCategoryConflict(p.dob, p.inscriptions);
     const aloneKeys = checkAloneInCategory(p.inscriptions);
     const hasAlone = aloneKeys.length > 0;
     const duplaSemParceiroKeys = checkDuplaSemParceiro(p.inscriptions);
     const hasDuplaSemParceiro = duplaSemParceiroKeys.length > 0;
-    const nameStyle = hasConflict ? 'color:#DC2626' : (hasAlone || hasDuplaSemParceiro) ? 'color:#D97706' : '';
-    const conflictIcon = hasConflict ? '<span title="Atleta inscrito em categoria incompativel com a idade" style="color:#DC2626;cursor:help;margin-left:4px">&#9888;</span>' : '';
-    const aloneIcon = hasAlone ? '<span title="Sozinho em: '+aloneKeys.join(', ')+' (precisa de mais inscritos)" style="color:#D97706;cursor:help;margin-left:4px">&#9888;</span>' : '';
-    const duplaIcon = hasDuplaSemParceiro ? '<span title="Dupla sem parceiro: '+duplaSemParceiroKeys.join(', ')+'" style="color:#D97706;cursor:help;margin-left:4px">&#9888;</span>' : '';
+    const nameCls = hasConflict ? 'is-err' : (hasAlone || hasDuplaSemParceiro) ? 'is-warn' : '';
+    const conflictIcon = hasConflict ? aviso('is-err', 'Atleta inscrito em categoria incompatível com a idade') : '';
+    const aloneIcon = hasAlone ? aviso('is-warn', 'Sozinho em: '+aloneKeys.join(', ')+' (precisa de mais inscritos)') : '';
+    const duplaIcon = hasDuplaSemParceiro ? aviso('is-warn', 'Dupla sem parceiro: '+duplaSemParceiroKeys.join(', ')) : '';
     const subLine = [];
     if(hasAlone) subLine.push('Sozinho: '+aloneKeys.map(k=>'<strong>'+esc(k)+'</strong>').join(', '));
     if(hasDuplaSemParceiro) subLine.push('Sem dupla: '+duplaSemParceiroKeys.map(k=>'<strong>'+esc(k)+'</strong>').join(', '));
+    const nome = `${p.firstName||''} ${p.lastName||''}`;
+    const gen = p.gender==='M' ? ['M','Masculino'] : p.gender==='F' ? ['F','Feminino'] : ['-',''];
+    const ins = (p.inscriptions||[]).map(i => {
+      const [mod, ...cat] = String(i.key||'').split(' ');
+      return `<span class="pl-ev">${esc(mod)}${cat.length ? ` <em>${esc(cat.join(' '))}</em>` : ''}</span>`;
+    }).join('');
     h += `<tr>
-      <td><strong style="${nameStyle}">${esc(p.firstName)} ${esc(p.lastName)}${conflictIcon}${aloneIcon}${duplaIcon}</strong>${subLine.length?'<div style="font-size:10px;color:#D97706;margin-top:2px">'+subLine.join(' | ')+'</div>':''}</td>
-      <td>${p.gender==='M'?'Masc':p.gender==='F'?'Fem':'-'}</td>
-      <td>${fmtDate(p.dob)}</td>
-      <td><span class="tag tag-blue">${esc(autoCat)}</span></td>
-      <td>${esc(p.club)||'-'}</td>
+      <td><div class="pl-name ${nameCls}"><span class="pl-av" data-ini="${esc(shellInitials(nome))}"></span><div><b>${esc(p.firstName)} ${esc(p.lastName)}${conflictIcon}${aloneIcon}${duplaIcon}</b>${subLine.length?'<small>'+subLine.join(' | ')+'</small>':''}</div></div></td>
+      <td><span class="pl-g" title="${gen[1]}">${gen[0]}</span></td>
+      <td class="num">${fmtDate(p.dob)}</td>
+      <td>${esc(autoCat)}</td>
+      <td${p.club?'':' class="pl-mut"'}>${esc(p.club)||'Sem clube'}</td>
       <td>${esc(p.state)||'-'}</td>
-      <td>${inscriptions > 0 ? `<span class="tag tag-green">${inscriptions} cat.</span>` : '<span class="tag tag-gray">0</span>'}</td>
-      <td>
-        <button class="btn btn-sm btn-secondary" data-action="editPlayer" data-arg-1="${esc(p.id)}">Editar</button>
-        <button class="btn btn-sm btn-danger" data-action="deletePlayer" data-arg-1="${esc(p.id)}">Excluir</button>
+      <td>${ins || '<span class="pl-mut">Nenhuma</span>'}</td>
+      <td class="acts">
+        <button class="btn-icon" data-action="editPlayer" data-arg-1="${esc(p.id)}" title="Editar">${icon('pencil')}</button>
+        <button class="btn-icon is-danger" data-action="deletePlayer" data-arg-1="${esc(p.id)}" title="Excluir">${icon('trash-2')}</button>
       </td></tr>`;
   });
   tb.innerHTML = h;
+  if (ft) ft.textContent = players.length === 1 ? '1 atleta' : `${players.length} atletas`;
 }
 
 function showNewPlayerModal() {

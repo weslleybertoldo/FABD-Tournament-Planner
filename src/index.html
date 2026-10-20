@@ -161,20 +161,26 @@
 
         <!-- JOGADORES -->
         <div class="page" id="page-players">
-          <div class="toolbar">
-            <div class="search-box"><span class="search-icon">&#128269;</span><input type="text" placeholder="Buscar jogadores..." id="search-players" data-action="filterPlayers" data-event="input"></div>
-            <button class="btn btn-primary" data-action="showNewPlayerModal">&#10133; Novo Jogador</button>
-            <button class="btn btn-success" data-action="showImportModal">&#128228; Importar Planilha</button>
-            <button class="btn btn-secondary" data-action="downloadImportTemplate">&#128196; Baixar Modelo</button>
-            <button class="btn btn-secondary" data-action="exportPlayersCSV">&#128229; Exportar CSV</button>
-            <button class="btn btn-danger" data-action="deleteAllPlayers">&#128465; Excluir Todos</button>
+          <div class="pg-head">
+            <div><h1>Jogadores</h1><p>Atletas do torneio aberto no app. Cadastre um por um ou importe a planilha.</p></div>
+            <div class="pg-actions">
+              <button class="btn btn-secondary" data-action="showImportModal"><i data-icon="file-spreadsheet"></i>Importar planilha</button>
+              <button class="btn btn-secondary" data-action="downloadImportTemplate"><i data-icon="download"></i>Baixar modelo</button>
+              <button class="btn btn-secondary" data-action="exportPlayersCSV"><i data-icon="table-2"></i>Exportar CSV</button>
+              <button class="btn btn-secondary is-danger" data-action="deleteAllPlayers"><i data-icon="trash-2"></i>Excluir todos</button>
+              <button class="btn btn-primary" data-action="showNewPlayerModal"><i data-icon="user-plus"></i>Novo jogador</button>
+            </div>
           </div>
-          <div class="card">
+          <div class="toolbar">
+            <div class="search-box"><span class="search-icon"><i data-icon="search"></i></span><input type="text" placeholder="Buscar pelo nome, clube..." id="search-players" data-action="filterPlayers" data-event="input"></div>
+          </div>
+          <div class="cd">
             <div class="table-container">
-              <table><thead><tr><th>Nome</th><th>Genero</th><th>Data Nasc.</th><th>Categoria (auto)</th><th>Clube</th><th>Estado</th><th>Inscricoes</th><th>Acoes</th></tr></thead>
+              <table><thead><tr><th>Nome</th><th>Gênero</th><th>Nascimento</th><th>Categoria</th><th>Clube</th><th>Estado</th><th>Inscrições</th><th></th></tr></thead>
               <tbody id="players-table-body"></tbody></table>
             </div>
-            <div class="empty-state" id="players-empty"><div class="icon">&#128101;</div><h3>Nenhum jogador cadastrado</h3><p>Clique em "Novo Jogador" para adicionar</p></div>
+            <div class="empty-state" id="players-empty"><i data-icon="users" data-icon-class="i es-ic"></i><h3>Nenhum jogador cadastrado</h3><p>Clique em "Novo jogador" para adicionar</p></div>
+            <div class="tbl-foot" id="players-foot"></div>
           </div>
         </div>
 
