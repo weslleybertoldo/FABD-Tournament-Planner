@@ -706,36 +706,28 @@ function spinUp(id,max){ const el=document.getElementById(id); const v=parseInt(
 function spinDown(id,min){ const el=document.getElementById(id); const v=parseInt(el.value)||0; if(v>min)el.value=v-1; }
 
 // === OVERVIEW ===
+// Tela no layout novo: overview-ui.js (mesmos dados de antes)
 function updateOverview() {
-  document.getElementById('stat-tournaments').textContent = tournament ? '1' : '0';
-  document.getElementById('stat-players').textContent = players.length;
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   const tm = tournament?.matches?.length || 0;
   const done = (tournament?.matches||[]).filter(m=>isMatchDone(m)).length;
-  document.getElementById('stat-matches').textContent = tm;
+  setTxt('stat-tournaments', tournament ? '1' : '0');
+  setTxt('stat-players', players.length);
+  setTxt('stat-matches', done);
   // Calcular total de inscricoes arrecadadas
-  let totalArrecadado=0;
-  const valorPadrao=tournament?.valorInscricao||30;
-  players.forEach(p=>{
-    const catCount=(p.inscriptions||[]).length;
-    const valor=p.valorCategoria||valorPadrao;
-    const pStatus=p.pagamentoStatus||'pago';
-    if(pStatus==='pago')totalArrecadado+=catCount*valor;
-  });
-  const statActive=document.getElementById('stat-active');
-  if(statActive)statActive.textContent=`R$ ${totalArrecadado.toFixed(2)}`;
+  const fin = ovFinance(players, tournament?.valorInscricao||30);
+  setTxt('stat-active', ovMoney(fin.total));
+  const st = tournament ? shellStatus(tournament, Date.now()) : null;
+  setTxt('stat-tournaments-sub', st ? ({ live:'ao vivo agora', run:'em andamento', sched:'agendado', done:'finalizado', draft:'rascunho' })[st.kind] : 'nenhum ativo');
+  const inscritos = tournament ? shellCounts(tournament, players).entries : 0;
+  setTxt('stat-players-sub', tournament ? `${inscritos} inscrito${inscritos===1?'':'s'} no torneio` : '');
+  setTxt('stat-matches-sub', tournament ? `de ${tm} jogo${tm===1?'':'s'} do torneio` : '');
+  setTxt('stat-active-sub', fin.paid ? `${fin.paid} inscriç${fin.paid===1?'ão paga':'ões pagas'}` : '');
 
-  const c = document.getElementById('recent-tournaments');
-  if (!tournament) {
-    c.innerHTML = '<div class="empty-state"><div class="icon">&#127942;</div><h3>Nenhum torneio ativo</h3><p>Crie um novo torneio ou abra um backup</p></div>';
-    document.getElementById('breadcrumb').textContent = '';
-    renderShell();
-    return;
-  }
-  document.getElementById('breadcrumb').textContent = tournament.name;
-  c.innerHTML = `<table><tbody>
-    <tr><td><strong>${esc(tournament.name)}</strong></td><td>${fmtDate(tournament.startDate)} - ${fmtDate(tournament.endDate)}</td><td>${esc(tournament.location)||'-'}</td><td>${statusTag(tournament)}</td>
-    <td><button class="btn btn-sm btn-primary" data-action="navigateTo" data-arg-1="players">Gerenciar</button></td></tr>
-  </tbody></table>`;
+  renderOverviewRecent(tournament, players);
+  renderOverviewCourts(tournament);
+  renderOverviewNext(tournament);
+  document.getElementById('breadcrumb').textContent = tournament ? tournament.name : '';
   renderShell();
 }
 

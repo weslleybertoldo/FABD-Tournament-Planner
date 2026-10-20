@@ -109,30 +109,31 @@
       <div class="content">
         <!-- OVERVIEW -->
         <div class="page active" id="page-overview">
-          <div class="welcome-banner">
-            <img src="assets/logo-fabd.jpg" alt="FABD">
-            <div>
-              <h2>Bem-vindo ao Planejador de Torneios</h2>
-              <p>Gerencie torneios, jogadores, chaves e partidas da Federacao Alagoana de Badminton</p>
+          <div class="ov-kpis">
+            <div class="cd ov-kpi"><div class="ov-ib"><i data-icon="trophy"></i></div><div><div class="ov-vl" id="stat-tournaments">0</div><div class="ov-lb">Torneios</div><div class="ov-sb" id="stat-tournaments-sub"></div></div></div>
+            <div class="cd ov-kpi"><div class="ov-ib"><i data-icon="users"></i></div><div><div class="ov-vl" id="stat-players">0</div><div class="ov-lb">Jogadores cadastrados</div><div class="ov-sb" id="stat-players-sub"></div></div></div>
+            <div class="cd ov-kpi"><div class="ov-ib"><i data-icon="check-check"></i></div><div><div class="ov-vl" id="stat-matches">0</div><div class="ov-lb">Partidas realizadas</div><div class="ov-sb" id="stat-matches-sub"></div></div></div>
+            <div class="cd ov-kpi"><div class="ov-ib"><i data-icon="wallet"></i></div><div><div class="ov-vl" id="stat-active">R$ 0,00</div><div class="ov-lb">Inscrições arrecadadas</div><div class="ov-sb" id="stat-active-sub"></div></div></div>
+          </div>
+          <div class="ov-actions">
+            <div class="cd ov-action is-red" data-action="quickActionNewTournament"><span class="ov-ab"><i data-icon="plus"></i></span><div><b>Novo torneio</b><small>Categorias, dias e quadras</small></div></div>
+            <div class="cd ov-action" data-action="quickActionNewPlayer"><span class="ov-ab"><i data-icon="user-plus"></i></span><div><b>Novo jogador</b><small>Atleta e clube</small></div></div>
+            <div class="cd ov-action" data-action="navigateTo" data-arg-1="tournaments"><span class="ov-ab"><i data-icon="trophy"></i></span><div><b>Ver torneios</b><small>Abrir ou importar</small></div></div>
+            <div class="cd ov-action" data-action="navigateTo" data-arg-1="reports"><span class="ov-ab"><i data-icon="chart-column"></i></span><div><b>Relatórios</b><small>Súmulas e ordem de jogo</small></div></div>
+          </div>
+          <div class="ov-grid">
+            <div class="cd">
+              <div class="ch"><span class="bar3"></span><h3>Torneios recentes</h3><button type="button" class="ch-link" data-action="navigateTo" data-arg-1="tournaments">Ver todos</button></div>
+              <div id="recent-tournaments"></div>
+            </div>
+            <div class="cd">
+              <div class="ch"><span class="bar3"></span><h3>Agora nas quadras</h3><button type="button" class="ch-link" data-action="navigateTo" data-arg-1="matches">Abrir Partidas</button></div>
+              <div id="ov-courts"></div>
             </div>
           </div>
-          <div class="stats-grid">
-            <div class="stat-card"><div class="stat-value" id="stat-tournaments">0</div><div class="stat-label">Torneios</div></div>
-            <div class="stat-card red"><div class="stat-value" id="stat-players">0</div><div class="stat-label">Jogadores Cadastrados</div></div>
-            <div class="stat-card green"><div class="stat-value" id="stat-matches">0</div><div class="stat-label">Partidas Realizadas</div></div>
-            <div class="stat-card yellow"><div class="stat-value" id="stat-active" style="font-size:20px">R$ 0,00</div><div class="stat-label">Inscricoes Arrecadadas</div></div>
-          </div>
-          <div class="quick-actions">
-            <div class="quick-action" data-action="quickActionNewTournament"><div class="icon">&#10133;</div><div class="label">Novo Torneio</div></div>
-            <div class="quick-action" data-action="quickActionNewPlayer"><div class="icon">&#128100;</div><div class="label">Novo Jogador</div></div>
-            <div class="quick-action" data-action="navigateTo" data-arg-1="tournaments"><div class="icon">&#128196;</div><div class="label">Ver Torneios</div></div>
-            <div class="quick-action" data-action="navigateTo" data-arg-1="reports"><div class="icon">&#128200;</div><div class="label">Relatorios</div></div>
-          </div>
-          <div class="card">
-            <div class="card-header"><h3>Torneios Recentes</h3></div>
-            <div id="recent-tournaments">
-              <div class="empty-state"><div class="icon">&#127942;</div><h3>Nenhum torneio cadastrado</h3><p>Crie seu primeiro torneio para comecar</p></div>
-            </div>
+          <div class="cd">
+            <div class="ch"><span class="bar3"></span><h3>Próximos jogos</h3><span class="ch-mut" id="ov-next-sub"></span><button type="button" class="ch-link" data-action="navigateTo" data-arg-1="schedule">Abrir Agenda</button></div>
+            <div id="ov-next"></div>
           </div>
         </div>
 
@@ -1209,6 +1210,7 @@
   <script src="js/modules/update-bar.js"></script>
   <script src="js/modules/icons.js"></script>
   <script src="js/modules/shell.js"></script>
+  <script src="js/modules/overview-ui.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
