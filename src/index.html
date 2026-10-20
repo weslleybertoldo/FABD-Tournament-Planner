@@ -318,20 +318,20 @@
 
         <!-- AGENDA -->
         <div class="page" id="page-schedule">
-          <div class="empty-state" id="schedule-no-tournament"><div class="icon">&#128197;</div><h3>Nenhum torneio selecionado</h3><p>Selecione um torneio para gerenciar a agenda de quadras</p><button class="btn btn-primary" data-action="navigateTo" data-arg-1="tournaments">Ir para Torneios</button></div>
+          <div class="empty-state" id="schedule-no-tournament"><i data-icon="calendar-days" data-icon-class="i es-ic"></i><h3>Nenhum torneio selecionado</h3><p>Selecione um torneio para gerenciar a agenda de quadras</p><button class="btn btn-primary" data-action="navigateTo" data-arg-1="tournaments">Ir para Torneios</button></div>
           <div id="schedule-content" style="display:none">
             <div class="toolbar">
-              <button class="btn btn-secondary" data-action="renderSchedule">&#128260; Atualizar</button>
-              <button class="btn btn-secondary" data-action="regenerateSchedule" style="background:#F59E0B;color:#000;border-color:#F59E0B">&#128337; Regenerar Horarios</button>
-              <button class="btn btn-secondary" id="btn-schedule-validation" data-action="showScheduleValidation">&#9989; Validar programa&ccedil;&atilde;o</button>
-              <span id="schedule-info" style="font-size:13px;color:var(--fabd-gray-600)"></span>
+              <div class="seg" id="schedule-views"></div>
+              <span class="sch-info" id="schedule-info"></span>
+              <div class="sch-actions">
+                <button class="btn btn-secondary btn-sq" data-action="renderSchedule" title="Atualizar"><i data-icon="refresh-cw"></i></button>
+                <button class="btn btn-secondary" id="btn-schedule-validation" data-action="showScheduleValidation"><i data-icon="list-checks"></i>Validar programação</button>
+                <button class="btn btn-primary" data-action="regenerateSchedule"><i data-icon="clock"></i>Regenerar horários</button>
+              </div>
             </div>
             <div id="schedule-grid-container"></div>
-            <div style="margin-top:12px;display:flex;gap:16px;font-size:12px;color:var(--fabd-gray-600)">
-              <span><span style="display:inline-block;width:12px;height:12px;background:#DBEAFE;border-radius:2px;vertical-align:middle"></span> Pendente</span>
-              <span><span style="display:inline-block;width:12px;height:12px;background:#FFF3E0;border-radius:2px;vertical-align:middle"></span> Em Quadra</span>
-              <span><span style="display:inline-block;width:12px;height:12px;background:#D1FAE5;border-radius:2px;vertical-align:middle"></span> Finalizada</span>
-              <span><span style="display:inline-block;width:12px;height:12px;background:#FEE2E2;border-radius:2px;vertical-align:middle"></span> Pausa</span>
+            <div class="sch-legend">
+              <span><i class="lg is-pend"></i>Pendente</span><span><i class="lg is-live"></i>Em quadra</span><span><i class="lg is-done"></i>Finalizada</span><span><i class="lg is-tbd"></i>A definir</span><span><i class="lg is-pause"></i>Pausa</span>
             </div>
           </div>
         </div>
