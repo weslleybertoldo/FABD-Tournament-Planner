@@ -1164,162 +1164,110 @@ td.ro-empty { text-align: center; color: var(--mu); padding: 40px 20px; }
   text-align: center;
 }
 
-/* === PROGRESSO DO DIA (aba Partidas) === */
-.matches-progress {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
+/* === PARTIDAS (W20 parte 8): filtros, quadras, lista de jogos, finalizadas e árbitros === */
+#page-matches .toolbar .search-box { flex: 0 1 300px; min-width: 220px; }
+.mt-day-sel { position: relative; display: inline-flex; align-items: center; flex: none; margin: 0; }
+.mt-day-sel > i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: flex; color: #475569; pointer-events: none; }
+.mt-day-sel > i svg.i { width: 15px; height: 15px; }
+.mt-day-sel .sel-filter { height: 34px; border-radius: 999px; padding: 0 30px 0 34px; appearance: none; -webkit-appearance: none; background: #fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23334155' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>") no-repeat right 11px center / 14px; }
+.mt-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+.mt-chip { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--ln); background: #fff; font: inherit; font-size: 12.5px; font-weight: 600; color: #334155; cursor: pointer; white-space: nowrap; transition: var(--transition); }
+.mt-chip:hover { border-color: #C9D6EC; color: var(--nv); }
+.mt-chip em { font-style: normal; font-size: 11px; font-weight: 600; color: var(--mu); background: #F1F5F9; border-radius: 999px; padding: 0 7px; font-variant-numeric: tabular-nums; }
+.mt-chip.active { background: var(--nv); border-color: var(--nv); color: #fff; }
+.mt-chip.active em { background: rgba(255,255,255,0.18); color: #fff; }
+.mt-actions { margin-left: auto; display: flex; gap: 9px; }
 
-.mp-tile {
-  background: var(--fabd-white);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  border-top: 4px solid var(--fabd-blue);
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
+/* Quadras: o jogo em quadra de cada uma */
+.courts-panel { display: grid; gap: 12px; margin-bottom: 14px; }
+.qc { background: #fff; border: 1px solid var(--ln); border-radius: 12px; overflow: hidden; min-width: 0; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+.qc-h { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--nv); color: #fff; font-size: 12.5px; min-height: 36px; }
+.qc-h b { font-weight: 650; white-space: nowrap; }
+.qc-j { font-weight: 500; opacity: 0.8; white-space: nowrap; }
+.qc-lv, .qc-st { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border-radius: 5px; padding: 2px 6px; white-space: nowrap; }
+.qc-lv { background: var(--rd); color: #fff; }
+.qc-lv s { width: 5px; height: 5px; border-radius: 50%; background: #fff; }
+.qc-st { background: #E2E8F0; color: #475569; }
+.qc.is-free .qc-h { background: #F1F5F9; color: var(--nv); border-bottom: 1px solid var(--ln); }
+.qc-b { padding: 9px 12px 11px; min-width: 0; }
+.qc-ev { font-size: 11.5px; color: var(--mu); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qc-cx { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; margin-top: 6px; align-items: center; font-size: 12.5px; }
+.qc-cx b { font-size: 18px; font-weight: 700; color: var(--nv); font-variant-numeric: tabular-nums; line-height: 1.2; text-align: right; }
+.qc-ft { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; font-size: 11.5px; color: var(--mu); align-items: center; }
+.qc-ft i { font-style: normal; background: #EEF2F7; border-radius: 5px; padding: 0 6px; color: #334155; font-variant-numeric: tabular-nums; }
+.qc-empty { display: flex; align-items: center; justify-content: center; min-height: 86px; color: var(--mu2); font-size: 12.5px; font-style: italic; }
 
-.mp-tile.green { border-top-color: #10B981; }
-.mp-tile.yellow { border-top-color: #F59E0B; }
-.mp-tile.red { border-top-color: var(--fabd-red); }
+/* Lista de jogos: abas, progresso do dia e a tabela */
+.mt-card { overflow: hidden; }
+.mt-head { padding: 10px 16px; gap: 12px; flex-wrap: wrap; min-height: 50px; }
+.mt-tabs { display: flex; align-items: center; gap: 18px; }
+#matches-tabs .tab { padding: 4px 0; margin: 0; border: 0; font-size: 13px; font-weight: 500; color: var(--mu); white-space: nowrap; }
+#matches-tabs .tab:hover { color: var(--nv); }
+#matches-tabs .tab.active { font-size: 14.5px; font-weight: 650; color: var(--tx); }
+.mt-fc { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px 0; font-size: 12.5px; color: var(--mu); }
+.mt-fc-i { white-space: nowrap; }
+.mt-fc-i + .mt-fc-i::before { content: "·"; margin: 0 7px; color: var(--mu2); }
+.mt-fc-i b { color: var(--tx); font-weight: 650; }
+.mt-fc-i.is-late { color: #C81E1E; font-weight: 600; }
+.toolbar.mt-sub { margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--ln); }
+.toolbar.mt-sub .search-box { flex: 0 1 360px; }
 
-.mp-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--fabd-gray-600);
-}
-
-.mp-value { font-size: 26px; font-weight: 800; color: var(--fabd-blue); line-height: 1.15; }
-.mp-tile.green .mp-value { color: #059669; }
-.mp-tile.red .mp-value { color: var(--fabd-red); }
-.mp-value small { font-size: 15px; font-weight: 700; color: var(--fabd-gray-500); margin-left: 2px; }
-.mp-sub { font-size: 12px; color: var(--fabd-gray-600); }
-
-.mp-bar { height: 8px; border-radius: 4px; background: var(--fabd-gray-200); overflow: hidden; }
-.mp-bar > span { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #34D399, #059669); }
-
-.mp-days { display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 600; color: var(--fabd-gray-700); }
-.mp-days > div { display: flex; justify-content: space-between; gap: 8px; }
-.mp-days strong { color: var(--fabd-blue); font-size: 15px; }
-
-@media (max-width: 1100px) {
-  .matches-progress { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-/* === COURTS PANEL (aba Partidas) === */
-.courts-panel {
-  display: grid;
-  gap: 12px;
-  margin-bottom: 0;
-}
-
-.court-card {
-  background: var(--fabd-white);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-}
-
-.court-card-header {
-  padding: 10px 16px;
-  font-weight: 700;
-  font-size: 14px;
-  color: white;
-  background: var(--fabd-blue);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.court-card-header .court-status {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: rgba(255,255,255,0.2);
-}
-
-.court-card-header.active {
-  background: #10B981;
-}
-
-.court-card-header.finished {
-  background: var(--fabd-gray-500);
-}
-
-.court-card-body {
-  padding: 12px 16px;
-  min-height: 50px;
-}
-
-.court-card-body.empty {
-  color: var(--fabd-gray-400);
-  font-style: italic;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 60px;
-}
-
-.court-match {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--fabd-gray-200);
-}
-
-.court-match:last-child { border-bottom: none; }
-
-.court-match .match-num {
-  background: var(--fabd-gray-200);
-  color: var(--fabd-gray-700);
-  font-weight: 700;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  min-width: 28px;
-  text-align: center;
-}
-
-.court-match .match-players {
-  flex: 1;
-  font-weight: 600;
-}
-
-.court-match .match-draw {
-  font-size: 11px;
-  color: var(--fabd-gray-500);
-}
-
-.court-match .match-score {
-  font-weight: 700;
-  color: var(--fabd-blue);
-  font-size: 12px;
-}
-
-.court-match.playing {
-  background: #FEF3C7;
-  border-radius: 4px;
-  padding: 6px 8px;
-  margin: 2px -8px;
-}
-
-.court-match.done {
-  opacity: 0.5;
-}
+.mt-tbl td { padding: 8px 12px; }
+.mt-tbl th { padding: 9px 12px; }
+.mt-tbl tr.mt-row.is-live td { background: #FFF7F7; }
+.mt-tbl tr.mt-row.is-live td:first-child { box-shadow: inset 3px 0 0 var(--rd); }
+.mt-tbl tr.mt-row.is-tbd td { color: var(--mu); }
+.mt-tbl tr.mt-row.is-tbd .mt-draw b { color: var(--mu); }
+td.mt-num { font-weight: 700; color: var(--nv); white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.mt-time, td.mt-t { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mt-time small, .mt-draw small { display: block; font-size: 11.5px; color: var(--mu); margin-top: 1px; white-space: nowrap; }
+.mt-tbl.is-one-day .mt-day { display: none; }
+.mt-draw b { display: block; font-weight: 600; color: var(--tx); white-space: nowrap; }
+.mt-pl { min-width: 0; max-width: 230px; line-height: 1.4; }
+.mt-pl .mt-nm { display: flex; align-items: center; gap: 4px; width: fit-content; max-width: 100%; }
+.mt-pl.is-win { font-weight: 650; color: var(--nv); }
+.mt-pl.is-tbd { color: var(--mu); font-style: italic; }
+.mt-sep { display: none; }
+.mt-nm.is-court, .mt-nm.is-absent, .mt-nm.is-rest { border-radius: 5px; padding: 0 5px; margin: 1px 0 1px -5px; }
+.mt-nm.is-court { background: #FEF3C7; }
+.mt-nm.is-absent { background: #FDECEC; }
+.mt-nm.is-rest { background: #EAF0FA; }
+.mt-flag { display: inline-flex; align-items: center; gap: 3px; cursor: help; flex: none; white-space: nowrap; }
+.mt-flag svg.i { width: 14px; height: 14px; }
+.mt-nm.is-court .mt-flag { color: #D97706; }
+.mt-nm.is-absent .mt-flag { color: #C81E1E; }
+.mt-nm.is-rest .mt-flag { color: var(--bl); font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mt-sc { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.mt-sc b { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--nv); font-variant-numeric: tabular-nums; }
+.mt-sc.is-live b { color: var(--rd); }
+.mt-ld { width: 7px; height: 7px; border-radius: 50%; background: var(--rd); box-shadow: 0 0 0 3px #FDE2E2; display: inline-block; }
+.mt-gm { display: inline-flex; gap: 4px; }
+.mt-gm i { font-style: normal; font-size: 11.5px; background: #EEF2F7; border-radius: 5px; padding: 1px 6px; color: #334155; font-variant-numeric: tabular-nums; }
+.mt-gm i.g { background: none; color: var(--mu); padding: 1px 0; }
+.mt-x { color: var(--mu2); }
+.mt-res { font-weight: 700; font-size: 12px; white-space: nowrap; }
+.mt-res.is-red { color: #C81E1E; }
+.mt-sc-txt { font-weight: 600; white-space: nowrap; color: #334155; }
+.sel-line { appearance: none; -webkit-appearance: none; border: 0; border-bottom: 1px dashed #CBD5E1; border-radius: 0; background: transparent url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>") no-repeat right 0 center / 13px; padding: 2px 17px 2px 0; font: inherit; font-size: 13px; color: var(--tx); cursor: pointer; max-width: 150px; text-overflow: ellipsis; field-sizing: content; }
+.sel-line:hover { border-bottom-color: #94A3B8; }
+.sel-line:focus { outline: none; border-bottom: 1px solid var(--bl); }
+.pill.mt-st s { display: block; }
+.pill.mt-st.is-pend { background: #EAF0FA; color: var(--bl); }
+.pill.mt-st.is-live { background: var(--rd); color: #fff; }
+.pill.mt-st.is-done { background: #E8F6EE; color: #0B7A43; }
+.pill.mt-st.is-tbd { background: #F1F5F9; color: var(--mu); }
+.pill.mt-st.is-red { background: #FDECEC; color: #C81E1E; }
+.pill.mt-st.is-warn { background: #FEF3C7; color: #92400E; }
+.pill.mt-st.is-gray { background: #F1F5F9; color: var(--mu); }
+.btn-soft svg.i { width: 14px; height: 14px; }
+.btn-soft.is-gray { color: #475569; background: #F1F5F9; }
+.btn-soft.is-gray:hover { background: #E2E8F0; }
+.mt-tbl tr.court-free-row td { background: var(--sb); padding-top: 6px; padding-bottom: 6px; }
+.mt-tbl tr.court-free-row .mt-time { color: var(--mu2); font-size: 12px; }
+td.mt-free { color: var(--mu2); font-size: 12px; font-style: italic; }
+.mt-tbl tr.mt-empty td, .mt-tbl tr.mt-none td { text-align: center; color: var(--mu); padding: 36px 16px; }
+td.mt-ump { font-weight: 650; white-space: nowrap; }
+td.mt-ump-list { font-size: 12px; color: var(--mu); }
 
 /* === SCHEDULE GRID === */
 .schedule-grid {
