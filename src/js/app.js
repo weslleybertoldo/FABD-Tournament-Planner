@@ -1159,13 +1159,26 @@ function renderRoster() {
   if (!tournament) return;
   const tb = document.getElementById('roster-table-body');
   const entries = tournament.entries || [];
-  if (!entries.length) { tb.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--fabd-gray-500);padding:40px">Nenhum inscrito. Adicione categorias nos jogadores.</td></tr>`; return; }
+  const filterCat = document.getElementById('roster-cat-filter')?.value || '';
+  // Layout novo (W20 parte 5): contagem em cada modalidade (com a categoria escolhida)
+  // e o resumo do lado; a lista e as ações são as de sempre.
+  const naCat = entries.filter(e => !filterCat || e.category === filterCat);
+  document.querySelectorAll('#roster-tabs [data-n]').forEach(n => {
+    n.textContent = n.dataset.n ? naCat.filter(e => e.events.includes(n.dataset.n)).length : naCat.length;
+  });
+  const sum = document.getElementById('roster-summary');
+  if (sum) {
+    const atletas = new Set(entries.map(e => e.playerId || e.playerName)).size;
+    const presentes = entries.filter(e => e.status === 'presente').length;
+    sum.textContent = entries.length ? `${atletas} atletas · ${entries.length} inscrições · ${presentes} com check-in` : '';
+  }
+  if (!entries.length) { tb.innerHTML = `<tr><td colspan="7" class="ro-empty">Nenhum inscrito. Adicione categorias nos jogadores.</td></tr>`; return; }
 
   // Filtro ativo
   const activeTab = document.querySelector('#roster-tabs .tab.active');
   const filterMod = activeTab?.dataset?.mod || '';
-  const filterCat = document.getElementById('roster-cat-filter')?.value || '';
 
+  const rot = { inscrito:'Inscrito', confirmado:'Confirmado', presente:'Presente', ausente:'Ausente' };
   let h = '';
   let count = 0;
   entries.forEach((e, i) => {
@@ -1174,22 +1187,23 @@ function renderRoster() {
     count++;
     const partner = e.partner ? players.find(p=>p.id===e.partner) : null;
     const partnerName = partner ? `${partner.firstName} ${partner.lastName}` : '';
-    const st = { inscrito:'tag-gray', confirmado:'tag-green', presente:'tag-blue', ausente:'tag-red' };
+    const sexo = { M:'Masculino', F:'Feminino' }[players.find(p=>p.id===e.playerId)?.gender] || '';
+    const sub = [esc(e.category), sexo].filter(Boolean).join(' · ');
     h += `<tr>
-      <td>${count}</td>
-      <td><strong>${esc(e.playerName)}</strong>${partnerName ? '<br><small style="color:var(--fabd-gray-500)">Dupla: '+esc(partnerName)+'</small>':''}${e.substituiu ? '<br><small style="color:var(--fabd-gray-500)">no lugar de '+esc(e.substituiu)+'</small>':''}</td>
-      <td>${esc(e.club)||'-'}</td>
-      <td><span class="tag tag-blue">${esc(e.key)}</span></td>
-      <td><span class="tag ${st[e.status]||'tag-gray'}">${esc(e.status)}</span></td>
-      <td><select class="form-control" style="width:110px;padding:2px 4px;font-size:11px" data-action="updateEntryStatus" data-event="change" data-arg-1="${i}" data-arg-2="$value">
+      <td class="num ro-n">${count}</td>
+      <td><div class="pl-name"><span class="pl-av" data-ini="${esc(shellInitials(e.playerName))}"></span><div><b>${esc(e.playerName)}</b><small class="ro-sub">${sub}${e.substituiu ? (sub?' · ':'')+'no lugar de '+esc(e.substituiu) : ''}</small></div></div></td>
+      <td${e.club?'':' class="pl-mut"'}>${esc(e.club)||'Sem clube'}</td>
+      <td><span class="ro-ev"><b>${esc(e.key)}</b>${partnerName ? ' c/ '+esc(partnerName) : ''}</span></td>
+      <td><span class="pill ro-st is-${esc(e.status)}"><s></s>${rot[e.status]||esc(e.status)}</span></td>
+      <td><select class="sel-mini" data-action="updateEntryStatus" data-event="change" data-arg-1="${i}" data-arg-2="$value" title="Check-in">
         <option value="inscrito"${e.status==='inscrito'?' selected':''}>Inscrito</option>
         <option value="confirmado"${e.status==='confirmado'?' selected':''}>Confirmado</option>
         <option value="presente"${e.status==='presente'?' selected':''}>Presente</option>
         <option value="ausente"${e.status==='ausente'?' selected':''}>Ausente</option>
       </select></td>
-      <td><button class="btn btn-sm btn-secondary" data-action="showSwapAthlete" data-arg-1="${i}" title="Trocar o atleta desta inscrição">&#8644; Trocar</button></td></tr>`;
+      <td class="acts"><button class="btn-soft" data-action="showSwapAthlete" data-arg-1="${i}" title="Trocar o atleta desta inscrição">${icon('arrow-left-right')}Trocar</button></td></tr>`;
   });
-  if (!count) h = `<tr><td colspan="7" style="text-align:center;color:var(--fabd-gray-500);padding:20px">Nenhum inscrito nesta categoria</td></tr>`;
+  if (!count) h = `<tr><td colspan="7" class="ro-empty">Nenhum inscrito nesta categoria</td></tr>`;
   tb.innerHTML = h;
 }
 
