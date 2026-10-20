@@ -167,12 +167,12 @@ async function authSendCode() {
   const msgEl = document.getElementById('auth-email-msg');
   const btnEl = document.getElementById('auth-send-btn');
   const email = (emailEl.value || '').trim().toLowerCase();
-  if (!email || !email.includes('@')) { msgEl.textContent = 'Informe um email valido'; return; }
+  if (!email || !email.includes('@')) { msgEl.textContent = 'Informe um e-mail válido'; return; }
   msgEl.style.color = '#94A3B8'; msgEl.textContent = 'Enviando...';
   btnEl.disabled = true;
   try {
     const res = await window.api.authSendOtp(email);
-    if (!res.ok) { msgEl.style.color = '#EF4444'; msgEl.textContent = res.error || 'Falhou ao enviar codigo'; btnEl.disabled = false; return; }
+    if (!res.ok) { msgEl.style.color = '#EF4444'; msgEl.textContent = res.error || 'Falhou ao enviar o código'; btnEl.disabled = false; return; }
     _authState.email = email;
     document.getElementById('auth-email-shown').textContent = email;
     document.getElementById('auth-step-email').style.display = 'none';
@@ -187,12 +187,12 @@ async function authVerifyCode() {
   const msgEl = document.getElementById('auth-code-msg');
   const btnEl = document.getElementById('auth-verify-btn');
   const token = (codeEl.value || '').trim();
-  if (!/^\d{6}$/.test(token)) { msgEl.style.color = '#EF4444'; msgEl.textContent = 'Codigo deve ter 6 digitos'; return; }
+  if (!/^\d{6}$/.test(token)) { msgEl.style.color = '#EF4444'; msgEl.textContent = 'O código tem 6 dígitos'; return; }
   msgEl.style.color = '#94A3B8'; msgEl.textContent = 'Verificando...';
   btnEl.disabled = true;
   try {
     const res = await window.api.authVerifyOtp(_authState.email, token);
-    if (!res.ok) { msgEl.style.color = '#EF4444'; msgEl.textContent = res.error || 'Codigo invalido'; btnEl.disabled = false; return; }
+    if (!res.ok) { msgEl.style.color = '#EF4444'; msgEl.textContent = res.error || 'Código inválido'; btnEl.disabled = false; return; }
     msgEl.style.color = '#10B981'; msgEl.textContent = 'Sucesso! Carregando...';
     hideAuthOverlay();
     showOrganizerBadge(await window.api.authStatus());
@@ -556,10 +556,10 @@ async function checkAutoUpdate(){
       const txt=document.getElementById('update-bar-text');
       const btn=document.getElementById('update-bar-btn');
       if(bar&&txt){
-        txt.textContent='Nova versao disponivel: v'+latestVersion;
+        txt.textContent='Nova versão disponível: v'+latestVersion;
         if(baixar.url&&btn){
           btn.onclick=()=>window.api.openExternal(baixar.url);
-          btn.style.display='inline-block';
+          btn.style.display='';
         } else if(btn){ btn.style.display='none'; }
         bar.style.display='flex';
       }
@@ -780,7 +780,7 @@ function openNewTournamentForm() {
   document.getElementById('t-city').value = 'Maceio - AL';
   document.getElementById('t-courts').value = '4';
   ['t-ev-sm','t-ev-sf','t-ev-dm','t-ev-df','t-ev-mx'].forEach(id=>{ const e=document.getElementById(id); if(e) e.checked=true; });
-  document.getElementById('modal-tournament-title').textContent = 'Novo Torneio';
+  document.getElementById('modal-tournament-title').textContent = 'Novo torneio';
   openModal('modal-tournament');
   requestAnimationFrame(()=>document.getElementById('t-name')?.focus());
 }
@@ -1306,11 +1306,11 @@ function showSwapAthlete(idx) {
   if (!e) return;
   _swapEntryIdx = idx;
   const dbl = swapIsDouble(e.key);
-  document.getElementById('swap-title').innerHTML = `&#8644; Trocar atleta — ${esc(e.key)}`;
+  document.getElementById('swap-title').textContent = `Trocar atleta — ${e.key}`;
   const ids = [e.playerId, dbl ? e.partner : ''].filter(Boolean);
   document.getElementById('swap-out').innerHTML = ids.map((id, n) => {
     const p = players.find(x => x.id === id);
-    return `<label style="display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;font-weight:400"><input type="radio" name="swap-out" value="${esc(id)}"${n === 0 ? ' checked' : ''} data-action="onSwapOutChange" data-event="change"> ${esc(swapName(p))}${dbl ? ` <small style="color:var(--fabd-gray-500)">Parceiro ${n + 1}</small>` : ''}</label>`;
+    return `<label class="radio-line"><input type="radio" name="swap-out" value="${esc(id)}"${n === 0 ? ' checked' : ''} data-action="onSwapOutChange" data-event="change"> ${esc(swapName(p))}${dbl ? ` <small>Parceiro ${n + 1}</small>` : ''}</label>`;
   }).join('');
   onSwapOutChange();
   openModal('modal-swap-athlete');
@@ -1331,9 +1331,9 @@ function onSwapOutChange() {
 // Jogos pendentes (Chave, Rodada, Dia, Hora, Situacao) nas 2 listas da janela
 function _swapMatchTable(list) {
   const rows = list.filter(m => !isMatchDone(m));
-  if (!rows.length) return '<p style="font-size:12px;color:var(--fabd-gray-500);margin:4px 0">Nenhum jogo pendente.</p>';
+  if (!rows.length) return '<p class="muted-sm">Nenhum jogo pendente.</p>';
   const day = m => { const d = getMatchDay(m); if (!d?.date) return '-'; const o = new Date(d.date + 'T00:00:00'); return `${String(o.getDate()).padStart(2, '0')}/${String(o.getMonth() + 1).padStart(2, '0')}`; };
-  return `<table style="font-size:12px"><thead><tr><th>Chave</th><th>Rodada</th><th>Dia</th><th>Hora</th><th>Situação</th></tr></thead><tbody>${rows.map(m =>
+  return `<table class="mini-tbl"><thead><tr><th>Chave</th><th>Rodada</th><th>Dia</th><th>Hora</th><th>Situação</th></tr></thead><tbody>${rows.map(m =>
     `<tr><td>${esc(m.drawName)}</td><td>${esc(m.roundName || 'R' + m.round)}</td><td>${day(m)}</td><td>${esc(m.time) || '-'}</td><td>${esc(resultStatusLabel(m.status))}</td></tr>`).join('')}</tbody></table>`;
 }
 
@@ -1348,9 +1348,9 @@ function renderSwapAthlete() {
   document.getElementById('swap-mine-title').textContent = dbl ? 'Jogos da dupla' : `Jogos de ${swapName(outP)}`;
   document.getElementById('swap-mine').innerHTML = _swapMatchTable(swapLineMatches(tournament.matches, e.key, label));
   document.getElementById('swap-his-title').textContent = inP ? `Jogos de ${swapName(inP)}` : 'Jogos de quem entra';
-  document.getElementById('swap-his').innerHTML = inP ? _swapMatchTable(swapAthleteMatches(tournament.matches, swapName(inP))) : '<p style="font-size:12px;color:var(--fabd-gray-500);margin:4px 0">Escolha quem entra.</p>';
+  document.getElementById('swap-his').innerHTML = inP ? _swapMatchTable(swapAthleteMatches(tournament.matches, swapName(inP))) : '<p class="muted-sm">Escolha quem entra.</p>';
   const probs = swapProblems(tournament, players, { key: e.key, outId, inId }, _swapDayOf);
-  document.getElementById('swap-problems').innerHTML = probs.map(t => `<div style="background:#FEF3C7;border:1px solid #F59E0B;color:#92400E;border-radius:6px;padding:8px 10px;font-size:13px;margin-top:8px">&#9888; ${esc(t)}</div>`).join('');
+  document.getElementById('swap-problems').innerHTML = probs.map(t => `<div class="note is-warn" style="margin-top:8px">${icon('triangle-alert')}<span>${esc(t)}</span></div>`).join('');
   document.getElementById('swap-ok').disabled = !inP || probs.length > 0;
 }
 
@@ -2939,7 +2939,7 @@ async function saveScore() {
 
 // Editar jogo finalizado (lapis da aba Finalizadas): placar, arbitro e quadra.
 // O vencedor nao muda por aqui: trocar o vencedor mexe em quem avancou na
-// chave, e isso continua pelo desfazer (↻) + placar novo.
+// chave, e isso continua pelo Desfazer + placar novo.
 let editingMatchIdx=null;
 const _isSpecialScore=m=>!matchSetsText(m)||m.status==='WO'||m.status==='SemJogo';
 function showEditFinishedModal(idx){
@@ -2958,8 +2958,8 @@ function showEditFinishedModal(idx){
   }
   document.getElementById('edit-sets-container').innerHTML=h;
   document.getElementById('edit-sets-note').textContent=special
-    ?`${resultText(m)||'-'}: aqui da pra trocar so a quadra e o arbitro.`
-    :'O vencedor nao muda por aqui. Pra trocar o vencedor, use o desfazer (↻) e lance o placar de novo.';
+    ?`${resultText(m)||'-'}: aqui dá pra trocar só a quadra e o árbitro.`
+    :'O vencedor não muda por aqui. Pra trocar o vencedor, use o Desfazer e lance o placar de novo.';
   document.getElementById('edit-court').innerHTML=`<option value="">-</option>${getCourtOptions(m.court)}`;
   document.getElementById('edit-umpire').innerHTML=`<option value="">-</option>${getUmpireOptions(m.umpire)}`;
   openModal('modal-edit-finished');
@@ -2984,7 +2984,7 @@ async function saveEditFinished(){
       if(m.status==='Finalizada'){
         const newWinner=w1>w2?1:w2>w1?2:0;
         if(!newWinner){alert('O placar precisa ter um vencedor.');return;}
-        if(newWinner!==m.winner){alert('Esse placar troca o vencedor. Pra trocar o vencedor, use o desfazer (↻) e lance o placar de novo.');return;}
+        if(newWinner!==m.winner){alert('Esse placar troca o vencedor. Pra trocar o vencedor, use o Desfazer e lance o placar de novo.');return;}
       }
       m.score=scores.join(' / ');
     }
@@ -3178,9 +3178,9 @@ function wizUpdateEventInfo() {
   if(wizHasProfile){
     const autoType=getDrawTypeForCount(tournament,count);
     const profile=gameProfiles.find(p=>p.id===tournament.gameProfileId);
-    if(autoType&&profile)info+=`<br><br><div style="background:#D1FAE5;padding:10px;border-radius:6px;color:#065F46"><strong>&#10003; Sistema: ${esc(autoType)}</strong> (perfil: ${esc(profile.name)})</div>`;
+    if(autoType&&profile)info+=`<div class="note is-ok">${icon('circle-check')}<span><strong>Sistema: ${esc(autoType)}</strong> (perfil: ${esc(profile.name)})</span></div>`;
   } else if(count>=2) {
-    info+=`<br><br><div style="background:#FEF3C7;padding:10px;border-radius:6px;color:#92400E">&#9888; Sem sistema configurado. Escolha no proximo passo.</div>`;
+    info+=`<div class="note is-warn">${icon('triangle-alert')}<span>Sem sistema configurado. Escolha no pr&oacute;ximo passo.</span></div>`;
   }
   document.getElementById('wiz-event-info').innerHTML=info;
 }
@@ -3207,7 +3207,7 @@ function wizUpdateSummary() {
   if(type==='Eliminatoria')det=`Tamanho: ${document.getElementById('wiz-draw-size').value}`;
   else if(type==='Todos contra Todos'){const key=`${mod.value} ${cat.value}`;const c=players.filter(p=>(p.inscriptions||[]).some(i=>i.key===key)).length;det=`${c} jogadores, ${c*(c-1)/2} partidas`;}
   else det=`${document.getElementById('wiz-num-groups').value} grupos, ${document.getElementById('wiz-qualifiers').value} classificados/grupo`;
-  const pi=wizHasProfile?'<br><span style="color:#10B981">&#10003; Sistema automatico</span>':'';
+  const pi=wizHasProfile?`<br><span class="wiz-auto">${icon('circle-check')} Sistema autom&aacute;tico</span>`:'';
   document.getElementById('wiz-summary').innerHTML=`<strong>Nome:</strong> ${esc(name)}<br><strong>Tipo:</strong> ${esc(type)}${pi}<br><strong>Detalhes:</strong> ${det}<br><strong>Seeds:</strong> ${seeds}`;
 }
 
@@ -4091,7 +4091,8 @@ function computeRoundRobinRanking(d){
 }
 
 // === TOAST ===
-function showToast(msg,type='success'){document.querySelectorAll('.toast').forEach(t=>t.remove());const c={success:{bg:'#D1FAE5',b:'#10B981',c:'#065F46',i:'&#10003;'},error:{bg:'#FEE2E2',b:'#EF4444',c:'#991B1B',i:'&#10007;'},warning:{bg:'#FEF3C7',b:'#F59E0B',c:'#92400E',i:'&#9888;'},info:{bg:'#DBEAFE',b:'#3B82F6',c:'#1E3A8A',i:'&#8505;'}}[type]||{bg:'#D1FAE5',b:'#10B981',c:'#065F46',i:'&#10003;'};const t=document.createElement('div');t.className='toast';t.style.cssText=`position:fixed;bottom:24px;right:24px;z-index:999;padding:12px 20px;border-radius:8px;background:${c.bg};border:1px solid ${c.b};color:${c.c};font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:400px;display:flex;align-items:center;gap:8px;`;t.innerHTML=`<span>${c.i}</span> ${esc(msg)}`;document.body.appendChild(t);setTimeout(()=>{if(t.parentNode)t.remove();},4000);}
+const TOAST_ICONS={success:'circle-check',error:'circle-x',warning:'triangle-alert',info:'info'};
+function showToast(msg,type='success'){document.querySelectorAll('.toast').forEach(t=>t.remove());const k=TOAST_ICONS[type]?type:'success';const t=document.createElement('div');t.className='toast is-'+k;t.setAttribute('role','status');t.innerHTML=`<span class="toast-ic">${icon(TOAST_ICONS[k])}</span><span class="toast-tx">${esc(msg)}</span>`;document.body.appendChild(t);setTimeout(()=>{if(t.parentNode)t.remove();},4000);}
 
 // === HELPERS ===
 function openModal(id){const el=document.getElementById(id);if(!el)return;el.classList.add('active');setTimeout(()=>{const f=el.querySelector('select,input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([readonly])');if(f)f.focus();},50);}
@@ -4262,19 +4263,22 @@ function _showUpdateToast() {
   if (!el) {
     el = document.createElement('div');
     el.id = 'update-modal';
+    el.className = 'upd-toast';
     el.setAttribute('role', 'status');
-    el.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99998;max-width:380px;width:92%;background:#fff;border:1px solid #BFDBFE;border-radius:14px;padding:16px;box-shadow:0 12px 40px rgba(15,23,42,.25)';
     document.body.appendChild(el);
   }
   const v = _updateInfo?.version || '?';
   el.innerHTML = `
-    <p style="margin:0 0 4px;color:#065F46;font-weight:700">Atualiza&ccedil;&atilde;o v${esc(String(v))} baixada</p>
-    <p style="margin:0 0 12px;color:#475569;font-size:13px">Reiniciar agora? O app fecha, instala sozinho e abre de novo. Se preferir, ela entra quando voc&ecirc; fechar o app.</p>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-secondary" data-action="updaterDeclineInstall">Depois</button>
-      <button class="btn btn-primary" data-action="updaterInstallNow">Reiniciar agora</button>
+    <span class="upd-toast-ic">${icon('download')}</span>
+    <div class="upd-toast-tx">
+      <b>Atualiza&ccedil;&atilde;o v${esc(String(v))} baixada</b>
+      <p>Reiniciar agora? O app fecha, instala sozinho e abre de novo. Se preferir, ela entra quando voc&ecirc; fechar o app.</p>
+      <div class="upd-toast-bts">
+        <button class="btn btn-secondary btn-sm" data-action="updaterDeclineInstall">Depois</button>
+        <button class="btn btn-primary btn-sm" data-action="updaterInstallNow">${icon('refresh-cw')} Reiniciar agora</button>
+      </div>
     </div>`;
-  el.style.display = 'block';
+  el.style.display = 'flex';
 }
 function _hideUpdateToast() {
   const el = document.getElementById('update-modal');

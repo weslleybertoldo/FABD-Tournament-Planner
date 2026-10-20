@@ -61,8 +61,8 @@ function setRanges(ranges){
         <span style="font-size:12px;font-weight:600;color:#64748B">&rarr;</span>
         <select class="form-control range-type" style="font-weight:600">
           <option value="Todos contra Todos"${r.type==='Todos contra Todos'?' selected':''}>Todos contra Todos</option>
-          <option value="Grupos + Eliminatoria"${r.type==='Grupos + Eliminatoria'?' selected':''}>Grupos + Eliminatoria</option>
-          <option value="Eliminatoria"${r.type==='Eliminatoria'?' selected':''}>Eliminatoria (mata-mata)</option>
+          <option value="Grupos + Eliminatoria"${r.type==='Grupos + Eliminatoria'?' selected':''}>Grupos + eliminatória</option>
+          <option value="Eliminatoria"${r.type==='Eliminatoria'?' selected':''}>Eliminatória (mata-mata)</option>
         </select>
       </div>
       <div style="display:flex;align-items:center"><button class="btn btn-sm btn-danger" data-action="removeRange" data-arg-1="${i}" title="Remover faixa">&times;</button></div>
@@ -185,7 +185,7 @@ function renderScoringTables(){
 }
 
 function addScoringTable(){
-  document.getElementById('st-modal-title').textContent='Novo Ranking';
+  document.getElementById('st-modal-title').textContent='Novo ranking';
   document.getElementById('st-id').value='';
   document.getElementById('st-name').value='';
   SCORING_BUCKETS.forEach(b=>{const i=document.getElementById('st-'+b.key);if(i)i.value=DEFAULT_SCORING_TABLE.points[b.key];});
@@ -195,7 +195,7 @@ function addScoringTable(){
 
 function editScoringTable(id){
   const t=scoringTables.find(x=>x.id===id);if(!t)return;
-  document.getElementById('st-modal-title').textContent=t.isDefault?'Editar Ranking (Padrão)':'Editar Ranking';
+  document.getElementById('st-modal-title').textContent=t.isDefault?'Editar ranking (padrão)':'Editar ranking';
   document.getElementById('st-id').value=t.id;
   document.getElementById('st-name').value=t.name;
   document.getElementById('st-name').disabled=!!t.isDefault;

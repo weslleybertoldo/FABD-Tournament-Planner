@@ -64,7 +64,7 @@ function showNewPlayerModal() {
   document.getElementById('p-gender').value = '';
   document.getElementById('p-state').value = 'AL';
   document.getElementById('p-autocat').textContent = '-';
-  document.getElementById('modal-player-title').textContent = 'Novo Jogador';
+  document.getElementById('modal-player-title').textContent = 'Novo jogador';
   // Sempre abrir na aba Dados (categorias renderizadas sob demanda ao clicar na aba)
   document.querySelectorAll('#player-tabs .tab').forEach((t,i)=>t.classList.toggle('active',i===0));
   document.getElementById('p-tab-dados').style.display='';
@@ -91,7 +91,7 @@ function editPlayer(id) {
   document.getElementById('p-phone').value = p.phone||'';
   document.getElementById('p-email').value = p.email||'';
   document.getElementById('p-autocat').textContent = calculateCategory(p.dob);
-  document.getElementById('modal-player-title').textContent = 'Editar Jogador';
+  document.getElementById('modal-player-title').textContent = 'Editar jogador';
   // Sempre abrir na aba Dados e limpar categorias antigas
   document.querySelectorAll('#player-tabs .tab').forEach((t,i)=>t.classList.toggle('active',i===0));
   document.getElementById('p-tab-dados').style.display='';
